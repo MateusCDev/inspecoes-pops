@@ -32,7 +32,7 @@ function sheet_() {
   if (!sheet) sheet = book.insertSheet(DESTINATION_SHEET);
   if (sheet.getMaxColumns() < expected.length) sheet.insertColumnsAfter(sheet.getMaxColumns(), expected.length-sheet.getMaxColumns());
   if (sheet.getLastRow() === 0) {
-    sheet.getRange(1,1,1,expected.length).setValues([expected]).setFontWeight('bold').setBackground('#17365d').setFontColor('#ffffff');
+    sheet.getRange(1,1,1,expected.length).setValues([expected]).setFontWeight('bold').setBackground('#ebebeb').setFontColor('#000000');
     sheet.setFrozenRows(1); sheet.setColumnWidths(1,expected.length,160);
     sheet.getRange(1,1,1,expected.length).createFilter();
   }
@@ -66,6 +66,7 @@ function row_(r, result, operator, hash) {
 }
 function validate_(r) {
   if (!r || !/^INSP-[A-Za-z0-9-]+$/.test(r.id||'') || !r.nome?.trim() || !r.inspetor?.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(r.data||'') || !r.finalizedAt || !r.updated) throw Error('Inspeção incompleta.');
+  if (!Number.isFinite(Date.parse(r.updated)) || !Number.isFinite(Date.parse(r.finalizedAt))) throw Error('Datas de atualização/finalização inválidas.');
   if (!Array.isArray(r.photos) || !Array.isArray(r.photoFiles) || r.photos.length !== r.photoFiles.length || r.photos.length > 100) throw Error('Fotografias incompletas ou limite de 100 fotos excedido.');
   const ids = new Set();
   r.photoFiles.forEach(p => {
@@ -76,7 +77,11 @@ function validate_(r) {
 function addObject_(body, heading, value) {
   if (!value || (typeof value === 'object' && !Object.keys(value).length)) return;
   body.appendParagraph(heading).setHeading(DocumentApp.ParagraphHeading.HEADING2);
-  body.appendParagraph(typeof value === 'string' ? value : JSON.stringify(value,null,2));
+  if (typeof value !== 'object') {body.appendParagraph(String(value)); return;}
+  if (Array.isArray(value)) {value.forEach((item,i)=>addObject_(body,heading+' — '+(i+1),item)); return;}
+  const scalar = Object.entries(value).filter(([,v])=>v === null || typeof v !== 'object').map(([k,v])=>[k,String(v??'')]);
+  if (scalar.length) body.appendTable(scalar);
+  Object.entries(value).filter(([,v])=>v && typeof v === 'object').forEach(([k,v])=>addObject_(body,k,v));
 }
 function createPdf_(r, folder, name) {
   const doc = DocumentApp.create(name);
@@ -157,7 +162,8 @@ function doPost(e) {
     const target = existing || sheet.getLastRow()+1;
     if (target > sheet.getMaxRows()) sheet.insertRowsAfter(sheet.getMaxRows(),100);
     sheet.getRange(target,1,1,headers.length).setValues([row_(r,result,operator,hash)]);
-    SpreadsheetApp.flush(); committed = true;
+    // Após setValues, preservar arquivos mesmo se flush falhar: a escrita pode já ter persistido.
+    committed = true; SpreadsheetApp.flush();
     return reply_(result);
   } catch (error) {
     if (!committed) created.forEach(file=>{try{file.setTrashed(true);}catch(_){}});

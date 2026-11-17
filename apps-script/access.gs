@@ -10,7 +10,7 @@ function requirePrivateData_() {
   }
 }
 function accessSheet_() {
-  const book = SpreadsheetApp.openById(config_().ACCESS_SPREADSHEET_ID);
+  const book = book_(config_().ACCESS_SPREADSHEET_ID);
   const sheet = book.getSheetByName(ACCESS_SHEET);
   if (!sheet || JSON.stringify(sheet.getRange(1,1,1,4).getValues()[0]) !== JSON.stringify(ACCESS_HEADERS)) {
     throw Error('Prepare a aba Acessos_Inspecoes_POPs com email, perfil, ativo e emitir_chave.');
@@ -28,6 +28,7 @@ function accessUsers_() {
   });
 }
 function issueAccessKeys_() {
+  beginRequest_();
   requirePrivateData_();
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(25000)) throw Error('Outro processo está em andamento.');
@@ -62,8 +63,8 @@ function authenticate_(input) {
 function canReadRow_(row,headers,user) {
   return user.role==='GESTAO'||recordOwner_(row[0])===user.email;
 }
-function recordOwner_(id) {return PropertiesService.getScriptProperties().getProperty('OWNER_'+hash_(String(id)))||'';}
-function recordRevision_(id) {return JSON.parse(PropertiesService.getScriptProperties().getProperty('REVISION_'+hash_(String(id)))||'null');}
+function recordOwner_(id) {return privateValue_('OWNER_'+hash_(String(id)))||'';}
+function recordRevision_(id) {return JSON.parse(privateValue_('REVISION_'+hash_(String(id)))||'null');}
 function listInspections_(input,user) {
   const sheet=sheet_(),headers=headers_(),limit=50;
   let cursor=input.cursor===undefined?sheet.getLastRow():Number(input.cursor);
@@ -71,7 +72,7 @@ function listInspections_(input,user) {
   const items=[];
   while(cursor>1&&items.length<limit){
     const start=Math.max(2,cursor-99);
-    const block=sheet.getRange(start,1,cursor-start+1,headers.length).getValues();
+    const block=sheet.getRange(start,1,cursor-start+1,43).getValues();
     for(let i=block.length-1;i>=0;i--){
       cursor=start+i-1;
       const row=block[i];
@@ -91,7 +92,7 @@ function downloadPdf_(input,user) {
   const row=sheet.getRange(matches[0].getRow(),1,1,headers.length).getValues()[0];
   if(!canReadRow_(row,headers,user))throw Error('Registro indisponível.');
   // Não usar o link da planilha como autorização para ler arquivos privados do Drive.
-  const pdfId=PropertiesService.getScriptProperties().getProperty('PDF_'+hash_(input.inspectionId));
+  const pdfId=privateValue_('PDF_'+hash_(input.inspectionId));
   if(!pdfId)throw Error('PDF ainda não vinculado pelo serviço.');
   const file=DriveApp.getFileById(pdfId);
   if(file.getSize()>15*1024*1024)throw Error('PDF maior que 15 MB. Solicite o arquivo à gestão.');

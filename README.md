@@ -4,18 +4,25 @@ O GitHub Pages hospeda `public/`. O Apps Script recebe os pedidos, valida as cre
 
 ## Estado da integração
 
-O site está configurado com a URL `/exec` da implantação fornecida pelo responsável. O serviço respondeu em JSON e rejeitou consultas de sessão e de inspeções com chave inválida. Os testes de perfis, gravação, PDF e prazos usam serviços simulados; a entrada com chave válida e o envio de uma inspeção real devem ser homologados pela equipe. Ao atualizar o servidor, publique uma nova versão no Apps Script, pois o GitHub não altera essa implantação.
+O site está conectado ao serviço Google. A versão v2 acrescenta processamento em fila, envio de fotos separado, resumo do painel, consolidação de ativos e administração de operadores pelo próprio aplicativo. O cliente negocia esses recursos com o servidor: enquanto o Apps Script não for atualizado, continua usando o fluxo anterior e mostra o aviso de atualização pendente à Gestão. Publicar no GitHub não atualiza o Apps Script. Os testes automatizados usam serviços simulados; homologar uma inspeção com fotos e inventário conferido após publicar a nova versão do serviço.
+
+## Cadastro de operadores pela interface
+
+Depois de atualizar o serviço, qualquer um dos cinco gestores pode abrir **Gerenciar acessos** na tela inicial. Basta informar o e-mail e clicar em **Cadastrar e gerar chave**. A chave aparece para cópia e entrega privada, sem acessar a planilha ou o Apps Script. A tela também permite reemitir chaves de operadores e desativar acessos; o histórico das inspeções permanece intacto. Reemissão invalida a chave anterior. A chave recém-gerada fica somente na memória da tela e é removida ao sair ou trocar de usuário, sem ser salva no navegador ou no histórico.
+
+Somente o servidor pode autorizar essas operações. Operadores não podem listar usuários, gerar chaves ou promover alguém a gestor. Os cinco gestores são exibidos como administrados pelo responsável; esta interface não altera nem cria perfis gerenciais. As ações ficam registradas sem chaves em `Historico_Acessos_POPs`, no arquivo privado de administração.
 
 ## Configuração atualizada em projeto separado
 
-1. No projeto **Inspeções POPs** do Apps Script, substitua somente o código da integração pelo conteúdo completo de [`apps-script/Bd.gs`](apps-script/Bd.gs). Este arquivo já inclui campos, acesso, prazos e recebimento. Não cole também `Code.gs`, `schema.gs`, `access.gs` ou `scheduling.gs` no mesmo projeto: são os fontes do arquivo único. Mantenha as outras automações em seu projeto original.
-2. Salve e execute **`prepararInspecoesPOPs`**. Autorize a conta que consegue editar a planilha central e acessar a lista privada de usuários e a pasta dos PDFs. As referências já constam no código.
-3. A [lista privada de acessos](https://docs.google.com/spreadsheets/d/1IRXgtRt8_oS1I5MuKD29MUrWv9xUNRibbuT_szs34j4/edit) tem as colunas `email`, `perfil`, `ativo` e `emitir_chave`. Os cinco gestores solicitados estão cadastrados. Para cada operador, adicione uma linha com e-mail, perfil **OPERACAO**, `ativo` marcado e `emitir_chave` marcado. Mantenha esse arquivo restrito à administração.
-4. Execute **`criarChaveInspecoesPOPs`**. O registro de execução exibirá uma chave por pessoa marcada em `emitir_chave`, e a marca será desfeita após a emissão. Entregue cada chave individualmente à pessoa correspondente; nunca grave chaves na planilha, no repositório ou no chat. As chaves anônimas da versão anterior não funcionam nesta versão.
-5. **Implantar → Nova implantação → Aplicativo da Web**. Executar como **Eu** e acesso **Qualquer pessoa**, se permitido pelo Workspace. Todo pedido de dados é autenticado no código; o acesso público à URL não libera as inspeções. Copie a URL terminada em `/exec` para `google.endpoint` em `public/config.js`. Se o aplicativo Web já existir, use **Gerenciar implantações → Editar → Nova versão** para manter a URL e atualizar o código.
-6. Entre no site com uma chave gerencial e uma de operador. Faça uma inspeção fictícia com fotos. Confirme a linha na planilha, o PDF e a consulta pelo autor e pela gestão. Confirme que outro operador não consulta nem altera esse registro. Teste falha de rede e reenvio sem duplicação.
+1. No projeto **Inspeções POPs** do Apps Script, substitua somente o código da integração pelo conteúdo completo de [`apps-script/Bd.gs`](apps-script/Bd.gs). Este arquivo já inclui todos os módulos. Não cole os outros arquivos `.gs` separadamente no mesmo projeto: são os fontes do arquivo único. Mantenha as outras automações em seu projeto original.
+2. Salve e execute **`prepararInspecoesPOPs`**. Autorize a conta que consegue editar a planilha central e acessar a lista privada de usuários e a pasta dos PDFs. As referências já constam no código. A preparação valida as colunas cadastrais, cria o histórico privado de alterações e instala um único acionador de `processarFilaInspecoesPOPs` a cada minuto. Autorize a nova permissão de acionadores. As chaves existentes são preservadas; não é necessário reemiti-las por causa desta atualização.
+3. Use **Implantar → Gerenciar implantações → Editar → Nova versão → Implantar** no aplicativo Web existente. Mantenha a mesma URL `/exec`, execução como **Eu** e configuração de acesso existente. Todo pedido de dados é autenticado no código. Não execute `criarChaveInspecoesPOPs` para atualizar o serviço: as chaves atuais continuam válidas.
+4. Entre no site com sua chave gerencial. A opção **Gerenciar acessos** deve aparecer na tela inicial. Novos operadores podem ser cadastrados por essa tela, sem editar a lista de usuários nem executar funções no Apps Script.
+5. Homologue uma inspeção de teste com fotos e inventário conferido. Confirme a linha na planilha, o PDF, a consolidação dos ativos e a consulta pelo autor e pela gestão. Confirme que outro operador não consulta nem altera esse registro. Teste falha de rede e reenvio sem duplicação.
 
-Não é necessário adicionar bibliotecas. O arquivo separado `appsscript.json` é uma referência para projeto dedicado; os serviços usados normalmente são identificados pelo Apps Script. Se o projeto tiver escopos OAuth explícitos, preserve os existentes e inclua Sheets, Drive e Documents conforme o manifesto de referência.
+A [lista privada de acessos](https://docs.google.com/spreadsheets/d/1IRXgtRt8_oS1I5MuKD29MUrWv9xUNRibbuT_szs34j4/edit) mantém as colunas `email`, `perfil`, `ativo` e `emitir_chave`. Os cinco gestores solicitados já estão cadastrados. Para a configuração inicial ou recuperação administrativa, o responsável pode marcar uma pessoa ativa em `emitir_chave` e executar `criarChaveInspecoesPOPs`: a função emite somente as chaves marcadas e revoga as anteriores dessas pessoas. Esse procedimento não é necessário na atualização nem no cadastro cotidiano de operadores. Mantenha o arquivo restrito à administração e entregue cada chave individualmente.
+
+Não é necessário adicionar bibliotecas. O arquivo separado `appsscript.json` é uma referência para projeto dedicado; os serviços usados normalmente são identificados pelo Apps Script. Se o projeto tiver escopos OAuth explícitos, preserve os existentes e inclua Sheets, Drive, Documents e `https://www.googleapis.com/auth/script.scriptapp` conforme o manifesto de referência.
 
 ## Perfis e credenciais
 
@@ -34,11 +41,34 @@ A lista de usuários e a pasta dos PDFs exigem acesso geral **Restrito**. Não c
 
 ## Como os dados são atualizados
 
-Finalizar salva o registro local e tenta enviar dados e fotos. O servidor cria o PDF e uma cópia JSON sem os bytes das fotos; depois grava uma linha na aba `Inspecoes_POPs`. Só então o aplicativo confirma o envio. Uma falha mantém o registro pendente.
+Finalizar salva o registro local e envia as fotos individualmente. Cada fotografia recebe uma referência assinada, vinculada ao autor e à inspeção. Isso evita montar um único corpo JSON com todas as imagens em memória. O limite continua sendo 100 fotos e 15 MB para o conjunto equivalente de fotos/dados; reenvios reutilizam fotos inalteradas.
 
-Reenvio idêntico devolve a confirmação anterior. Uma revisão posterior atualiza a mesma linha e mantém os arquivos das revisões antigas como histórico. Versões antigas ou conflitantes são rejeitadas. O painel central consulta todas as páginas acessíveis ao usuário quando aberto, ao clicar em **Atualizar dados** e a cada minuto enquanto estiver visível. O Sheets não envia notificações em tempo real ao navegador.
+O serviço confirma primeiro **Recebida / em processamento** e guarda uma cópia privada para a fila. A geração do PDF ocorre fora do bloqueio global de gravação. A página tenta adiantar o processamento; o acionador do Google continua o trabalho se ela for fechada. Somente após gravar a inspeção, o PDF e o resultado da tentativa de consolidação dos ativos, o estado muda para **Sincronizada**. Pendências de cadastro dos ativos aparecem separadamente; não significam que todos os ativos foram alterados.
 
-Os indicadores centrais mostram o histórico de inspeções consultadas, e as não conformidades por POP são acumuladas nesse histórico. A taxa é C ÷ (C + NC); NA e NV não entram no denominador. Os indicadores locais de inventário/cronograma continuam baseados nos registros do usuário naquele navegador. A lista de inspeções central e o download de PDFs não exigem Looker.
+Reenvio idêntico devolve a confirmação anterior; revisões mais novas atualizam a mesma inspeção. O painel pede um resumo consolidado, carrega inicialmente 50 linhas do histórico e oferece **Carregar mais**. Os indicadores e o cronograma consideram todo o histórico autorizado, mesmo quando somente a primeira página é exibida. Há cache de 45 segundos separado pelo escopo de acesso (Gestão ou usuário de Operação), invalidado a cada gravação. A consulta automática continua a cada minuto enquanto o painel estiver visível.
+
+Os campos locais são gravados após 400 ms sem nova alteração e imediatamente na finalização, navegação, saída da conta ou ocultação da página. Fotos permanecem no IndexedDB. O logo embutido foi unificado para reduzir o HTML, preservando o relatório portátil.
+
+## Atualização automática dos cadastros
+
+A consolidação usa as abas existentes e seus cabeçalhos, sem mudar as posições das colunas originais:
+
+| Aba | Atualização |
+| --- | --- |
+| Ativos | Equipamentos de rede, retificadoras, climatizadores, DIOs, transceivers e baterias identificados |
+| Climatização_Voanet | Cadastro e medições do aparelho; série, fabricante, modelo, capacidade e instalação informada |
+| Retificadores | Cadastro, módulos e verificações da retificadora |
+| Controle_Baterias | Banco completo, identificado e conferido; composição, tecnologia e capacidades explicitamente informadas |
+
+A aba **Inspecao_Climatizacao** continua exclusiva do AppSheet. As datas de manutenção e testes não são alteradas por uma simples inspeção visual. Fórmulas existentes de manutenção, vida útil, capacidade e status são preservadas; novos registros recebem a estrutura e as fórmulas relativas da tabela de destino.
+
+`Nº Série` e `Patrimônio` são os campos canônicos. A integração não cria cópias quando esses campos já existem. Os campos técnicos adicionais são `ID_Ativo`, `Codigo_POP`, `ID_Ultima_Inspecao` e `Versao_Inspecao`. A data da vistoria usa `Data_Ultima_Inspecao` nas abas que não têm um campo equivalente; em Retificadores, reutiliza `Data de Verficação`. Nenhuma dessas datas substitui manutenção ou teste. A preparação e a consolidação bloqueiam cabeçalhos redundantes/ambíguos.
+
+Somente grupos marcados como conferidos/atualizados e identificações confirmadas podem alimentar os cadastros. Para baterias, confirme cada unidade e marque **Conferi todas as baterias deste banco; o cadastro está completo**. Isso impede que uma conferência parcial reduza indevidamente a quantidade do banco.
+
+A identificação usa ID já cadastrado, série/patrimônio ou correspondência única de POP, fabricante e modelo para um cadastro existente. Novos ativos exigem série ou patrimônio. Mais de uma correspondência, divergência de fabricante/série, movimentação entre POPs, valor não aceito pela validação ou inspeção anterior à última atualização geram pendência. Campos vazios não apagam informações; ausência de um equipamento no formulário não o exclui do cadastro.
+
+O histórico detalhado fica na aba privada `Historico_Ativos_POPs`, com inspeção, ativo, ação, motivo e valores anteriores/novos. O painel mostra quantos cadastros foram criados/atualizados e quantas pendências existem, com opção de reprocessar após uma correção de validação ou cadastro. Inspeções anteriores à v2 precisam ser reenviadas a partir da cópia local para adquirir a cópia de processamento necessária à consolidação.
 
 ## Regra de próximas inspeções
 

@@ -5,7 +5,7 @@ function schedulingDays_(criticality){
   return null;
 }
 function stations_(){
-  const sheet=SpreadsheetApp.openById(config_().SPREADSHEET_ID).getSheetByName('POPs');
+  const sheet=book_(config_().SPREADSHEET_ID).getSheetByName('POPs');
   if(!sheet||sheet.getLastRow()<1)throw Error('Cadastro de POPs indisponível.');
   const data=sheet.getRange(1,1,sheet.getLastRow(),10).getValues(),header=data.shift();
   if(header[0]!=='Código'||header[1]!=='Nome da Estação'||header[8]!=='Criticidade')throw Error('Cabeçalho do cadastro de POPs incompatível.');

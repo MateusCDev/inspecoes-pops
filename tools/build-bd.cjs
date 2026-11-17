@@ -14,7 +14,13 @@ ${read('schema.gs')}
 ${read('Code.gs')}
 ${read('access.gs')}
 ${read('scheduling.gs')}
-return { setup, createOperatorKey, doPost };
+${read('runtime.gs')}
+${read('staging.gs')}
+${read('jobs.gs')}
+${read('dashboard.gs')}
+${read('assets.gs')}
+${read('access-admin.gs')}
+return { setup, createOperatorKey, doPost, processQueue };
 })();
 
 function prepararInspecoesPOPs() {
@@ -23,6 +29,10 @@ function prepararInspecoesPOPs() {
 
 function criarChaveInspecoesPOPs() {
   return BdInspecoesPOPs.createOperatorKey();
+}
+
+function processarFilaInspecoesPOPs() {
+  return BdInspecoesPOPs.processQueue();
 }
 
 function receberInspecoesPOPs(e) {

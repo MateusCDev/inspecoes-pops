@@ -41,21 +41,15 @@ const readings=[['tensaoAC','Tensão CA (V)'],['correnteCA','Corrente CA (A)'],[
 const DESTINATION_SHEET = 'Inspecoes_POPs';
 const CONFIG_DEFAULTS = {
   SPREADSHEET_ID: '1WArVbYwKaiWkhgNxeNXdbPx4OK5tNqyJcDRbFp91Gf8',
-  PDF_FOLDER_ID: '1onSSKBtDs46OXBLaHZCOkh7rXKUFROHc'
+  PDF_FOLDER_ID: '1onSSKBtDs46OXBLaHZCOkh7rXKUFROHc',
+  ACCESS_SPREADSHEET_ID: '1IRXgtRt8_oS1I5MuKD29MUrWv9xUNRibbuT_szs34j4'
 };
 function config_() {return Object.assign({}, CONFIG_DEFAULTS, PropertiesService.getScriptProperties().getProperties());}
 function hash_(text) {
   return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text, Utilities.Charset.UTF_8).map(b => ((b+256)%256).toString(16).padStart(2,'0')).join('');
 }
 function createOperatorKey() {
-  // Execute no editor, entregue a chave fora do GitHub e remova o log após a entrega.
-  const token = Utilities.getUuid() + Utilities.getUuid();
-  const props = PropertiesService.getScriptProperties();
-  const users = JSON.parse(props.getProperty('TOKEN_HASHES') || '{}');
-  const name = 'operador-' + Utilities.getUuid().slice(0,8);
-  users[hash_(token)] = name;
-  props.setProperty('TOKEN_HASHES', JSON.stringify(users));
-  console.log('Operador: ' + name + '\nChave individual: ' + token);
+  return issueAccessKeys_();
 }
 function headers_() {
   return ['id_inspecao','codigo_pop', ...fields.map(([k])=>k), 'created','updated','finalizedAt','schedulePeriod','scheduleBaseDate','scheduleDueDate',
@@ -79,6 +73,8 @@ function sheet_() {
   return sheet;
 }
 function setup() {
+  requirePrivateData_();
+  accessUsers_();
   const sheet = sheet_();
   DriveApp.getFolderById(config_().PDF_FOLDER_ID).getName();
   console.log('Aba preparada: ' + sheet.getName());
@@ -166,26 +162,44 @@ function doPost(e) {
   try {
     if (!e?.postData?.contents || e.postData.contents.length > 15*1024*1024) throw Error('Requisição vazia ou maior que 15 MB.');
     const input = JSON.parse(e.postData.contents);
-    const users = JSON.parse(config_().TOKEN_HASHES||'{}');
-    const operator = typeof input.token === 'string' && users[hash_(input.token)];
-    if (!operator) return reply_({ok:false,error:'Chave de envio inválida ou revogada.'});
+    const user = authenticate_(input);
+    if (!user) return reply_({ok:false,code:'AUTH',error:'Chave inválida, revogada ou ainda não vinculada a uma pessoa ativa.'});
+    requirePrivateData_();
     if (input.version !== 1) throw Error('Versão incompatível.');
+    if (input.action === 'session') return reply_({ok:true,user});
+    if (input.action === 'stations') return reply_({ok:true,stations:stations_()});
+    if (input.action === 'list') return reply_(listInspections_(input,user));
+    if (input.action === 'pdf') return reply_(downloadPdf_(input,user));
+    if (input.action && input.action !== 'submit') throw Error('Operação desconhecida.');
     const r = input.record;
     validate_(r);
-    const hash = hash_(JSON.stringify(r));
-    // Valida limites de célula antes de criar arquivos no Drive.
-    row_(r,{},operator,hash);
+    const schedule = applyScheduling_(r);
     lock = LockService.getScriptLock();
     if (!lock.tryLock(25000)) throw Error('Outro envio está em andamento. Tente novamente.');
     const sheet = sheet_(), headers = headers_();
     const matches = sheet.getLastRow()>1 ? sheet.getRange(2,1,sheet.getLastRow()-1,1).createTextFinder(r.id).matchEntireCell(true).findAll() : [];
     if (matches.length > 1) throw Error('ID duplicado na planilha. Contate o responsável.');
     const existing = matches.length ? matches[0].getRow() : null;
+    let operator = recordOwner_(r.id) || user.email, previous = null;
+    if (operator !== user.email && user.role !== 'GESTAO') throw Error('Registro indisponível.');
     if (existing) {
-      const previous = sheet.getRange(existing,1,1,headers.length).getValues()[0];
-      if (previous[headers.indexOf('hash_versao')] === hash) return reply_({ok:true,inspectionId:r.id,pdfUrl:previous[headers.indexOf('pdf_url')],receivedAt:previous[headers.indexOf('recebido_em')]});
-      if (String(previous[headers.indexOf('updated')]) >= r.updated) throw Error('Existe uma versão mais recente ou conflitante desta inspeção. Contate o responsável.');
+      previous = sheet.getRange(existing,1,1,headers.length).getValues()[0];
+      if (!canReadRow_(previous,headers,user)) throw Error('Registro indisponível.');
     }
+    // Autoria é definida pelo servidor, nunca pelo inspetor/e-mail/perfil do formulário.
+    r.ownerEmail = operator;
+    const hash = hash_(JSON.stringify(r));
+    row_(r,{},operator,hash);
+    const revision = recordRevision_(r.id);
+    if (previous) {
+      if (revision?.hash === hash) {
+        const pdfId=PropertiesService.getScriptProperties().getProperty('PDF_'+hash_(r.id));
+        if(pdfId)return reply_({ok:true,inspectionId:r.id,pdfUrl:DriveApp.getFileById(pdfId).getUrl(),receivedAt:revision.receivedAt,schedule});
+      }
+    }
+    if (revision && revision.hash !== hash && revision.updated >= r.updated) throw Error('Existe uma versão mais recente ou conflitante desta inspeção. Contate o responsável.');
+    // Reservar a autoria antes de gravar. Uma falha não transfere o ID a outra pessoa.
+    PropertiesService.getScriptProperties().setProperty('OWNER_'+hash_(r.id),operator);
     const folder = DriveApp.getFolderById(config_().PDF_FOLDER_ID);
     const name = r.id+'_'+hash.slice(0,12);
     // Nome determinístico permite recuperar arquivos criados antes de uma falha/timeout.
@@ -197,12 +211,16 @@ function doPost(e) {
     const pdf = artifact(name+'.pdf',()=>createPdf_(r,folder,name));
     const clean = JSON.parse(JSON.stringify(r)); delete clean.photoFiles;
     const backup = artifact(name+'.json',()=>folder.createFile(name+'.json',JSON.stringify(clean),MimeType.PLAIN_TEXT));
-    const result = {ok:true,inspectionId:r.id,pdfUrl:pdf.getUrl(),backupUrl:backup.getUrl(),receivedAt:new Date().toISOString()};
+    const result = {ok:true,inspectionId:r.id,pdfUrl:pdf.getUrl(),backupUrl:backup.getUrl(),receivedAt:new Date().toISOString(),schedule};
     const target = existing || sheet.getLastRow()+1;
     if (target > sheet.getMaxRows()) sheet.insertRowsAfter(sheet.getMaxRows(),100);
+    // Autoria privada: a coluna pública não é usada para conceder acesso.
     sheet.getRange(target,1,1,headers.length).setValues([row_(r,result,operator,hash)]);
     // Após setValues, preservar arquivos mesmo se flush falhar: a escrita pode já ter persistido.
-    committed = true; SpreadsheetApp.flush();
+    committed = true;
+    PropertiesService.getScriptProperties().setProperty('PDF_'+hash_(r.id),pdf.getId());
+    PropertiesService.getScriptProperties().setProperty('REVISION_'+hash_(r.id),JSON.stringify({hash,updated:r.updated,receivedAt:result.receivedAt}));
+    SpreadsheetApp.flush();
     return reply_(result);
   } catch (error) {
     if (!committed) created.forEach(file=>{try{file.setTrashed(true);}catch(_){}});
@@ -210,6 +228,146 @@ function doPost(e) {
   } finally {if(lock?.hasLock()) lock.releaseLock();}
 }
 function doGet() {return reply_({ok:true,service:'VOANET — recebimento de inspeções',version:1});}
+
+// A lista de e-mails e perfis permanece na planilha privada, fora do site público.
+const ACCESS_SHEET = 'Acessos_Inspecoes_POPs';
+const ACCESS_HEADERS = ['email','perfil','ativo','emitir_chave'];
+function requirePrivateData_() {
+  if (DriveApp.getFileById(config_().ACCESS_SPREADSHEET_ID).getSharingAccess() !== DriveApp.Access.PRIVATE) {
+    throw Error('A lista de acessos precisa ter acesso geral Restrito no Drive.');
+  }
+  if (DriveApp.getFolderById(config_().PDF_FOLDER_ID).getSharingAccess() !== DriveApp.Access.PRIVATE) {
+    throw Error('A pasta de relatórios precisa ter acesso geral Restrito no Drive.');
+  }
+}
+function accessSheet_() {
+  const book = SpreadsheetApp.openById(config_().ACCESS_SPREADSHEET_ID);
+  const sheet = book.getSheetByName(ACCESS_SHEET);
+  if (!sheet || JSON.stringify(sheet.getRange(1,1,1,4).getValues()[0]) !== JSON.stringify(ACCESS_HEADERS)) {
+    throw Error('Prepare a aba Acessos_Inspecoes_POPs com email, perfil, ativo e emitir_chave.');
+  }
+  return sheet;
+}
+function accessUsers_() {
+  const sheet = accessSheet_(), seen = new Set();
+  return sheet.getLastRow() < 2 ? [] : sheet.getRange(2,1,sheet.getLastRow()-1,4).getValues().flatMap((r,i)=>{
+    if (!String(r[0]||'').trim()) return [];
+    const email=String(r[0]).trim().toLowerCase(),role=String(r[1]).trim().toUpperCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !['GESTAO','OPERACAO'].includes(role) || seen.has(email)) throw Error('E-mail/perfil inválido ou duplicado na aba de acessos.');
+    seen.add(email);
+    return [{email,role,active:r[2]===true,issue:r[3]===true,row:i+2}];
+  });
+}
+function issueAccessKeys_() {
+  requirePrivateData_();
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(25000)) throw Error('Outro processo está em andamento.');
+  try {
+    const selected=accessUsers_().filter(u=>u.active&&u.issue);
+    if (!selected.length) throw Error('Marque emitir_chave para as pessoas que receberão uma nova chave.');
+    const props=PropertiesService.getScriptProperties();
+    const keys=JSON.parse(props.getProperty('TOKEN_HASHES')||'{}');
+    const issued=selected.map(u=>{
+      Object.keys(keys).forEach(hash=>{if(keys[hash]?.email===u.email)delete keys[hash];});
+      const token=Utilities.getUuid()+Utilities.getUuid();
+      keys[hash_(token)]={email:u.email};
+      return {user:u,token};
+    });
+    props.setProperty('TOKEN_HASHES',JSON.stringify(keys));
+    const sheet=accessSheet_();
+    issued.forEach(({user,token})=>{
+      sheet.getRange(user.row,4).setValue(false);
+      console.log('E-mail: '+user.email+' | Perfil: '+user.role+'\nChave individual: '+token);
+    });
+    console.log('Entregue cada chave somente à pessoa correspondente. Não publique as chaves na planilha.');
+  } finally {lock.releaseLock();}
+}
+function authenticate_(input) {
+  const keys=JSON.parse(config_().TOKEN_HASHES||'{}');
+  const binding=typeof input.token==='string'&&keys[hash_(input.token)];
+  // Chaves antigas anônimas não podem acessar dados ou escolher um perfil.
+  const user=binding?.email&&accessUsers_().find(u=>u.active&&u.email===binding.email);
+  if (!user) return null;
+  return {email:user.email,role:user.role};
+}
+function canReadRow_(row,headers,user) {
+  return user.role==='GESTAO'||recordOwner_(row[0])===user.email;
+}
+function recordOwner_(id) {return PropertiesService.getScriptProperties().getProperty('OWNER_'+hash_(String(id)))||'';}
+function recordRevision_(id) {return JSON.parse(PropertiesService.getScriptProperties().getProperty('REVISION_'+hash_(String(id)))||'null');}
+function listInspections_(input,user) {
+  const sheet=sheet_(),headers=headers_(),limit=50;
+  let cursor=input.cursor===undefined?sheet.getLastRow():Number(input.cursor);
+  if (!Number.isInteger(cursor)||cursor<1||cursor>sheet.getLastRow()) throw Error('Página inválida.');
+  const items=[];
+  while(cursor>1&&items.length<limit){
+    const start=Math.max(2,cursor-99);
+    const block=sheet.getRange(start,1,cursor-start+1,headers.length).getValues();
+    for(let i=block.length-1;i>=0;i--){
+      cursor=start+i-1;
+      const row=block[i];
+      if(!row[0]||!canReadRow_(row,headers,user))continue;
+      const get=k=>row[headers.indexOf(k)];
+      items.push({id:row[0],stationCode:get('codigo_pop'),station:get('nome'),date:get('data'),updated:get('updated'),technician:get('inspetor'),owner:recordOwner_(row[0])||'Autoria não vinculada',criticality:get('classificacao'),nc:get('itens_nao_conformes'),conform:get('itens_conformes'),unverified:get('itens_nao_verificados'),due:get('scheduleDueDate'),period:get('schedulePeriod'),issues:get('qtd_pendencias')});
+      if(items.length===limit)break;
+    }
+  }
+  return {ok:true,items,nextCursor:cursor>1?cursor:null};
+}
+function downloadPdf_(input,user) {
+  if(!/^INSP-[A-Za-z0-9-]+$/.test(input.inspectionId||''))throw Error('Registro indisponível.');
+  const sheet=sheet_(),headers=headers_();
+  const matches=sheet.getLastRow()>1?sheet.getRange(2,1,sheet.getLastRow()-1,1).createTextFinder(input.inspectionId).matchEntireCell(true).findAll():[];
+  if(matches.length!==1)throw Error('Registro indisponível.');
+  const row=sheet.getRange(matches[0].getRow(),1,1,headers.length).getValues()[0];
+  if(!canReadRow_(row,headers,user))throw Error('Registro indisponível.');
+  // Não usar o link da planilha como autorização para ler arquivos privados do Drive.
+  const pdfId=PropertiesService.getScriptProperties().getProperty('PDF_'+hash_(input.inspectionId));
+  if(!pdfId)throw Error('PDF ainda não vinculado pelo serviço.');
+  const file=DriveApp.getFileById(pdfId);
+  if(file.getSize()>15*1024*1024)throw Error('PDF maior que 15 MB. Solicite o arquivo à gestão.');
+  return {ok:true,fileName:input.inspectionId+'.pdf',base64:Utilities.base64Encode(file.getBlob().getBytes())};
+}
+
+function schedulingDays_(criticality){
+  const normalized=String(criticality||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase();
+  if(['ALTA','CRITICA','CRITICO'].includes(normalized))return 45;
+  if(normalized==='MEDIA')return 90;
+  return null;
+}
+function stations_(){
+  const sheet=SpreadsheetApp.openById(config_().SPREADSHEET_ID).getSheetByName('POPs');
+  if(!sheet||sheet.getLastRow()<1)throw Error('Cadastro de POPs indisponível.');
+  const data=sheet.getRange(1,1,sheet.getLastRow(),10).getValues(),header=data.shift();
+  if(header[0]!=='Código'||header[1]!=='Nome da Estação'||header[8]!=='Criticidade')throw Error('Cabeçalho do cadastro de POPs incompatível.');
+  const stations=data.flatMap(row=>{
+    const code=String(row[0]??'').trim(),name=String(row[1]??'').trim();
+    if(!code||!name)return [];
+    const criticality=String(row[8]||'').trim();
+    const inactive=code==='PCAM.021'&&name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase()==='POP CORDEBRAS';
+    return [{code,name,city:String(row[3]||''),criticality,days:schedulingDays_(criticality),inactive}];
+  });
+  const counts=Object.create(null);stations.filter(s=>!s.inactive).forEach(s=>counts[s.code]=(counts[s.code]||0)+1);
+  return stations.map(s=>({...s,duplicate:!s.inactive&&counts[s.code]>1}));
+}
+function addInspectionDays_(date,days){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw Error('Data de vistoria inválida.');
+  const d=new Date(date+'T12:00:00Z');
+  if(!Number.isFinite(d.getTime())||d.toISOString().slice(0,10)!==date)throw Error('Data de vistoria inválida.');
+  d.setUTCDate(d.getUTCDate()+days);return d.toISOString().slice(0,10);
+}
+function applyScheduling_(record){
+  const code=String(record.codigoPop??'').trim(),catalog=stations_();
+  if(catalog.some(s=>s.inactive&&s.code===code&&s.name===record.nome))throw Error('Este POP foi retirado da programação de inspeções.');
+  const station=catalog.find(s=>s.code===code&&!s.inactive);
+  if(!station)throw Error('Selecione um código do cadastro de POPs.');
+  if(station.duplicate)throw Error('O código deste POP está duplicado no cadastro. Solicite a correção à gestão.');
+  if(!station.days)throw Error('A criticidade deste POP ainda não tem periodicidade definida.');
+  record.codigoPop=station.code;record.nome=station.name;record.popCriticality=station.criticality;
+  record.schedulePeriod=station.days;record.scheduleBaseDate=record.data;
+  record.scheduleDueDate=addInspectionDays_(record.data,station.days);
+  return {days:station.days,baseDate:record.data,dueDate:record.scheduleDueDate,criticality:station.criticality};
+}
 
 return { setup, createOperatorKey, doPost };
 })();

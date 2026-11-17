@@ -1,61 +1,57 @@
-# Inspeções POPs — GitHub Pages, Sheets e Drive
+# Inspeções POPs — aplicação, painel central e PDFs
 
-Aplicação baseada no pacote v2.2 enviado pelo usuário. O frontend é publicado a partir de `public/`. O código em `apps-script/` roda no Google, não no Pages.
+O GitHub Pages hospeda `public/`. O Apps Script recebe os pedidos, valida as credenciais e consulta/grava as inspeções no Sheets. O Drive guarda PDFs e cópias JSON. O Looker Studio é opcional: o próprio aplicativo tem um painel central.
 
-## Estado da entrega
+## Estado da integração
 
-- O formulário, checklist, inventário e evidências da aplicação original foram preservados.
-- Finalizar salva localmente e tenta enviar a inspeção completa.
-- Sem internet/configuração/chave, o registro permanece pendente.
-- O servidor cria um PDF e uma cópia JSON dos dados (sem os bytes das fotos), depois grava uma linha na aba `Inspecoes_POPs`.
-- O PDF inclui as fotos disponíveis. A cópia JSON no Drive não substitui o backup portátil original, que também inclui os arquivos das fotos.
-- Reenvio idêntico devolve a confirmação anterior; revisão mais nova atualiza a mesma linha. PDFs de revisões anteriores são mantidos como histórico.
-- Nenhuma aba de inspeções histórica é sobrescrita. O script cria apenas a nova aba e valida o cabeçalho antes de escrever.
-- A integração permanece INATIVA enquanto `public/config.js` não contiver a URL de uma implantação autorizada do Google Apps Script.
+O código do site e do serviço está preparado para Gestão e Operação. O serviço Google precisa ser instalado/atualizado e implantado pela pessoa responsável pela conta; a URL `/exec` ainda deve ser configurada em `public/config.js`. Enquanto essa URL estiver vazia, o site mostra a tela de ativação e não permite entrar. Os testes locais usam serviços simulados; confirmar a integração real após a implantação.
 
-## Ativar o serviço Google (proprietário da planilha)
+## Configuração atualizada em projeto separado
 
-### Alternativa de arquivo único no projeto de automações existente
+1. No projeto **Inspeções POPs** do Apps Script, substitua somente o código da integração pelo conteúdo completo de [`apps-script/Bd.gs`](apps-script/Bd.gs). Este arquivo já inclui campos, acesso, prazos e recebimento. Não cole também `Code.gs`, `schema.gs`, `access.gs` ou `scheduling.gs` no mesmo projeto: são os fontes do arquivo único. Mantenha as outras automações em seu projeto original.
+2. Salve e execute **`prepararInspecoesPOPs`**. Autorize a conta que consegue editar a planilha central e acessar a lista privada de usuários e a pasta dos PDFs. As referências já constam no código.
+3. A [lista privada de acessos](https://docs.google.com/spreadsheets/d/1IRXgtRt8_oS1I5MuKD29MUrWv9xUNRibbuT_szs34j4/edit) tem as colunas `email`, `perfil`, `ativo` e `emitir_chave`. Os cinco gestores solicitados estão cadastrados. Para cada operador, adicione uma linha com e-mail, perfil **OPERACAO**, `ativo` marcado e `emitir_chave` marcado. Mantenha esse arquivo restrito à administração.
+4. Execute **`criarChaveInspecoesPOPs`**. O registro de execução exibirá uma chave por pessoa marcada em `emitir_chave`, e a marca será desfeita após a emissão. Entregue cada chave individualmente à pessoa correspondente; nunca grave chaves na planilha, no repositório ou no chat. As chaves anônimas da versão anterior não funcionam nesta versão.
+5. **Implantar → Nova implantação → Aplicativo da Web**. Executar como **Eu** e acesso **Qualquer pessoa**, se permitido pelo Workspace. Todo pedido de dados é autenticado no código; o acesso público à URL não libera as inspeções. Copie a URL terminada em `/exec` para `google.endpoint` em `public/config.js`. Se o aplicativo Web já existir, use **Gerenciar implantações → Editar → Nova versão** para manter a URL e atualizar o código.
+6. Entre no site com uma chave gerencial e uma de operador. Faça uma inspeção fictícia com fotos. Confirme a linha na planilha, o PDF e a consulta pelo autor e pela gestão. Confirme que outro operador não consulta nem altera esse registro. Teste falha de rede e reenvio sem duplicação.
 
-Para instalar em `Bd.gs`, use somente o conteúdo de [`apps-script/Bd.gs`](apps-script/Bd.gs) no lugar do código POPs anteriormente colado nesse arquivo. Ele já inclui o schema e mantém os auxiliares dentro de um módulo para reduzir conflitos com outros arquivos. Não é necessário criar `schema.gs` separado nem substituir o código das automações existentes. Escolha esta alternativa OU a instalação de `Code.gs` + `schema.gs` abaixo; não cole as duas versões do receptor no mesmo projeto.
+Não é necessário adicionar bibliotecas. O arquivo separado `appsscript.json` é uma referência para projeto dedicado; os serviços usados normalmente são identificados pelo Apps Script. Se o projeto tiver escopos OAuth explícitos, preserve os existentes e inclua Sheets, Drive e Documents conforme o manifesto de referência.
 
-Salve e execute `prepararInspecoesPOPs` para validar a planilha e a pasta, autorizando a conta quando solicitado. Depois execute `criarChaveInspecoesPOPs` para gerar as chaves individuais. Os nomes dessas funções substituem `setup` e `createOperatorKey` nesta alternativa.
+## Perfis e credenciais
 
-Antes de implantar, confira se os outros arquivos do projeto já possuem um `doPost`. Deve existir somente um ponto de entrada global; nesse caso, integre o encaminhamento para `receberInspecoesPOPs(e)` na função existente, preservando as demais rotas, em vez de manter dois `doPost`. O arquivo único não altera um `doGet` preexistente. Preserve as configurações e os escopos de OAuth das outras automações no manifesto; se os escopos forem explícitos, acrescente apenas os que a integração exige. A autorização precisa ser feita por uma pessoa na conta Google.
+- **GESTAO:** consulta todas as inspeções recebidas, indicadores e PDFs.
+- **OPERACAO:** cria/envia inspeções e consulta somente as próprias inspeções e PDFs.
+- A chave é uma credencial individual vinculada ao e-mail pelo administrador. Isso não é login Google/OAuth nem prova automática de posse da caixa de e-mail. Quem possui a chave assume o acesso da pessoa; por isso, a entrega deve ser privada.
+- O servidor resolve o perfil na lista privada a cada pedido. Alterar e-mail, perfil ou seletor no navegador não concede acesso. Desmarcar `ativo` revoga os pedidos seguintes; a reemissão revoga a chave anterior da pessoa.
+- A autoria de cada ID é armazenada nas propriedades privadas do script. Modificar `operador_envio` na planilha pública não transfere a autoria dentro do aplicativo. Registros antigos sem vínculo de autoria aparecem apenas para Gestão; a atribuição exige uma migração administrativa.
+- Os registros e as fotos locais ficam separados por usuário. Sair limpa a sessão em memória, sem apagar os rascunhos individuais. A chave não é persistida. É necessário conectar-se para entrar novamente após recarregar a página; durante uma sessão já validada, é possível preencher sem conexão e reenviar quando ela voltar.
 
-O arquivo único é gerado por `node tools/build-bd.cjs`; após mudar os fontes, gere novamente antes de publicar.
+### Compartilhamento da planilha central
 
-### Instalação em arquivos separados em projeto dedicado
+Por solicitação do responsável, o compartilhamento existente da planilha central foi mantido. A restrição por operador se aplica às consultas e alterações pelo aplicativo. Quem tiver acesso direto à planilha continua sujeito às permissões do próprio Google Sheets e pode ver/editar os dados diretamente. A divisão de perfis do aplicativo não restringe esse caminho.
 
-1. Na planilha fornecida, abra **Extensões → Apps Script**.
-2. Crie os arquivos `Code.gs` e `schema.gs` e copie os conteúdos de `apps-script/`. O primeiro já aponta para a planilha e para a pasta criada para os PDFs.
-3. Em Configurações do projeto, habilite a exibição de `appsscript.json` e substitua pelo manifesto deste pacote. Os escopos permitem operar a planilha e criar o documento temporário/PDF no Drive.
-4. Execute `setup` no editor e autorize o acesso. Isso cria o cabeçalho da nova aba. Execute também `createOperatorKey` uma vez para cada pessoa autorizada. Cada execução mostra uma chave individual no log: entregue-a diretamente ao operador, nunca pelo repositório ou pela planilha. Limpe o log após entregá-la.
-5. As chaves são credenciais de envio, NÃO senhas Google ou login corporativo. O servidor armazena apenas hashes SHA-256 em `TOKEN_HASHES` nas propriedades do script. Para revogar, remova o hash correspondente. Para nomear operadores, substitua o rótulo gerado automaticamente pelo nome desejado nas propriedades.
-6. **Implantar → Nova implantação → Aplicativo da Web**. Executar como proprietário; acesso **Qualquer pessoa**, se a política do Workspace permitir. A URL é acessível, mas todo envio exige chave válida; não existe endpoint público de leitura dos registros. Caso a política da empresa proíba esse modo, usar uma API corporativa autenticada no lugar desta implantação, sem enfraquecer a configuração do Workspace.
-7. Copie a URL que termina em `/exec` e coloque em `public/config.js`, em `google.endpoint`. Atualize o repositório. Modificações futuras no código do Apps Script exigem uma nova versão da implantação.
-8. A pasta dos PDFs herda a política de compartilhamento do Drive. Conceda acesso apenas à equipe que precisa abrir os relatórios. A chave de envio não concede permissão para consultar a planilha ou os PDFs.
+A lista de usuários e a pasta dos PDFs exigem acesso geral **Restrito**. Não compartilhe a lista de acessos com operadores, pois ela determina os perfis. Os PDFs são baixados pelo aplicativo mediante a mesma verificação de autoria, sem precisar publicar os arquivos no Drive. Administradores do script e da base mantêm acesso administrativo.
 
-## Homologar antes do uso pela equipe
+## Como os dados são atualizados
 
-Crie uma inspeção fictícia pelo site, informe a chave no painel da aba Resumo e finalize. Confirme: uma linha na nova aba, um PDF legível com todas as fotos e link funcional. Reenvie sem alterações e confirme que não duplica. Edite, finalize e confira a atualização. Teste sem internet e reconexão; simule uma chave inválida e confirme que não grava nada. A integração precisa ser testada na origem real do Pages para confirmar redirecionamentos e CORS do Apps Script. Nunca usar `mode: no-cors`, pois isso impediria confirmar o recebimento.
+Finalizar salva o registro local e tenta enviar dados e fotos. O servidor cria o PDF e uma cópia JSON sem os bytes das fotos; depois grava uma linha na aba `Inspecoes_POPs`. Só então o aplicativo confirma o envio. Uma falha mantém o registro pendente.
 
-Limites desta versão: 15 MB por envio, até 100 fotos, limites de execução e conversão do Apps Script. Uma falha mantém o registro pendente; não trate como sucesso antes de aparecer a confirmação. Conversões de imagens não suportadas pelo Google Docs devem ser corrigidas no cadastro e reenviadas. Os testes locais usam serviços simulados e não substituem a homologação no Google.
+Reenvio idêntico devolve a confirmação anterior. Uma revisão posterior atualiza a mesma linha e mantém os arquivos das revisões antigas como histórico. Versões antigas ou conflitantes são rejeitadas. O painel central consulta todas as páginas acessíveis ao usuário quando aberto, ao clicar em **Atualizar dados** e a cada minuto enquanto estiver visível. O Sheets não envia notificações em tempo real ao navegador.
 
-## Publicar no GitHub Pages
+Os indicadores centrais mostram o histórico de inspeções consultadas, e as não conformidades por POP são acumuladas nesse histórico. A taxa é C ÷ (C + NC); NA e NV não entram no denominador. Os indicadores locais de inventário/cronograma continuam baseados nos registros do usuário naquele navegador. A lista de inspeções central e o download de PDFs não exigem Looker.
 
-No repositório: **Settings → Pages → Source: GitHub Actions**. O workflow `.github/workflows/pages.yml` publica apenas `public/`. O backend não precisa ser copiado ao diretório público. O site não contém dados reais, chaves, senhas nem credenciais Google; o código do formulário é público.
+## Regra de próximas inspeções
 
-Cada navegador guarda seus próprios dados; um novo endereço/origem/caminho pode exigir importar os backups JSON das inspeções antigas. O novo site não acessa o armazenamento da instalação anterior. A chave digitada fica só em memória e precisa ser informada novamente ao reabrir a página. Com a página aberta e a chave informada, a reconexão tenta reenviar pendências.
+O cadastro `POPs` da planilha central define a criticidade de cada POP. O aplicativo exige escolher um POP cadastrado. O servidor recalcula a próxima inspeção a cada nova vistoria, em dias corridos contados da data da vistoria: **ALTA/CRÍTICA = 45 dias**; **MÉDIA = 90 dias**. A criticidade operacional observada durante a vistoria é um campo independente e não substitui a classificação do cadastro. Classes sem regra não recebem um prazo inventado; o envio solicita definição pela gestão.
 
-## Looker Studio
+O painel central mostra a programação da última vistoria de cada POP, preservando o histórico das anteriores, com a data prevista e dias restantes/vencidos. São alertas visuais no aplicativo, sem envio de e-mail. O prazo e a criticidade usados no cálculo são preservados no PDF/backup; a tabela central mantém `schedulePeriod`, `scheduleBaseDate` e `scheduleDueDate`.
 
-Conecte o Google Sheets à aba `Inspecoes_POPs`. Use `COUNT_DISTINCT(id_inspecao)` para inspeções. A taxa consolidada é `SUM(itens_conformes)/(SUM(itens_conformes)+SUM(itens_nao_conformes))`, com divisão por zero tratada como nulo. `NA` e `NV` são separados. Configure `data`, `scheduleBaseDate` e `scheduleDueDate` como datas `YYYY-MM-DD` (ou use `PARSE_DATE("%Y-%m-%d", campo)`). Os horários de recebimento/finalização são ISO UTC. As leituras preservam o texto original, inclusive unidades e valores como módulos ativos/total; converta só os campos estritamente numéricos que precisar nos gráficos.
+Por orientação do responsável, **POP Cordebras (PCAM.021)** foi retirado da programação e da seleção para novas inspeções, sem apagar registros antigos nem alterar a planilha de cadastro. O **POP 46 Base Nova**, que possui o mesmo código no cadastro, permanece selecionável; a verificação de duplicidade considera somente os POPs ativos na programação.
 
-Há uma coluna de situação e outra de observação por item do checklist. Pendências e inventário completos ficam em JSON; análises individuais por equipamento/pendência exigem tabelas auxiliares em uma evolução futura. Não somar a quantidade de equipamentos de todas as inspeções como se fosse o inventário atual. O código do POP é informado no Resumo para relacionar ao cadastro existente.
+## Limites e publicação
 
-## Testes locais
+Limites atuais: 15 MB por envio, até 100 fotos, limites de execução e conversão do Apps Script. Chaves e autoria usam as propriedades do script, sujeitas às cotas do Google; o Sheets atende este piloto e não substitui um banco transacional para grandes volumes. A cópia JSON do Drive não substitui o backup portátil original, que inclui os arquivos das fotos.
 
-`node --test tests/*.test.cjs`
+O workflow `.github/workflows/pages.yml` publica somente `public/` a partir de `main`. O código público não contém chaves individuais nem a lista de e-mails. A lista de usuários fica no arquivo privado do Drive. O endereço/origem mudou em relação à aplicação anterior; backups antigos precisam ser importados pelo próprio autor na sessão correta, pois não há migração automática entre dispositivos/usuários.
 
-Cobertura: cabeçalhos e alinhamento, validação de fotos e dados obrigatórios, neutralização de fórmulas, autorização antes da escrita, idempotência, atualização, conflitos, falha na geração do PDF, confirmação do frontend e preservação de alterações durante envio.
+Após alterar os fontes do servidor, gere o arquivo único novamente com `node tools/build-bd.cjs`. Verifique com `node --test tests/*.test.cjs` e atualize a implantação do Google para que as mudanças de servidor tenham efeito. Publicar no GitHub não atualiza o Apps Script automaticamente.

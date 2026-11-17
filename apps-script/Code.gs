@@ -2,21 +2,15 @@
 const DESTINATION_SHEET = 'Inspecoes_POPs';
 const CONFIG_DEFAULTS = {
   SPREADSHEET_ID: '1WArVbYwKaiWkhgNxeNXdbPx4OK5tNqyJcDRbFp91Gf8',
-  PDF_FOLDER_ID: '1onSSKBtDs46OXBLaHZCOkh7rXKUFROHc'
+  PDF_FOLDER_ID: '1onSSKBtDs46OXBLaHZCOkh7rXKUFROHc',
+  ACCESS_SPREADSHEET_ID: '1IRXgtRt8_oS1I5MuKD29MUrWv9xUNRibbuT_szs34j4'
 };
 function config_() {return Object.assign({}, CONFIG_DEFAULTS, PropertiesService.getScriptProperties().getProperties());}
 function hash_(text) {
   return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text, Utilities.Charset.UTF_8).map(b => ((b+256)%256).toString(16).padStart(2,'0')).join('');
 }
 function createOperatorKey() {
-  // Execute no editor, entregue a chave fora do GitHub e remova o log após a entrega.
-  const token = Utilities.getUuid() + Utilities.getUuid();
-  const props = PropertiesService.getScriptProperties();
-  const users = JSON.parse(props.getProperty('TOKEN_HASHES') || '{}');
-  const name = 'operador-' + Utilities.getUuid().slice(0,8);
-  users[hash_(token)] = name;
-  props.setProperty('TOKEN_HASHES', JSON.stringify(users));
-  console.log('Operador: ' + name + '\nChave individual: ' + token);
+  return issueAccessKeys_();
 }
 function headers_() {
   return ['id_inspecao','codigo_pop', ...fields.map(([k])=>k), 'created','updated','finalizedAt','schedulePeriod','scheduleBaseDate','scheduleDueDate',
@@ -40,6 +34,8 @@ function sheet_() {
   return sheet;
 }
 function setup() {
+  requirePrivateData_();
+  accessUsers_();
   const sheet = sheet_();
   DriveApp.getFolderById(config_().PDF_FOLDER_ID).getName();
   console.log('Aba preparada: ' + sheet.getName());
@@ -127,26 +123,44 @@ function doPost(e) {
   try {
     if (!e?.postData?.contents || e.postData.contents.length > 15*1024*1024) throw Error('Requisição vazia ou maior que 15 MB.');
     const input = JSON.parse(e.postData.contents);
-    const users = JSON.parse(config_().TOKEN_HASHES||'{}');
-    const operator = typeof input.token === 'string' && users[hash_(input.token)];
-    if (!operator) return reply_({ok:false,error:'Chave de envio inválida ou revogada.'});
+    const user = authenticate_(input);
+    if (!user) return reply_({ok:false,code:'AUTH',error:'Chave inválida, revogada ou ainda não vinculada a uma pessoa ativa.'});
+    requirePrivateData_();
     if (input.version !== 1) throw Error('Versão incompatível.');
+    if (input.action === 'session') return reply_({ok:true,user});
+    if (input.action === 'stations') return reply_({ok:true,stations:stations_()});
+    if (input.action === 'list') return reply_(listInspections_(input,user));
+    if (input.action === 'pdf') return reply_(downloadPdf_(input,user));
+    if (input.action && input.action !== 'submit') throw Error('Operação desconhecida.');
     const r = input.record;
     validate_(r);
-    const hash = hash_(JSON.stringify(r));
-    // Valida limites de célula antes de criar arquivos no Drive.
-    row_(r,{},operator,hash);
+    const schedule = applyScheduling_(r);
     lock = LockService.getScriptLock();
     if (!lock.tryLock(25000)) throw Error('Outro envio está em andamento. Tente novamente.');
     const sheet = sheet_(), headers = headers_();
     const matches = sheet.getLastRow()>1 ? sheet.getRange(2,1,sheet.getLastRow()-1,1).createTextFinder(r.id).matchEntireCell(true).findAll() : [];
     if (matches.length > 1) throw Error('ID duplicado na planilha. Contate o responsável.');
     const existing = matches.length ? matches[0].getRow() : null;
+    let operator = recordOwner_(r.id) || user.email, previous = null;
+    if (operator !== user.email && user.role !== 'GESTAO') throw Error('Registro indisponível.');
     if (existing) {
-      const previous = sheet.getRange(existing,1,1,headers.length).getValues()[0];
-      if (previous[headers.indexOf('hash_versao')] === hash) return reply_({ok:true,inspectionId:r.id,pdfUrl:previous[headers.indexOf('pdf_url')],receivedAt:previous[headers.indexOf('recebido_em')]});
-      if (String(previous[headers.indexOf('updated')]) >= r.updated) throw Error('Existe uma versão mais recente ou conflitante desta inspeção. Contate o responsável.');
+      previous = sheet.getRange(existing,1,1,headers.length).getValues()[0];
+      if (!canReadRow_(previous,headers,user)) throw Error('Registro indisponível.');
     }
+    // Autoria é definida pelo servidor, nunca pelo inspetor/e-mail/perfil do formulário.
+    r.ownerEmail = operator;
+    const hash = hash_(JSON.stringify(r));
+    row_(r,{},operator,hash);
+    const revision = recordRevision_(r.id);
+    if (previous) {
+      if (revision?.hash === hash) {
+        const pdfId=PropertiesService.getScriptProperties().getProperty('PDF_'+hash_(r.id));
+        if(pdfId)return reply_({ok:true,inspectionId:r.id,pdfUrl:DriveApp.getFileById(pdfId).getUrl(),receivedAt:revision.receivedAt,schedule});
+      }
+    }
+    if (revision && revision.hash !== hash && revision.updated >= r.updated) throw Error('Existe uma versão mais recente ou conflitante desta inspeção. Contate o responsável.');
+    // Reservar a autoria antes de gravar. Uma falha não transfere o ID a outra pessoa.
+    PropertiesService.getScriptProperties().setProperty('OWNER_'+hash_(r.id),operator);
     const folder = DriveApp.getFolderById(config_().PDF_FOLDER_ID);
     const name = r.id+'_'+hash.slice(0,12);
     // Nome determinístico permite recuperar arquivos criados antes de uma falha/timeout.
@@ -158,12 +172,16 @@ function doPost(e) {
     const pdf = artifact(name+'.pdf',()=>createPdf_(r,folder,name));
     const clean = JSON.parse(JSON.stringify(r)); delete clean.photoFiles;
     const backup = artifact(name+'.json',()=>folder.createFile(name+'.json',JSON.stringify(clean),MimeType.PLAIN_TEXT));
-    const result = {ok:true,inspectionId:r.id,pdfUrl:pdf.getUrl(),backupUrl:backup.getUrl(),receivedAt:new Date().toISOString()};
+    const result = {ok:true,inspectionId:r.id,pdfUrl:pdf.getUrl(),backupUrl:backup.getUrl(),receivedAt:new Date().toISOString(),schedule};
     const target = existing || sheet.getLastRow()+1;
     if (target > sheet.getMaxRows()) sheet.insertRowsAfter(sheet.getMaxRows(),100);
+    // Autoria privada: a coluna pública não é usada para conceder acesso.
     sheet.getRange(target,1,1,headers.length).setValues([row_(r,result,operator,hash)]);
     // Após setValues, preservar arquivos mesmo se flush falhar: a escrita pode já ter persistido.
-    committed = true; SpreadsheetApp.flush();
+    committed = true;
+    PropertiesService.getScriptProperties().setProperty('PDF_'+hash_(r.id),pdf.getId());
+    PropertiesService.getScriptProperties().setProperty('REVISION_'+hash_(r.id),JSON.stringify({hash,updated:r.updated,receivedAt:result.receivedAt}));
+    SpreadsheetApp.flush();
     return reply_(result);
   } catch (error) {
     if (!committed) created.forEach(file=>{try{file.setTrashed(true);}catch(_){}});

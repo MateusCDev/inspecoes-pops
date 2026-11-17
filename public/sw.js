@@ -1,4 +1,4 @@
-const CACHE = 'voanet-google-v1';
+const CACHE = 'voanet-google-profiles-v2';
 const BASE = new URL('./', self.location.href);
 const FILES = ['index.html','config.js','google-sync.js','entra-client.js','manifest.webmanifest','icon-192.png','icon-512.png'].map(p=>new URL(p,BASE).href);
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES))));

@@ -12,6 +12,8 @@ const BdInspecoesPOPs = (() => {
 'use strict';
 ${read('schema.gs')}
 ${read('Code.gs')}
+${read('access.gs')}
+${read('scheduling.gs')}
 return { setup, createOperatorKey, doPost };
 })();
 

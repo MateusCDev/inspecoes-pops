@@ -4,7 +4,7 @@ O GitHub Pages hospeda `public/`. O Apps Script recebe os pedidos, valida as cre
 
 ## Estado da integração
 
-O código do site e do serviço está preparado para Gestão e Operação. O serviço Google precisa ser instalado/atualizado e implantado pela pessoa responsável pela conta; a URL `/exec` ainda deve ser configurada em `public/config.js`. Enquanto essa URL estiver vazia, o site mostra a tela de ativação e não permite entrar. Os testes locais usam serviços simulados; confirmar a integração real após a implantação.
+O site está configurado com a URL `/exec` da implantação fornecida pelo responsável. O serviço respondeu em JSON e rejeitou consultas de sessão e de inspeções com chave inválida. Os testes de perfis, gravação, PDF e prazos usam serviços simulados; a entrada com chave válida e o envio de uma inspeção real devem ser homologados pela equipe. Ao atualizar o servidor, publique uma nova versão no Apps Script, pois o GitHub não altera essa implantação.
 
 ## Configuração atualizada em projeto separado
 

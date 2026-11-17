@@ -15,6 +15,18 @@ Aplicação baseada no pacote v2.2 enviado pelo usuário. O frontend é publicad
 
 ## Ativar o serviço Google (proprietário da planilha)
 
+### Alternativa de arquivo único no projeto de automações existente
+
+Para instalar em `Bd.gs`, use somente o conteúdo de [`apps-script/Bd.gs`](apps-script/Bd.gs) no lugar do código POPs anteriormente colado nesse arquivo. Ele já inclui o schema e mantém os auxiliares dentro de um módulo para reduzir conflitos com outros arquivos. Não é necessário criar `schema.gs` separado nem substituir o código das automações existentes. Escolha esta alternativa OU a instalação de `Code.gs` + `schema.gs` abaixo; não cole as duas versões do receptor no mesmo projeto.
+
+Salve e execute `prepararInspecoesPOPs` para validar a planilha e a pasta, autorizando a conta quando solicitado. Depois execute `criarChaveInspecoesPOPs` para gerar as chaves individuais. Os nomes dessas funções substituem `setup` e `createOperatorKey` nesta alternativa.
+
+Antes de implantar, confira se os outros arquivos do projeto já possuem um `doPost`. Deve existir somente um ponto de entrada global; nesse caso, integre o encaminhamento para `receberInspecoesPOPs(e)` na função existente, preservando as demais rotas, em vez de manter dois `doPost`. O arquivo único não altera um `doGet` preexistente. Preserve as configurações e os escopos de OAuth das outras automações no manifesto; se os escopos forem explícitos, acrescente apenas os que a integração exige. A autorização precisa ser feita por uma pessoa na conta Google.
+
+O arquivo único é gerado por `node tools/build-bd.cjs`; após mudar os fontes, gere novamente antes de publicar.
+
+### Instalação em arquivos separados em projeto dedicado
+
 1. Na planilha fornecida, abra **Extensões → Apps Script**.
 2. Crie os arquivos `Code.gs` e `schema.gs` e copie os conteúdos de `apps-script/`. O primeiro já aponta para a planilha e para a pasta criada para os PDFs.
 3. Em Configurações do projeto, habilite a exibição de `appsscript.json` e substitua pelo manifesto deste pacote. Os escopos permitem operar a planilha e criar o documento temporário/PDF no Drive.

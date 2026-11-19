@@ -25,8 +25,12 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.52 system-ui,-ap
 .v22-bat{border:1px solid #dce5ef;border-left:4px solid #4f87be;padding:11px;border-radius:9px;margin:9px 0;background:#fff}
 .v22-small{font-size:12px;color:#52657b}
 .v22-alert{border-color:#efc77b;background:#fff9ec}
-</style></head>
+</style><link rel="stylesheet" href="./portal.css"></head>
 <body><header class="header"><img class="logo" alt="VOANET" id="brandLogo" width="1116" height="229"><div class="hsep"></div><div class="header-sub"><strong>Inspeção Preventiva - Infraestrutura</strong>Diagnóstico técnico • Infraestrutura</div><div class="head-right"><span id="save" class="small muted hide-sm">Dados neste dispositivo</span><button class="btn tiny hide-sm" id="goHome">Estações</button></div></header>
+<nav class="portal-tabs" aria-label="Aplicações de infraestrutura">
+  <a href="./" aria-current="page">Inspeções POPs</a>
+  <a href="./frota/">Frota</a>
+</nav>
 <div id="app"></div>
 <script src="./config.js?v=__BUILD_ID__"></script>
 <script src="./google-sync.js?v=__BUILD_ID__"></script>

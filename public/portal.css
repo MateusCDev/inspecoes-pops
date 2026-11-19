@@ -1,0 +1,18 @@
+.portal-tabs {
+  display: flex;
+  gap: .25rem;
+  padding-inline: 1rem;
+  background: #fff;
+  border-bottom: 1px solid #dfe2e7;
+  font: 600 .875rem/1.5 system-ui, sans-serif;
+}
+.portal-tabs a {
+  padding: .7rem .75rem;
+  color: #353b44;
+  text-decoration: none;
+}
+.portal-tabs [aria-current="page"] {
+  color: #a91520;
+  box-shadow: inset 0 -3px #c91c27;
+}
+.portal-tabs a:focus-visible { outline: 2px solid #a91520; outline-offset: -2px; }

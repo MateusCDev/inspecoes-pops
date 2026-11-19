@@ -20,11 +20,16 @@ ${read('jobs.gs')}
 ${read('dashboard.gs')}
 ${read('assets.gs')}
 ${read('access-admin.gs')}
-return { setup, createOperatorKey, doPost, processQueue };
+${read('fleet.gs')}
+return { setup, setupFleet, createOperatorKey, doPost, processQueue };
 })();
 
 function prepararInspecoesPOPs() {
   return BdInspecoesPOPs.setup();
+}
+
+function prepararFrota() {
+  return BdInspecoesPOPs.setupFleet();
 }
 
 function criarChaveInspecoesPOPs() {

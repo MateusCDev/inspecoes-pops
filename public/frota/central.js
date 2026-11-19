@@ -12,7 +12,7 @@ const fleetMedia = value => typeof value === 'string' &&
   /^data:image\/(?:png|jpeg|gif|webp);base64,[a-zA-Z0-9+/]+={0,2}$/.test(value) ? value : '';
 
 async function fleetRpc(action, data, key = fleetKey) {
-  const endpoint = window.VOANET_SYNC_CONFIG?.google?.endpoint;
+  const endpoint = window.VOANET_SYNC_CONFIG?.fleet?.endpoint;
   if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(endpoint || '')) {
     throw Error('Serviço Google da Frota não configurado.');
   }

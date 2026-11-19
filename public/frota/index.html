@@ -17,7 +17,7 @@
   <a href="./" aria-current="page">Frota</a>
 </nav>
 <div id="root"></div>
-<script src="../config.js"></script>
+<script src="../config.js?v=__BUILD_ID__"></script>
 <script>
 'use strict';
 const CHECK_GROUPS = [
@@ -1358,4 +1358,4 @@ async function saveExtension(id){let v=vehicle(id),d=deadline(v),reason=$('ext_r
 const vehicleDetailBase=vehicleDetail;vehicleDetail=function(id){vehicleDetailBase(id);let v=vehicle(id),d=deadline(v);document.querySelector('#overlay .modal').insertAdjacentHTML('beforeend',`<h3 class="space">Controle V2.3</h3><p>Próximo checklist: ${d?displayDate(d.due):'Primeira inspeção pendente'}${d?.extended?' · Prorrogação: '+h(v.extension.reason):''}</p><div class="flex"><button class="btn secondary" onclick="qrModal('${id}')">QR Code</button><button class="btn secondary" onclick="compareModal('${id}')">Comparar fotos</button><button class="btn secondary" onclick="extensionModal('${id}')">Prorrogar para 15 dias</button></div>`)};
 async function saveQRBase(){let val=$('qr_base').value.trim();try{if(val){let u=new URL(val);if(!['http:','https:'].includes(u.protocol)||u.username||u.password)throw Error();u.hash='';val=u.href}state.settings??={};state.settings.qrBase=val;await save();notify('Endereço salvo.')}catch(e){notify('Informe uma URL HTTP(S) válida.')}}
 
-</script><script src="./central.js"></script></body></html>
+</script><script src="./central.js?v=__BUILD_ID__"></script></body></html>

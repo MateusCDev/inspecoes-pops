@@ -126,6 +126,7 @@ function doPost(e) {
     requirePrivateData_();
     if(input.version!==1)throw Error('Versão incompatível.');
     if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,accessAdmin:true}});
+    if(input.action==='fleetLoad'||input.action==='fleetSave')return reply_(fleetRequest_(input,user));
     if(input.action==='users')return reply_(listAccess_(user));
     if(input.action==='manageOperator')return reply_(manageOperator_(input,user));
     if(input.action==='stations')return reply_({ok:true,stations:stations_()});

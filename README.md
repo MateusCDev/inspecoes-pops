@@ -6,6 +6,20 @@ O GitHub Pages hospeda `public/`. O Apps Script recebe os pedidos, valida as cre
 
 O site está conectado ao serviço Google. A versão v2 acrescenta processamento em fila, envio de fotos separado, resumo do painel, consolidação de ativos e administração de operadores pelo próprio aplicativo. O cliente negocia esses recursos com o servidor: enquanto o Apps Script não for atualizado, continua usando o fluxo anterior e mostra o aviso de atualização pendente à Gestão. Publicar no GitHub não atualiza o Apps Script. Os testes automatizados usam serviços simulados; homologar uma inspeção com fotos e inventário conferido após publicar a nova versão do serviço.
 
+## Frota Infra
+
+O portal oferece as abas **Inspeções POPs** e **Frota**. A Frota usa a mesma URL do Apps Script e as chaves individuais já emitidas. Nesta versão, só o perfil **Gestão** pode consultar ou gravar o acervo de Frota. A chave deve ser informada ao entrar no módulo.
+
+A aba **Frota** do arquivo **DADOS CENTRALIZADOS (INFRA)** recebe a lista operacional de veículos, checklists, avarias e devoluções. A descrição nessa lista é padronizada. O acervo completo, inclusive os cadastros de condutores, fotos, documentos e histórico de gravações, é guardado no Drive restrito. A aba é atualizada pelo aplicativo. Edições manuais nos registros da Frota podem ser substituídas na próxima gravação. O compartilhamento já configurado da planilha permite acesso direto à lista operacional.
+
+### Ativar no Apps Script
+
+1. No projeto Apps Script já usado para Inspeções POPs, copie o conteúdo gerado de [`apps-script/Bd.gs`](apps-script/Bd.gs) para o arquivo único da integração. Preserve a implantação atual e suas propriedades. A Frota faz parte desse mesmo arquivo.
+2. Com a conta que executa a implantação, execute **`prepararFrota`**. Ela confere os cabeçalhos da guia **Frota** e cria uma pasta de Drive dedicada, de acesso geral restrito. A propriedade privada `FLEET_FOLDER_ID` identifica a pasta. Restrinja também os convites diretos à pasta.
+3. Crie uma nova versão da implantação Web existente, preservando a URL `/exec`. Em homologação, entre com uma chave de Gestão, grave um veículo fictício e confira a linha na guia Frota. Confirme também a recusa de uma chave do perfil Operação. Publique a interface pelo fluxo habitual do GitHub Pages depois que o serviço estiver disponível.
+
+É possível importar um backup da Frota Infra V2.3 pela tela de configurações na primeira revisão. A integração mantém até 12 MB de acervo por gravação, incluindo imagens e PDFs. Use imagens reduzidas e acompanhe o volume em homologação. Rascunhos de checklist permanecem na sessão atual. Duas pessoas podem consultar o acervo ao mesmo tempo. Em caso de gravações conflitantes, atualize a tela antes de refazer a alteração.
+
 ## Cadastro de operadores pela interface
 
 Depois de atualizar o serviço, qualquer um dos cinco gestores pode abrir **Gerenciar acessos** na tela inicial. Basta informar o e-mail e clicar em **Cadastrar e gerar chave**. A chave aparece para cópia e entrega privada, sem acessar a planilha ou o Apps Script. A tela também permite reemitir chaves de operadores e desativar acessos; o histórico das inspeções permanece intacto. Reemissão invalida a chave anterior. A chave recém-gerada fica somente na memória da tela e é removida ao sair ou trocar de usuário, sem ser salva no navegador ou no histórico.

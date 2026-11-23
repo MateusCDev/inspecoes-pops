@@ -202,3 +202,29 @@ function assetIssues_(input,user){
   const rows=sheet&&sheet.getLastRow()>1?sheet.getRange(2,1,sheet.getLastRow()-1,AUDIT_HEADERS.length).getValues():[];
   return {ok:true,issues:rows.filter(r=>r[2]===input.inspectionId&&r[6]==='PENDENCIA'&&r[10]===(revision?.assetAuditVersion||revision?.hash)).map(r=>({tab:r[4],detail:r[7]}))};
 }
+
+function inspectionAssets_(input,user){
+  const id=input.inspectionId;
+  if(!/^INSP-[A-Za-z0-9-]+$/.test(id||'')||user.role!=='GESTAO'||!recordOwner_(id))throw Error('Inventário indisponível.');
+  const revision=recordRevision_(id);
+  if(!revision?.payloadId)throw Error('O inventário desta inspeção ainda não está disponível.');
+  const record=readJsonFile_(revision.payloadId);
+  const banks=record.invBatteryBanks?.length?record.invBatteryBanks:(record.equipamentos?.bancos||[]);
+  const groups=[
+    ['Equipamentos de rede',record.inventory],
+    ['Transceivers',record.invTransceivers],
+    ['Climatização',record.equipamentos?.climatizadores],
+    ['Retificadores',record.equipamentos?.retificadoras],
+    ['DIOs',record.equipamentos?.dios],
+    ['Bancos de baterias',banks],
+    ['Baterias',banks.flatMap(bank=>bank.baterias||[])]
+  ].filter(([,items])=>Array.isArray(items)&&items.length).map(([label,items])=>({
+    label,items:items.map(item=>({
+      name:String(item.modelo||item.identificacao||item.tipo||'Sem identificação').slice(0,130),
+      serial:String(item.serie||item.serial||'').slice(0,80),
+      asset:String(item.patrimonio||'').slice(0,80),
+      status:String(item.estado||item.confirmacao||'').slice(0,90)
+    }))
+  }));
+  return {ok:true,inspectionId:id,groups};
+}

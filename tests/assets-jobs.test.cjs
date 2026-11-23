@@ -88,3 +88,16 @@ test('reprocessamento mostra somente as pendências atuais e conserva o PDF e a 
  assert.equal(h.request(list,'manager').issues.length,0);
  assert.equal(h.audit.some(row=>row[0]==='registro antigo'),true);
 });
+
+test('Gestão consulta equipamentos da inspeção arquivada sem alterar os ativos centrais',()=>{
+ const h=harness(),record=climateRecord(h);
+ record.invTransceivers=[{id:'TX-FICTICIO',tipo:'SFP+',serie:'TX-1'}];
+ assert.equal(h.send(record).ok,true);
+ const action={action:'inspectionAssets',inspectionId:record.id};
+ assert.equal(h.request(action).ok,false);
+ assert.equal(h.request(action,'other').ok,false);
+ const inventory=h.request(action,'manager');
+ assert.equal(inventory.ok,true);
+ assert.deepEqual(inventory.groups.map(group=>group.label),['Transceivers','Climatização']);
+ assert.equal(inventory.groups[1].items[0].name,'AC100');
+});

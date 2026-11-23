@@ -73,13 +73,13 @@ async function googlePollJobs(){
   }finally{googleJobsPolling=false;}
 }
 async function googleRefreshSummary(){
-  if(googleCentralBusy||!googleUser)return;googleCentralBusy=true;const session=googleSession;render();
+  if(googleCentralBusy||!googleUser)return;googleCentralBusy=true;googleCentralError='';const session=googleSession;googleRenderCentralData();
   try{
     const result=await googleRpc('dashboard');if(session!==googleSession)return;
     if(!Array.isArray(result.items)||!result.summary)throw Error('Resumo central inválido.');
     googleCentralItems=result.items;googleSummary=result.summary;googleNextCursor=result.nextCursor;googleCentralUpdated=new Date().toLocaleString('pt-BR');
-  }catch(error){if(session===googleSession)alert('Falha ao consultar o painel: '+error.message);}
-  finally{if(session===googleSession){googleCentralBusy=false;render();}}
+  }catch(error){if(session===googleSession)googleCentralError=error.message;}
+  finally{if(session===googleSession){googleCentralBusy=false;googleRenderCentralData();}}
 }
 async function googleLoadMore(){
   if(googleCentralBusy||googleNextCursor===null)return;googleCentralBusy=true;const session=googleSession;
@@ -95,26 +95,42 @@ async function googleReprocessAssets(id){
 function closeGoogleAssetIssues(){
   document.getElementById('google-asset-issues')?.close();
 }
-async function googleShowAssetIssues(id){
+function openGoogleAssetDialog(title,id,loading){
   closeGoogleAssetIssues();
-  const session=googleSession,key=googleAccessKey;
   const record=googleCentralItems.find(item=>item.id===id);
   const dialog=document.createElement('dialog');
   dialog.id='google-asset-issues';
   dialog.className='asset-issues-dialog';
   dialog.setAttribute('aria-labelledby','asset-issues-title');
   dialog.innerHTML=`<header class="card-head">
-    <div><h2 id="asset-issues-title">Pendências de conferência</h2>
+    <div><h2 id="asset-issues-title">${title}</h2>
       ${record?`<p class="muted">${esc(record.station)} · ${esc(fmt(record.date))}</p>`:''}
     </div>
     <form method="dialog"><button class="btn tiny" autofocus>Fechar</button></form>
-  </header><div data-asset-issues-content aria-live="polite"><p>Carregando pendências…</p></div>`;
+  </header><div data-asset-issues-content aria-live="polite"><p>${loading}</p></div>`;
   dialog.addEventListener('close',()=>dialog.remove(),{once:true});
   document.body.append(dialog);
   dialog.showModal();
-  const content=dialog.querySelector('[data-asset-issues-content]');
+  return {dialog,content:dialog.querySelector('[data-asset-issues-content]')};
+}
+async function googleShowInventory(id){
+  const session=googleSession;
+  const {dialog,content}=openGoogleAssetDialog('Equipamentos da vistoria',id,'Consultando o inventário arquivado…');
   try{
-    const result=await googleRpc('assetIssues',{inspectionId:id},key);
+    const result=await googleRpc('inspectionAssets',{inspectionId:id});
+    if(session!==googleSession||!dialog.open)return;
+    if(!Array.isArray(result.groups))throw Error('O serviço não trouxe o inventário.');
+    content.innerHTML=result.groups.length?result.groups.map(group=>`<section>
+      <h3>${esc(group.label)}</h3><ul>${group.items.map(item=>`<li><strong>${esc(item.name)}</strong>
+      ${esc([item.serial&&'Série '+item.serial,item.asset&&'Patrimônio '+item.asset,item.status].filter(Boolean).join(' · '))}</li>`).join('')}</ul></section>`).join('')
+      :'<p>Nenhum equipamento foi registrado nesta inspeção.</p>';
+  }catch(error){if(session===googleSession&&dialog.open)content.innerHTML=`<p role="alert">${esc(error.message)}</p>`;}
+}
+async function googleShowAssetIssues(id){
+  const session=googleSession;
+  const {dialog,content}=openGoogleAssetDialog('Pendências de conferência',id,'Carregando pendências…');
+  try{
+    const result=await googleRpc('assetIssues',{inspectionId:id});
     if(session!==googleSession||!dialog.open)return;
     if(!Array.isArray(result.issues))throw Error('A resposta do serviço não trouxe os detalhes das pendências.');
     const tabs=new Map();
@@ -132,6 +148,7 @@ async function googleShowAssetIssues(id){
 document.addEventListener('click',e=>{
   const action=e.target.closest('[data-action]')?.dataset.action;if(!googleUser)return;
   if(action==='googleLoadMore')googleLoadMore();if(action?.startsWith('googleAssets:'))googleReprocessAssets(action.slice(13));
+  if(action?.startsWith('googleInventory:'))googleShowInventory(action.slice('googleInventory:'.length));
   if(action?.startsWith('googleIssues:'))googleShowAssetIssues(action.slice(13));
 });
 if(typeof window.setInterval==='function')window.setInterval(googlePollJobs,5000);

@@ -20,6 +20,13 @@ A aba **Frota** do arquivo **DADOS CENTRALIZADOS (INFRA)** recebe a lista operac
 
 É possível importar um backup da Frota Infra V2.3 pela tela de configurações na primeira revisão. A integração mantém até 12 MB de acervo por gravação, incluindo imagens e PDFs. Use imagens reduzidas e acompanhe o volume em homologação. Rascunhos de checklist permanecem na sessão atual. Duas pessoas podem consultar o acervo ao mesmo tempo. Em caso de gravações conflitantes, atualize a tela antes de refazer a alteração.
 
+## Consultas de inspeções e ativos
+
+- **Dashboard Gerencial** mostra indicadores consolidados. **Inspeções Recebidas** lista os envios da equipe e **Cronograma** mostra a próxima data por POP.
+- O perfil **Operação** consulta seus próprios envios, de acordo com a autoria verificada no Apps Script. A lista local de cada perfil continua mostrando as inspeções preenchidas ou importadas com aquela conta e navegador.
+- **Gestão de Ativos** mostra o resultado da consolidação por inspeção. Depois de implantar o `Bd.gs` atualizado, **Ver equipamentos** consulta o inventário arquivado de cada vistoria, inclusive os itens que precisam de conferência antes de entrar na planilha central.
+- **Baixar resumo PDF** gera uma página com indicadores da base central. **PDF arquivado** abre o relatório associado ao envio.
+
 ## Relatório de inspeção
 
 O PDF gerencial traz a identidade VOANET, um resumo de uma página da vistoria, os principais achados e as ações prioritárias. O nome do arquivo começa pela estação e pela data da vistoria. O checklist, o inventário e todas as fotos continuam no envio arquivado para consulta técnica.

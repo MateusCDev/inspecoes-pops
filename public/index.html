@@ -43,6 +43,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.52 system-ui,-ap
 <script src="./config.js?v=__BUILD_ID__"></script>
 <script src="./google-sync.js?v=__BUILD_ID__"></script>
 <script src="./google-features.js?v=__BUILD_ID__"></script>
+<script src="./google-pdf.js?v=__BUILD_ID__"></script>
 <script src="./google-access.js?v=__BUILD_ID__"></script>
 <script src="./entra-client.js"></script>
 
@@ -225,6 +226,20 @@ function inv13Dashboard(){const last=stationSummaries(records.filter(r=>r.finali
 }
 function inv13Report(r){inv13(r);const map=new Map(r.inventory.map(a=>[a.id,a]));return `<section><h2>13.2 — Transceivers ópticos</h2><table><thead><tr><th>Equipamento / porta</th><th>Tipo / velocidade</th><th>Fabricante / modelo</th><th>Série / patrimônio</th><th>Estado</th></tr></thead><tbody>${r.invTransceivers.map(t=>{const a=map.get(t.equipamentoId);return `<tr><td>${esc((a?.modelo||a?.tipo||'Não vinculado')+' / '+(t.porta||'—'))}</td><td>${esc(t.tipo||'—')} ${esc(t.velocidade||'—')} Gbps<br>${esc(t.alcance||'—')} km / ${esc(t.onda||'—')}</td><td>${esc(t.fabricante||'—')} / ${esc(t.modelo||'—')}</td><td>${esc(t.serie||'—')} / ${esc(t.patrimonio||'—')}</td><td>${esc(t.estado||'—')}</td></tr>`}).join('')||'<tr><td colspan="5">Não cadastrado</td></tr>'}</tbody></table></section><section><h2>13.3 — Bancos e baterias</h2>${r.invBatteryBanks.map(bank=>`<h3>${esc(bank.identificacao||'Banco de baterias')} — ${esc(bank.local||'')}</h3><p>Tensão: ${esc(bank.tensao||'—')} V · Configuração: ${esc(bank.topologia||'—')}</p><table><thead><tr><th>Identificação / fabricante</th><th>Dados técnicos</th><th>Fabricação</th><th>Instalação</th><th>Vida útil / limite</th><th>Condição</th></tr></thead><tbody>${bank.baterias.map(b=>{const v=lifeData(b);return `<tr><td>${esc(b.identificacao||'—')}<br>${esc(b.fabricante||'—')} ${esc(b.modelo||'')}</td><td>${esc(b.tensao||'—')} V / ${esc(b.capacidade||'—')} Ah<br>Série: ${esc(b.serie||'—')}</td><td>${esc(fmt(b.fabricacao))}</td><td>${esc(fmt(b.instalacao))}</td><td>${esc(b.vidaAnos||'—')} anos<br>${esc(fmt(v.due))}<br>${esc(v.label)}</td><td>${esc(b.estado||'—')}</td></tr>`}).join('')||'<tr><td colspan="6">Nenhuma bateria neste banco.</td></tr>'}</tbody></table>`).join('')||'<p>Nenhum banco cadastrado.</p>'}</section>`}
 
+function renderCentralAssets(){
+  if(!isGoogleMode()||googleUser?.role!=='GESTAO')return '';
+  const rows=googleCentralItems.map(record=>`<tr><td>${esc(record.station)}</td><td>${esc(fmt(record.date))}</td>
+    <td>${esc(record.assets?googleAssetText(record.assets):'Resultados de consolidação indisponíveis')}</td>
+    <td>${googleCapabilities.assetInventory?button('googleInventory:'+record.id,'Ver equipamentos','tiny'):''}
+    ${record.assets?.pending?button('googleIssues:'+record.id,'Ver pendências','tiny'):''}</td></tr>`).join('');
+  return `<section class="card"><div class="card-head"><div><h2>Ativos nas inspeções recebidas</h2>
+    <p class="small muted">${esc(googleCentralStatus())}</p></div>${button('googleRefresh','Atualizar','tiny')}</div>
+    ${googleCapabilities.assetInventory?'':'<p class="small muted">A lista de equipamentos por vistoria requer a versão atual do Apps Script.</p>'}
+    <div class="table-scroll"><table class="data-table"><thead><tr><th>Estação</th><th>Vistoria</th><th>Cadastro central</th><th>Consulta</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="4">Nenhum resultado disponível nesta consulta.</td></tr>'}</tbody></table></div>
+    ${googleNextCursor!==null?button('googleLoadMore','Carregar mais inspeções','tiny'):''}</section>`;
+}
+
 function renderAssetsOverview(){
   const books=[
     ['inventory','Inventário de ativos','Equipamentos e transceivers'],
@@ -243,6 +258,7 @@ function renderAssetsOverview(){
   return `<div class="shell" style="display:block;max-width:1160px">
     <div class="home-hero"><div><h1>Gestão de Ativos</h1><p>Consulte o inventário por estação e acompanhe a vida útil das baterias.</p></div>${button('home','Voltar','primary')}</div>
     ${catalog}
+    ${renderCentralAssets()}
     <section class="card"><h2>Inventário das inspeções neste dispositivo</h2>
       <div class="table-scroll"><table class="data-table"><thead><tr><th>Estação</th><th>Vistoria</th><th>Ativos</th><th>Transceivers</th><th>Baterias</th><th>Ação</th></tr></thead>
       <tbody>${localRows||'<tr><td colspan="6">Nenhuma inspeção com estação cadastrada neste dispositivo.</td></tr>'}</tbody></table></div>
@@ -277,6 +293,16 @@ function effectiveHomeRole(){
  return authenticatedRole||rolePreview;
 }
 function homeTile(action,icon,title,detail){return `<button class="home-tile" type="button" data-action="${action}"><span class="tile-icon" aria-hidden="true">${icon}</span><span class="tile-copy"><strong>${esc(title)}</strong><small>${esc(detail)}</small></span><span aria-hidden="true">›</span></button>`}
+function renderReceivedOverview(){
+  if(!isGoogleMode()||!googleUser)return '';
+  const manager=googleUser.role==='GESTAO';
+  const rows=googleCentralItems.slice(0,5).map(item=>`<tr><td>${esc(item.station)}</td><td>${esc(fmt(item.date))}</td><td>${esc(item.technician||'—')}</td></tr>`).join('');
+  return `<section class="card"><div class="card-head"><div><h2>${manager?'Inspeções recebidas da equipe':'Minhas inspeções enviadas'}</h2>
+    <p class="small muted">${esc(googleCentralStatus())}${googleCentralUpdated?' · '+(googleSummary?.total??googleCentralItems.length)+' registro(s)':''}</p>
+    </div>${button(manager?'homeReceived':'googleCentral','Abrir histórico','primary tiny')}</div>
+    ${rows?`<div class="table-scroll"><table class="data-table"><thead><tr><th>Estação</th><th>Vistoria</th><th>Técnico</th></tr></thead><tbody>${rows}</tbody></table></div>`
+      :googleCentralUpdated&&!googleCentralBusy?'<p>Nenhuma inspeção sincronizada para este perfil.</p>':''}</section>`;
+}
 function renderHome(){
  const role=effectiveHomeRole(),isManager=managementRoles.has(role),isIT=role==='ti';
  const managerTiles=[
@@ -303,7 +329,7 @@ function renderHome(){
  const tiles=(isManager?managerTiles:isIT?itTiles:technicianTiles).map(t=>homeTile(...t)).join('')+(isGoogleMode()&&isManager&&googleCapabilities.accessAdmin?homeTile('googleAccess','♙','Gerenciar acessos','Cadastrar operadores, gerar chaves e desativar acessos'):'');
  const rolePicker=isGoogleMode()?googleProfilePanel():!internalProfile?`<div class="card profile-preview"><div class="card-head"><div><h2>Prévia de navegação por perfil</h2><p class="muted small">Somente para homologação visual. Trocar a opção não autentica nem concede permissões. A validação real será feita pela API do TI.</p></div></div><div class="field"><label for="role-preview">Simular tela inicial</label><select id="role-preview" data-role-preview><option value="gestao_interna" ${role==='gestao_interna'?'selected':''}>Gestão Interna / Análise</option><option value="tecnico" ${role==='tecnico'?'selected':''}>Equipe Infraestrutura O&M</option><option value="ti" ${role==='ti'?'selected':''}>Administrador TI</option></select></div></div>`:`<div class="notice"><b>Perfil validado pelo servidor:</b> ${esc(roleName[role]||'Não identificado')}.</div>`;
  const stats=`<div class="grid3" style="margin-bottom:18px"><div class="stat"><strong>${records.length}</strong><span>Inspeções neste dispositivo</span></div><div class="stat"><strong>${records.reduce((n,r)=>n+ncCount(r),0)}</strong><span>Não conformidades registradas</span></div><div class="stat"><strong>${records.reduce((n,r)=>n+r.photos.length,0)}</strong><span>Fotos vinculadas</span></div></div>`;
- return `<div class="shell" style="display:block;max-width:1120px"><div class="home-hero"><div><div class="eyebrow" style="color:#ffb5bd">VOANET | O&M</div><h1>Gestão de Infraestrutura</h1><p>Inspeções preventivas, conformidade técnica e acompanhamento de planos de ação das estações.</p></div><div class="btnrow">${isManager?button(isGoogleMode()?'googleCentral':'dashboard','Dashboard Gerencial','primary'):button('new','+ Nova inspeção','primary')}</div></div>${rolePicker}<div class="card"><div class="card-head"><div><h2>${isManager?'Área de Gestão':isIT?'Área Administrativa':'Área de Campo'}</h2><p class="muted small">Perfil: ${esc(roleName[role]||'Não identificado')}. ${isManager?'Consulte o painel central para acompanhar as inspeções da equipe.':'Atalhos organizados conforme a atividade.'}</p></div></div><div class="home-tile-grid">${tiles}</div></div><div class="card" id="estacoes"><div class="card-head"><div><h2>Inspeções neste dispositivo</h2><p class="small muted" style="margin:0">Inspeções preenchidas ou importadas neste navegador.</p></div><div class="btnrow">${isGoogleMode()&&isManager?button('homeReceived','Ver inspeções recebidas','tiny'):''}${button('import','Importar backup','tiny')}</div></div>${stats}${records.length?records.slice().sort((a,b)=>b.updated.localeCompare(a.updated)).map(r=>`<div class="record"><div class="record-main"><strong>${esc(r.nome||'Estação sem nome')}</strong><small>${esc(r.inspetor||'Técnico não informado')} · ${fmt(r.data)} · ${completed(r)}/${totalChecks()} verificações · ${scheduleChip(scheduleState(r))}</small></div><div class="btnrow">${button('open:'+r.id,'Abrir','primary tiny')}${button('delete:'+r.id,'Excluir','danger tiny')}</div></div>`).join(''):`<div class="empty"><strong>Nenhuma inspeção neste dispositivo</strong>${button('new','+ Iniciar inspeção','primary')}</div>`}</div><div id="sync-section">${syncPanel()}</div>${isGoogleMode()?'<div class="notice">As permissões são verificadas no serviço. O painel local mostra registros deste usuário neste navegador; o painel central consulta a planilha.</div>':`<div class="notice"><b>Segurança:</b> os perfis desta prévia são apenas navegação visual. Sem login e autorização validados no backend, não há isolamento entre usuários. Os dados permanecem neste dispositivo até sincronização confirmada pelo servidor.</div>`}<div class="footer">VOANET · Gestão de Infraestrutura · Homologação v2.1</div></div><input id="importFile" type="file" accept="application/json,.json" hidden>`;
+ return `<div class="shell" style="display:block;max-width:1120px"><div class="home-hero"><div><div class="eyebrow" style="color:#ffb5bd">VOANET | O&M</div><h1>Gestão de Infraestrutura</h1><p>Inspeções preventivas, conformidade técnica e acompanhamento de planos de ação das estações.</p></div><div class="btnrow">${isManager?button(isGoogleMode()?'googleCentral':'dashboard','Dashboard Gerencial','primary'):button('new','+ Nova inspeção','primary')}</div></div>${rolePicker}<div class="card"><div class="card-head"><div><h2>${isManager?'Área de Gestão':isIT?'Área Administrativa':'Área de Campo'}</h2><p class="muted small">Perfil: ${esc(roleName[role]||'Não identificado')}. ${isManager?'Consulte o painel central para acompanhar as inspeções da equipe.':'Atalhos organizados conforme a atividade.'}</p></div></div><div class="home-tile-grid">${tiles}</div></div>${renderReceivedOverview()}<div class="card" id="estacoes"><div class="card-head"><div><h2>Inspeções neste dispositivo</h2><p class="small muted" style="margin:0">Inspeções preenchidas ou importadas neste navegador.</p></div><div class="btnrow">${isGoogleMode()&&isManager?button('homeReceived','Ver inspeções recebidas','tiny'):''}${button('import','Importar backup','tiny')}</div></div>${stats}${records.length?records.slice().sort((a,b)=>b.updated.localeCompare(a.updated)).map(r=>`<div class="record"><div class="record-main"><strong>${esc(r.nome||'Estação sem nome')}</strong><small>${esc(r.inspetor||'Técnico não informado')} · ${fmt(r.data)} · ${completed(r)}/${totalChecks()} verificações · ${scheduleChip(scheduleState(r))}</small></div><div class="btnrow">${button('open:'+r.id,'Abrir','primary tiny')}${button('delete:'+r.id,'Excluir','danger tiny')}</div></div>`).join(''):`<div class="empty"><strong>Nenhuma inspeção neste dispositivo</strong>${button('new','+ Iniciar inspeção','primary')}</div>`}</div><div id="sync-section">${syncPanel()}</div>${isGoogleMode()?'<div class="notice">As permissões são verificadas no serviço. O painel local mostra registros deste usuário neste navegador; o painel central consulta a planilha.</div>':`<div class="notice"><b>Segurança:</b> os perfis desta prévia são apenas navegação visual. Sem login e autorização validados no backend, não há isolamento entre usuários. Os dados permanecem neste dispositivo até sincronização confirmada pelo servidor.</div>`}<div class="footer">VOANET · Gestão de Infraestrutura · Homologação v2.1</div></div><input id="importFile" type="file" accept="application/json,.json" hidden>`;
 }
 function specialSection(r){
  if(view==='torre')return `<div class="card feature-card"><div class="eyebrow">Caracterização da estação</div><h2>🗼 Estrutura de torre</h2><p class="muted small">Registre se a base possui torre. Em bases sem torre, os itens TR recebem “Não se aplica”. Somente inspeção visual a partir de local seguro e documentos disponíveis; avaliação ou acesso à estrutura exige profissional habilitado.</p><div class="grid">${htmlField('torrePresenca','Esta base possui torre?','select',['Não verificado','Sim','Não'])}${htmlField('torreTipo','Tipo de estrutura','select',['','Autoportante','Estaiada','Monopolo','Outra','Não identificado'])}${htmlField('torreAltura','Altura informada (m)','text','Se disponível em documentação')}${htmlField('torreLaudo','Data do último laudo/inspeção estrutural','date')}${htmlField('torreObs','Observações e recomendações','textarea','Registre evidências, documentos e pontos a verificar','full')}</div>${r.torrePresenca==='Não'?'<div class="subtle" style="margin-top:14px">Base sem torre: checklist estrutural classificado como não aplicável. Isso não indica conformidade de outros sistemas.</div>':''}</div>`;
@@ -410,9 +436,13 @@ async function makeReport(){const r=cur();let photoHtml='';const categories=new 
 async function report(open){if(isBusy)return;isBusy=true;let tab=null;if(open)tab=window.open('','_blank');try{const r=cur();const html=await makeReport();if(open&&tab){tab.document.open();tab.document.write(html);tab.document.close()}else download(html,`VOANET_Relatorio_${issueId(r)}_${r.data||'vistoria'}.html`,'text/html;charset=utf-8')}catch(e){console.error(e);if(tab)tab.close();alert('Não foi possível gerar o relatório.')}finally{isBusy=false}}
 function handleAction(s){
 if(s==='homeStations'){document.getElementById('estacoes')?.scrollIntoView({behavior:'smooth',block:'start'});return}
-if(s==='homeReceived'&&isGoogleMode())return openGoogleCentral('google-history-heading');
-if(s==='homeSchedule'){if(isGoogleMode())return openGoogleCentral('google-schedule-heading');dashboardFilter='alerta';return navigate('dashboard')}
-if(s==='homeAssets')return navigate('assets');
+if(s==='homeReceived'&&isGoogleMode())return openGoogleCentral('history');
+if(s==='homeSchedule'){if(isGoogleMode())return openGoogleCentral('schedule');dashboardFilter='alerta';return navigate('dashboard')}
+if(s==='homeAssets'){
+ navigate('assets');
+ if(isGoogleMode()&&googleUser?.role==='GESTAO')googleRefreshCentral();
+ return;
+}
 if(s.startsWith('openInventory:')){
  const id=s.slice('openInventory:'.length);
  if(records.some(record=>record.id===id)){activeId=id;return navigate('inventario')}

@@ -15,7 +15,7 @@ function enqueueInspection_(record,user,reprocess=false){
       if(previous.hash!==hash)throw Error('A versão anterior ainda está em processamento. Aguarde sua conclusão.');
       return previous;
     }
-    const current={id:record.id,hash,actor:user.email,owner,updated:record.updated,state:'recebendo',createdAt:new Date().toISOString(),leaseUntil:Date.now()+JOB_LEASE_MS,schedule,reprocess};
+    const current={id:record.id,hash,actor:user.email,owner,updated:record.updated,state:'recebendo',createdAt:new Date().toISOString(),leaseUntil:Date.now()+JOB_LEASE_MS,schedule,reprocess,assetAuditVersion:reprocess?hash+'-'+Utilities.getUuid():hash};
     setPrivate_('OWNER_'+hash_(record.id),owner);setPrivate_(jobKey_(record.id),JSON.stringify(current));return current;
   });
   if(job.result)return job.result;
@@ -52,8 +52,9 @@ function processJob_(id){
     const record=readJsonFile_(job.payloadId);validate_(record);if(!job.reprocess)validatePhotoRefs_(record,job.actor);
     const folder=DriveApp.getFolderById(config_().PDF_FOLDER_ID),name=id+'_'+job.hash.slice(0,12);
     // Conversão e imagens ficam fora do bloqueio de gravação compartilhado.
-    const reportName=name+'_'+REPORT_VERSION;
-    const pdf=artifact_(folder,reportName+'.pdf',()=>createPdf_(record,folder,reportName));
+    const reportName=reportDriveName_(record,job.hash);
+    const existingPdfId=job.reprocess&&privateValue_('PDF_'+hash_(id));
+    const pdf=existingPdfId?DriveApp.getFileById(existingPdfId):artifact_(folder,reportName+'.pdf',()=>createPdf_(record,folder,reportName));
     const clean=JSON.parse(JSON.stringify(record));delete clean.photoFiles;
     const backup=artifact_(folder,name+'.json',()=>folder.createFile(name+'.json',JSON.stringify(clean),MimeType.PLAIN_TEXT));
     return withWriteLock_(()=>{
@@ -64,13 +65,14 @@ function processJob_(id){
       const matches=sheet.getLastRow()>1?sheet.getRange(2,1,sheet.getLastRow()-1,1).createTextFinder(id).matchEntireCell(true).findAll():[];
       if(matches.length>1)throw Error('ID duplicado na planilha.');
       const revision=recordRevision_(id);if(revision&&revision.hash!==job.hash&&revision.updated>=record.updated)throw Error('Versão mais recente já gravada.');
-      const assets=syncAssets_(record,job.hash);
+      const assetAuditVersion=job.assetAuditVersion||job.hash;
+      const assets=syncAssets_(record,assetAuditVersion);
       const result={ok:true,inspectionId:id,pdfUrl:pdf.getUrl(),backupUrl:backup.getUrl(),receivedAt:revision?.hash===job.hash?revision.receivedAt:new Date().toISOString(),schedule:job.schedule,assets};
       const target=matches.length?matches[0].getRow():sheet.getLastRow()+1;if(target>sheet.getMaxRows())sheet.insertRowsAfter(sheet.getMaxRows(),100);
       if(!job.reprocess||!matches.length)sheet.getRange(target,1,1,headers.length).setValues([row_(record,result,owner,job.hash)]);
       setPrivate_('PDF_'+hash_(id),pdf.getId());
       const compactAssets={created:assets.created,updated:assets.updated,unchanged:assets.unchanged,pending:assets.pending};
-      setPrivate_('REVISION_'+hash_(id),JSON.stringify({hash:job.hash,updated:record.updated,receivedAt:result.receivedAt,schedule:job.schedule,assets:compactAssets,payloadId:job.payloadId}));
+      setPrivate_('REVISION_'+hash_(id),JSON.stringify({hash:job.hash,updated:record.updated,receivedAt:result.receivedAt,schedule:job.schedule,assets:compactAssets,assetAuditVersion,payloadId:job.payloadId}));
       setPrivate_('DATA_VERSION',Utilities.getUuid());deletePrivate_(jobKey_(id));SpreadsheetApp.flush();return result;
     });
   }catch(error){

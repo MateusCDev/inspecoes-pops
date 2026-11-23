@@ -57,3 +57,34 @@ test('referências de fotos são assinadas e não podem ser transferidas a outro
 test('coluna de série redundante impede a consolidação ambígua, preservando a inspeção',()=>{
  const h=harness();h.assets['Climatização_Voanet'][0].push('Numero_Serie');const result=h.send(climateRecord(h));assert.equal(result.ok,true);assert.ok(result.assets.pending>=1);assert.equal(h.assets['Climatização_Voanet'].length,1);
 });
+
+test('climatização aceita datas brasileiras e converte explicitamente quilogramas para gramas',()=>{
+ const h=harness(),r=climateRecord(h);
+ Object.assign(r.equipamentos.climatizadores[0],{instalacao:'21/11/2026',cargaGas:'625g'});
+ const sent=h.send(r);
+ assert.equal(sent.ok,true);
+ assert.equal(sent.assets.pending,0);
+ assert.equal(value(h,'Climatização_Voanet',1,'Carga Gás'),625);
+ assert.equal(value(h,'Climatização_Voanet',1,'Data Instalação').toISOString(),'2026-11-21T12:00:00.000Z');
+ assert.equal(h.c.validatedAssetValue_(null,'0,625 kg','Carga Gás'),625);
+ assert.throws(()=>h.c.validatedAssetValue_(null,'R-410A','Carga Gás'),/Informe a carga/);
+ assert.deepEqual({...h.c.assetDate_('31/02/2026')},{_invalidDate:'31/02/2026'});
+});
+
+test('reprocessamento mostra somente as pendências atuais e conserva o PDF e a auditoria anterior',()=>{
+ const h=harness(),r=climateRecord(h);
+ const sent=h.send(r);
+ assert.equal(sent.ok,true);
+ const revision=h.props['REVISION_'+h.digest(r.id)];
+ const version=JSON.parse(revision).hash;
+ h.audit.push(['registro antigo',new Date(),r.id,r.codigoPop,'Climatização_Voanet','','PENDENCIA','Valor anterior rejeitado','','',version]);
+ const list={action:'assetIssues',inspectionId:r.id};
+ assert.equal(h.request(list,'manager').issues.length,1);
+ const reprocessed=h.request({action:'reprocessAssets',inspectionId:r.id},'manager');
+ assert.equal(reprocessed.pending,true);
+ const done=h.request({action:'process',inspectionId:r.id},'manager');
+ assert.equal(done.ok,true);
+ assert.equal(done.pdfUrl,sent.pdfUrl);
+ assert.equal(h.request(list,'manager').issues.length,0);
+ assert.equal(h.audit.some(row=>row[0]==='registro antigo'),true);
+});

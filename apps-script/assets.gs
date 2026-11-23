@@ -19,7 +19,14 @@ function stationAssetKey_(value){return normalizeAsset_(value).replace(/^\w+[.-]
 function identityTokens_(value,prefix){return String(value||'').split(/[,;\n]+/).map(x=>normalizeAsset_(x)).filter(x=>x&&!['N/A','NA','NAO IDENTIFICADO','SEM SERIE','SEM PATRIMONIO','-'].includes(x)).map(x=>prefix+x);}
 function reviewed_(r,group){return ['mantido','alterado'].includes(r.inventoryReview?.[group]);}
 function assetState_(v){return ({OPERACIONAL:'Operacional',ATENCAO:'Atenção','EM OBSERVACAO':'Atenção',CRITICO:'Crítico','SUBSTITUICAO RECOMENDADA':'Crítico',INATIVO:'Inativo',RETIRADA:'Inativo'})[normalizeAsset_(v)];}
-function assetDate_(value){if(!value)return undefined;try{addInspectionDays_(String(value),0);return new Date(value+'T12:00:00Z');}catch(_){return {_invalidDate:String(value)};}}
+function assetDate_(value){
+  if(!value)return undefined;
+  const original=String(value).trim();
+  const br=original.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  const iso=br?[br[3],br[2],br[1]].join('-'):original;
+  try{addInspectionDays_(iso,0);return new Date(iso+'T12:00:00Z');}
+  catch(_){return {_invalidDate:original};}
+}
 function dateKey_(value){if(!value)return '';return value instanceof Date?Utilities.formatDate(value,'America/Sao_Paulo','yyyy-MM-dd'):typeof value==='number'?new Date((value-25569)*86400000).toISOString().slice(0,10):String(value).slice(0,10);}
 function commonBattery_(units,key){const values=[...new Set(units.map(u=>u[key]).filter(v=>v!==undefined&&v!==''))];return values.length===1?values[0]:undefined;}
 function assetCandidates_(r){
@@ -113,8 +120,11 @@ function validatedAssetValue_(rule,value,header){
   if(typeof value==='string'&&['NAO VERIFICADO','NAO IDENTIFICADO'].includes(normalizeAsset_(value)))return undefined;
   if(['Nº Série','Patrimônio'].includes(header)&&!identityTokens_(value,'').length)return undefined;
   if(['BTUs','Carga Gás','Última Medição Corrente','Última Medição Temperatura','Módulos','Corrente (A) (TOTAL)','Tensão (V)','Quantidade','Autonomia (h)','Tensão Nominal (V)','Capacidade (Ah)'].includes(header)){
-    const normalized=String(value).trim().replace(/\s*(BTU\/h|BTUs?|Ah|A|V|h|°C)$/i,'').replace(',','.');
-    if(!/^-?\d+(\.\d+)?$/.test(normalized))throw Error('Informe um valor numérico.');value=Number(normalized);
+    const raw=String(value).trim();
+    const gasUnit=header==='Carga Gás'?raw.match(/\s*(kg|g)$/i):null;
+    const normalized=(gasUnit?raw.slice(0,gasUnit.index):raw.replace(/\s*(BTU\/h|BTUs?|Ah|A|V|h|°C)$/i,'')).replace(',','.');
+    if(!/^-?\d+(\.\d+)?$/.test(normalized))throw Error(header==='Carga Gás'?'Informe a carga em g ou kg.':'Informe um valor numérico.');
+    value=Number(normalized)*(gasUnit?.[1].toLowerCase()==='kg'?1000:1);
   }
   if(value instanceof Date)return value;
   if(!rule)return text_(value);
@@ -190,5 +200,5 @@ function assetIssues_(input,user){
   const owner=recordOwner_(input.inspectionId);if(!owner||(owner!==user.email&&user.role!=='GESTAO'))throw Error('Registro indisponível.');
   const revision=recordRevision_(input.inspectionId),sheet=book_(config_().ACCESS_SPREADSHEET_ID).getSheetByName(ASSET_AUDIT);
   const rows=sheet&&sheet.getLastRow()>1?sheet.getRange(2,1,sheet.getLastRow()-1,AUDIT_HEADERS.length).getValues():[];
-  return {ok:true,issues:rows.filter(r=>r[2]===input.inspectionId&&r[6]==='PENDENCIA'&&r[10]===revision?.hash).map(r=>({tab:r[4],detail:r[7]}))};
+  return {ok:true,issues:rows.filter(r=>r[2]===input.inspectionId&&r[6]==='PENDENCIA'&&r[10]===(revision?.assetAuditVersion||revision?.hash)).map(r=>({tab:r[4],detail:r[7]}))};
 }

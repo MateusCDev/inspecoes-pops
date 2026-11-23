@@ -57,6 +57,7 @@ async function googleLogin(form){
   finally{form.elements.key.value='';if(submit.isConnected)submit.disabled=false;}
 }
 function googleLogout(){
+  if(typeof closeGoogleAssetIssues==='function')closeGoogleAssetIssues();
   if(typeof googleClearAccessState==='function')googleClearAccessState();
   if(typeof flushLocalSave==='function')flushLocalSave();googleCapabilities={};googleSummary=null;googleNextCursor=null;
   googleSession++;googleAccessKey='';googleUser=null;records=[];activeId=null;view='home';
@@ -170,7 +171,16 @@ async function googleDownloadPdf(id){
   try{
     const result=await googleRpc('pdf',{inspectionId:id});if(session!==googleSession)return;
     if(typeof result.base64!=='string')throw Error('PDF indisponível.');
-    const bytes=Uint8Array.from(atob(result.base64),c=>c.charCodeAt(0));download(new Blob([bytes],{type:'application/pdf'}),String(result.fileName||'inspecao.pdf'),'application/pdf');
+    let name=String(result.fileName||id+'.pdf');
+    if(name===id+'.pdf'){
+      const item=googleCentralItems.find(entry=>entry.id===id);
+      const local=records.find(entry=>entry.id===id);
+      const station=String(item?.station||local?.nome||'').replace(/[<>:"/\\|?*\x00-\x1f\x7f]/g,' ').replace(/\s+/g,' ').trim().slice(0,90);
+      const date=fmt(item?.date||local?.data).replaceAll('/','-');
+      if(station)name=station+(/^\d{2}-\d{2}-\d{4}$/.test(date)?' - '+date:'')+'.pdf';
+    }
+    const bytes=Uint8Array.from(atob(result.base64),c=>c.charCodeAt(0));
+    download(new Blob([bytes],{type:'application/pdf'}),name,'application/pdf');
   }catch(error){if(session===googleSession)alert(error.message);}
 }
 document.addEventListener('submit',e=>{if(e.target.id==='googleAccessLogin'){e.preventDefault();googleLogin(e.target);}});

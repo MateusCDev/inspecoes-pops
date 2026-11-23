@@ -92,7 +92,43 @@ async function googleReprocessAssets(id){
   try{const result=await googleRpc('reprocessAssets',{inspectionId:id},key);if(session!==googleSession)return;alert('Atualização de ativos solicitada. O resultado aparecerá no painel.');if(result.pending)googleRpc('process',{inspectionId:id},key).then(()=>{if(session===googleSession)googleRefreshCentral();}).catch(()=>{});}
   catch(error){if(session===googleSession)alert(error.message);}
 }
-async function googleShowAssetIssues(id){const session=googleSession,key=googleAccessKey;try{const result=await googleRpc('assetIssues',{inspectionId:id},key);if(session===googleSession)alert(result.issues.map(i=>(i.tab?i.tab+': ':'')+i.detail).join('\n')||'Sem pendências nesta versão.');}catch(error){if(session===googleSession)alert(error.message);}}
+function closeGoogleAssetIssues(){
+  document.getElementById('google-asset-issues')?.close();
+}
+async function googleShowAssetIssues(id){
+  closeGoogleAssetIssues();
+  const session=googleSession,key=googleAccessKey;
+  const record=googleCentralItems.find(item=>item.id===id);
+  const dialog=document.createElement('dialog');
+  dialog.id='google-asset-issues';
+  dialog.className='asset-issues-dialog';
+  dialog.setAttribute('aria-labelledby','asset-issues-title');
+  dialog.innerHTML=`<header class="card-head">
+    <div><h2 id="asset-issues-title">Pendências de conferência</h2>
+      ${record?`<p class="muted">${esc(record.station)} · ${esc(fmt(record.date))}</p>`:''}
+    </div>
+    <form method="dialog"><button class="btn tiny" autofocus>Fechar</button></form>
+  </header><div data-asset-issues-content aria-live="polite"><p>Carregando pendências…</p></div>`;
+  dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+  document.body.append(dialog);
+  dialog.showModal();
+  const content=dialog.querySelector('[data-asset-issues-content]');
+  try{
+    const result=await googleRpc('assetIssues',{inspectionId:id},key);
+    if(session!==googleSession||!dialog.open)return;
+    if(!Array.isArray(result.issues))throw Error('A resposta do serviço não trouxe os detalhes das pendências.');
+    const tabs=new Map();
+    const names={Ativos:'Inventário de ativos',Climatização_Voanet:'Climatização',Controle_Baterias:'Baterias',Retificadores:'Retificadores'};
+    for(const entry of result.issues){
+      const title=names[entry.tab]||entry.tab||'Conferência de inventário';
+      if(!tabs.has(title))tabs.set(title,[]);
+      tabs.get(title).push(entry.detail);
+    }
+    content.innerHTML=tabs.size?[...tabs].map(([title,items])=>`<section><h3>${esc(title)}</h3><ul>${items.map(item=>`<li>${esc(item)}</li>`).join('')}</ul></section>`).join(''):'<p>Sem pendências nesta versão.</p>';
+  }catch(error){
+    if(session===googleSession&&dialog.open)content.innerHTML=`<p role="alert">${esc(error.message)}</p>`;
+  }
+}
 document.addEventListener('click',e=>{
   const action=e.target.closest('[data-action]')?.dataset.action;if(!googleUser)return;
   if(action==='googleLoadMore')googleLoadMore();if(action?.startsWith('googleAssets:'))googleReprocessAssets(action.slice(13));

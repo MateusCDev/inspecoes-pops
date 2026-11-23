@@ -23,20 +23,22 @@ test('Gestão atualiza somente o PDF de uma inspeção recebida e preserva o arq
  assert.equal(h.files.get('pdf-historico.pdf'),old);
  assert.equal(h.request({action:'refreshReport',inspectionId:record.id},'manager').pdfUrl,result.pdfUrl);
  assert.equal(h.files.size,count+1);
- assert.equal(h.request({action:'pdf',inspectionId:record.id}).ok,true);
+ assert.equal(h.request({action:'pdf',inspectionId:record.id}).fileName,'POP fictício - 16-11-2026.pdf');
+ assert.match([...h.files.keys()].find(name=>name.endsWith('gerencial-v3.pdf')), /^POP fictício - 16-11-2026 - /);
 });
 
-test('organiza fotos pelas seções do checklist e conserva a numeração das evidências',()=>{
+test('seleciona no máximo duas fotos com prioridade para não conformidades distintas',()=>{
  const {c}=harness();
- const sections=c.reportPhotoGroups_([
-  {id:'A',target:'check:EL-01'}, {id:'B',caption:'Acesso'}, {id:'C',target:'check:EL-02'},
-  {id:'D',target:'interligacoes:planilha'}
- ]);
- const names=[...sections.keys()];
- assert.deepEqual(names,['Energia elétrica e proteções','Fotos gerais da estação','Interligações']);
- const electrical=Array.from(sections.get(names[0]));
- assert.deepEqual(electrical.map(item=>item.index),[1,3]);
- assert.match(electrical[1].label,/EL-02/);
+ const selected=c.reportPhotoSelection_({
+  checks:{'EL-01':{status:'NC'},'EL-02':{status:'NC'}},
+  photos:[
+   {id:'A',target:'check:EL-01'}, {id:'B',caption:'Acesso'}, {id:'C',target:'check:EL-01'},
+   {id:'D',target:'check:EL-02'}, {id:'E',target:'interligacoes:planilha'}
+  ]
+ });
+ assert.deepEqual(Array.from(selected,item=>item.index),[1,4]);
+ assert.match(selected[1].label,/EL-02/);
+ assert.equal(c.reportFileBase_('POP Sul / Norte','2026-11-21','INSP-01'),'POP Sul Norte - 21-11-2026');
 });
 
 test('monta o PDF com cabeçalho VOANET, resumo, galeria e dados de vistoria',()=>{
@@ -78,9 +80,9 @@ test('monta o PDF com cabeçalho VOANET, resumo, galeria e dados de vistoria',()
   sintese:'A vistoria está registrada.',checks:{'EL-01':{status:'NC',note:'Evidência registrada'}},
   photos:[{id:'foto-1',target:'check:EL-01',caption:'Quadro de energia'}],photoFiles:[{id:'foto-1'}]};
  assert.equal(environment.createPdf_(report,{createFile:name=>name},'homologacao'),'homologacao.pdf');
- for(const expected of ['voanet.png','Relatório de inspeção técnica','Resumo da vistoria','Checklist técnico','Evidências fotográficas',
+ for(const expected of ['voanet.png','Relatório gerencial de inspeção','Resumo da vistoria','Não conformidades','Evidências selecionadas',
   'Quadro de energia','foto-1','21/11/2026','Não conforme']){
   assert.ok(JSON.stringify(entries).includes(expected),expected);
  }
- assert.equal(entries.filter(entry=>entry==='PAGE_BREAK').length,2);
+ assert.equal(entries.filter(entry=>entry==='PAGE_BREAK').length,1);
 });

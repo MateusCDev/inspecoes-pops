@@ -1,4 +1,4 @@
-const REPORT_VERSION = 'relatorio-v2';
+const REPORT_VERSION = 'gerencial-v3';
 const REPORT_INK = '#192638';
 const REPORT_MUTED = '#526277';
 const REPORT_RED = '#b9142a';
@@ -10,16 +10,6 @@ function reportValue_(value) {
   if (value === false) return 'Não';
   const text = String(value ?? '').trim();
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text.split('-').reverse().join('/') : (text || '—');
-}
-
-function reportLabel_(key) {
-  const labels = {
-    id:'Identificador',os:'OS / SIGA+',cftv:'CFTV',dataUltima:'Última atualização',
-    dataConferencia:'Data da conferência',tx:'Transceiver',nc:'Não conformidades',
-    retificadoras:'Retificadoras',bancos:'Bancos de baterias',baterias:'Baterias',
-    climatizadores:'Climatizadores',dios:'DIOs',confirmado:'Cadastro confirmado'
-  };
-  return labels[key] || (key.charAt(0).toUpperCase() + key.slice(1)).replace(/[_-]+/g,' ').replace(/([a-z0-9])([A-Z])/g,'$1 $2');
 }
 
 function reportParagraph_(container,text,options={}) {
@@ -59,66 +49,56 @@ function reportTable_(body,head,rows,widths) {
   return table;
 }
 
-function reportDetails_(body,title,value,depth=0) {
-  if(!value||typeof value!=='object'||depth>6)return;
-  const entries=Object.entries(value).filter(([,v])=>v!==''&&v!==null&&v!==undefined&&
-    (typeof v!=='object'||Object.keys(v).length));
-  if(!entries.length)return;
-  if(Array.isArray(value)){
-    entries.forEach(([index,item])=>{
-      if(typeof item==='object')reportDetails_(body,title+' '+(Number(index)+1),item,depth+1);
-      else reportParagraph_(body,title+' '+(Number(index)+1)+' · '+reportValue_(item));
-    });
-    return;
-  }
-  const fields=entries.filter(([,v])=>typeof v!=='object');
-  if(fields.length){
-    reportHeading_(body,title,2);
-    reportTable_(body,['Campo','Registro'],fields.map(([key,v])=>[reportLabel_(key),v]),[169,335]);
-  }
-  entries.filter(([,v])=>typeof v==='object').forEach(([key,nested])=>
-    reportDetails_(body,title+' · '+reportLabel_(key),nested,depth+1));
+function reportExcerpt_(value,limit) {
+  const text=String(value??'').replace(/\s+/g,' ').trim();
+  if(text.length<=limit)return text;
+  const cut=text.slice(0,limit-1);
+  const boundary=cut.lastIndexOf(' ');
+  return (boundary>limit*.75?cut.slice(0,boundary):cut).trimEnd()+'…';
 }
 
-function reportPhotoGroups_(photos) {
-  const byCode=new Map(groups.flatMap(group=>group.items.map(([code,label])=>[code,{title:group.title,label:code+' · '+label}])));
-  const sections=new Map();
-  photos.forEach((photo,index)=>{
+function reportFileBase_(station,date,id) {
+  const safeStation=String(station||'').replace(/[<>:"/\\|?*\x00-\x1f\x7f]/g,' ').replace(/\s+/g,' ').trim().slice(0,90);
+  const iso=date instanceof Date?Utilities.formatDate(date,'America/Sao_Paulo','yyyy-MM-dd'):String(date||'').slice(0,10);
+  const day=/^\d{4}-\d{2}-\d{2}$/.test(iso)?iso.split('-').reverse().join('-'):'';
+  return [safeStation||id||'Inspeção',day].filter(Boolean).join(' - ');
+}
+
+function reportDriveName_(record,hash) {
+  return reportFileBase_(record.nome,record.data,record.id)+' - '+hash.slice(0,12)+' - '+REPORT_VERSION;
+}
+
+function reportPhotoSelection_(record) {
+  const photos=record.photos||[];
+  const checks=new Map(groups.flatMap(group=>group.items.map(([code,label])=>[code,code+' · '+label])));
+  const photoIndex=photos.map((photo,index)=>{
     const target=String(photo.target||'');
-    const item=target.startsWith('check:')?byCode.get(target.slice(6)):null;
-    const title=item?.title||(target.startsWith('interligacoes:')?'Interligações':
-      target?'Inventário e equipamentos':(photo.category&&photo.category!=='Item vinculado'?photo.category:'Fotos gerais da estação'));
-    if(!sections.has(title))sections.set(title,[]);
-    sections.get(title).push({photo,index:index+1,label:item?.label||''});
+    const code=target.startsWith('check:')?target.slice(6):'';
+    return {photo,index:index+1,label:checks.get(code)||'',finding:record.checks?.[code]?.status==='NC',target};
   });
-  return sections;
+  const uniqueFindings=photoIndex.filter((item,i,items)=>item.finding&&items.findIndex(other=>other.target===item.target&&other.finding)===i);
+  return [...uniqueFindings,...photoIndex.filter(item=>!uniqueFindings.includes(item))].slice(0,2);
 }
 
 function reportPhotos_(body,record) {
-  const photos=record.photos||[];
-  if(!photos.length)return;
+  const selected=reportPhotoSelection_(record);
+  if(!selected.length)return;
   const references=new Map(record.photoFiles.map(ref=>[ref.id,ref]));
-  body.appendPageBreak();
-  reportHeading_(body,'Evidências fotográficas');
-  reportParagraph_(body,photos.length+' foto(s) registradas na vistoria.',{color:REPORT_MUTED});
-  for(const [title,items] of reportPhotoGroups_(photos)){
-    reportHeading_(body,title,2);
-    for(let i=0;i<items.length;i+=2){
-      const gallery=body.appendTable([['','']]).setBorderWidth(.5).setBorderColor(REPORT_LINE);
-      gallery.setColumnWidth(0,252).setColumnWidth(1,252);
-      items.slice(i,i+2).forEach(({photo,index,label},col)=>{
-        const cell=gallery.getCell(0,col);
-        cell.getChild(0).asParagraph().setText('Foto '+String(index).padStart(2,'0'))
-          .editAsText().setFontSize(9).setBold(true).setForegroundColor(REPORT_RED);
-        if(label)reportParagraph_(cell,label,{size:9,bold:true});
-        const image=cell.appendImage(photoBlob_(references.get(photo.id)));
-        const scale=Math.min(1,225/image.getWidth(),165/image.getHeight());
-        image.setWidth(Math.max(1,Math.round(image.getWidth()*scale))).setHeight(Math.max(1,Math.round(image.getHeight()*scale)));
-        const caption=photo.caption||photo.name;
-        if(caption)reportParagraph_(cell,caption,{size:9,color:REPORT_MUTED,before:3});
-      });
-    }
-  }
+  reportHeading_(body,'Evidências selecionadas');
+  reportParagraph_(body,'Exibindo '+selected.length+' de '+record.photos.length+' fotos. As evidências completas estão arquivadas com a inspeção.',{color:REPORT_MUTED});
+  const gallery=body.appendTable([['','']]).setBorderWidth(.5).setBorderColor(REPORT_LINE);
+  gallery.setColumnWidth(0,252).setColumnWidth(1,252);
+  selected.forEach(({photo,index,label},col)=>{
+    const cell=gallery.getCell(0,col);
+    cell.getChild(0).asParagraph().setText('Foto '+String(index).padStart(2,'0'))
+      .editAsText().setFontSize(9).setBold(true).setForegroundColor(REPORT_RED);
+    if(label)reportParagraph_(cell,reportExcerpt_(label,110),{size:9,bold:true});
+    const image=cell.appendImage(photoBlob_(references.get(photo.id)));
+    const scale=Math.min(1,225/image.getWidth(),155/image.getHeight());
+    image.setWidth(Math.max(1,Math.round(image.getWidth()*scale))).setHeight(Math.max(1,Math.round(image.getHeight()*scale)));
+    const caption=reportExcerpt_(photo.caption||photo.name,120);
+    if(caption)reportParagraph_(cell,caption,{size:9,color:REPORT_MUTED,before:3});
+  });
 }
 
 function createPdf_(record,folder,name) {
@@ -135,57 +115,47 @@ function createPdf_(record,folder,name) {
     }else{
       reportParagraph_(header,'VOANET  |  INFRAESTRUTURA E OPERAÇÕES',{color:REPORT_RED,bold:true,size:9});
     }
-    reportParagraph_(doc.addFooter(),record.id+'  ·  Relatório de inspeção técnica',{color:REPORT_MUTED,size:8});
-    reportParagraph_(body,'Relatório de inspeção técnica',{heading:'TITLE',size:27,bold:true,after:8});
-    reportParagraph_(body,[record.codigoPop,record.nome].filter(Boolean).join(' · '),{size:18,bold:true,color:REPORT_RED});
-    reportParagraph_(body,record.id,{size:9,color:REPORT_MUTED,after:15});
+    reportParagraph_(doc.addFooter(),record.id+'  ·  Relatório gerencial de inspeção',{color:REPORT_MUTED,size:8});
+    reportParagraph_(body,'Relatório gerencial de inspeção',{heading:'TITLE',size:25,bold:true,after:7});
+    reportParagraph_(body,reportExcerpt_([record.codigoPop,record.nome].filter(Boolean).join(' · '),105),{size:17,bold:true,color:REPORT_RED});
+    reportTable_(body,['Vistoria','Técnico responsável','Próxima inspeção'],
+      [[record.data,reportExcerpt_(record.inspetor,75),record.scheduleDueDate]],[130,244,130]);
+    if(record.municipio||record.os)reportParagraph_(body,reportExcerpt_([record.municipio,record.os].filter(Boolean).join(' · '),140),{size:9,before:6,color:REPORT_MUTED});
 
-    reportTable_(body,['Data da vistoria','Técnico responsável','Próxima inspeção'],
-      [[record.data,record.inspetor,record.scheduleDueDate]],[130,244,130]);
+    const checks=groups.flatMap(group=>group.items.map(([code,label])=>({
+      title:code+' · '+label,status:record.checks?.[code]?.status||'NV',note:record.checks?.[code]?.note
+    })));
+    if(record.interligacoes?.status)checks.push({title:'Interligações',status:record.interligacoes.status,note:record.interligacoes.observacoes});
+    const findings=checks.filter(item=>item.status==='NC');
     reportHeading_(body,'Resumo da vistoria');
-    const groupsChecks=groups.flatMap(group=>group.items.map(([id])=>record.checks?.[id]?.status||'NV'));
-    if(record.interligacoes?.status)groupsChecks.push(record.interligacoes.status);
-    const counts=Object.keys(REPORT_STATUS).map(status=>groupsChecks.filter(value=>value===status).length);
-    reportTable_(body,Object.values(REPORT_STATUS),[counts],[126,126,126,126]);
-    for(const [label,value] of [['Síntese técnica',record.sintese],['Recomendações',record.investimentos]]){
-      if(value){reportHeading_(body,label,2);reportParagraph_(body,value);}
+    reportTable_(body,Object.values(REPORT_STATUS),[Object.keys(REPORT_STATUS).map(status=>checks.filter(item=>item.status===status).length)],[126,126,126,126]);
+    if(record.sintese)reportParagraph_(body,reportExcerpt_(record.sintese,390),{before:8});
+    if(record.investimentos){
+      reportHeading_(body,'Recomendações',2);
+      reportParagraph_(body,reportExcerpt_(record.investimentos,260));
     }
-    reportHeading_(body,'Identificação e programação');
-    const details=fields.filter(([key])=>!['nome','data','inspetor','sintese','investimentos'].includes(key)&&String(record[key]??'').trim())
-      .map(([key,label])=>[label,record[key]]);
-    if(record.popCriticality)details.push(['Criticidade cadastral do POP',record.popCriticality]);
-    if(record.schedulePeriod)details.push(['Periodicidade preventiva',record.schedulePeriod+' dias']);
-    if(record.scheduleNotes)details.push(['Observações da programação',record.scheduleNotes]);
-    if(details.length)reportTable_(body,['Campo','Registro'],details,[169,335]);
+    reportHeading_(body,'Não conformidades',2);
+    if(findings.length){
+      reportTable_(body,['Item','Observação'],findings.slice(0,4).map(item=>[reportExcerpt_(item.title,95),reportExcerpt_(item.note,105)]),[240,264]);
+      if(findings.length>4)reportParagraph_(body,'Mais '+(findings.length-4)+' no checklist completo.',{color:REPORT_MUTED,before:4});
+    }else reportParagraph_(body,'Nenhuma não conformidade registrada.');
 
-    body.appendPageBreak();
-    reportHeading_(body,'Checklist técnico');
-    groups.forEach(group=>{
-      reportHeading_(body,group.title,2);
-      reportTable_(body,['Item avaliado','Situação','Observações'],group.items.map(([id,title])=>[
-        id+' · '+title,REPORT_STATUS[record.checks?.[id]?.status||'NV']||'Situação não reconhecida',record.checks?.[id]?.note
-      ]),[215,99,190]);
-    });
-    const measurements=readings.filter(([key])=>record.readings?.[key]!==''&&record.readings?.[key]!=null)
-      .map(([key,label])=>[label,record.readings[key]]);
-    if(measurements.length){reportHeading_(body,'Medições');reportTable_(body,['Parâmetro','Valor'],measurements,[235,269]);}
-    reportDetails_(body,'Interligações',record.interligacoes);
-    reportDetails_(body,'Estrutura de torre',{presenca:record.torrePresenca,tipo:record.torreTipo,altura:record.torreAltura,
-      laudo:record.torreLaudo,observacoes:record.torreObs});
-    reportDetails_(body,'Monitoramento por câmeras',{presenca:record.cftvPresenca,obrigatorio:record.cftvObrigatorio,
-      quantidade:record.cftvQtd,estado:record.cftvEstado,gravacao:record.cftvGravacao,ultimoTeste:record.cftvUltimoTeste,observacoes:record.cftvObs});
-
-    reportHeading_(body,'Plano de ação');
-    if(record.issues?.length)reportDetails_(body,'Pendência',record.issues);
-    else reportParagraph_(body,'Sem pendências registradas.');
-    reportHeading_(body,'Inventário e conferências');
-    for(const [label,value] of [
-      ['Equipamento de rede',record.inventory],['Equipamentos da estação',record.equipamentos],
-      ['Transceiver óptico',record.invTransceivers],['Banco de baterias',record.invBatteryBanks],
-      ['Conferência do inventário',record.inventoryReview],['Origem do inventário',record.inventorySource],
-      ['Conferência de baterias',record.batteryReview]
-    ])reportDetails_(body,label,value);
-    reportPhotos_(body,record);
+    const issues=record.issues||[];
+    if(issues.length||record.photos?.length){
+      body.appendPageBreak();
+      if(issues.length){
+        reportHeading_(body,'Plano de ação');
+        const order=issue=>Number(String(issue.prioridade||'').match(/^P([0-9])/i)?.[1]||9);
+        const priority=issues.slice().sort((a,b)=>order(a)-order(b));
+        reportTable_(body,['Ação','Prioridade e situação','Responsável e prazo'],priority.slice(0,4).map(issue=>[
+          reportExcerpt_([issue.titulo,issue.acao].filter(Boolean).join(' · '),150),
+          reportExcerpt_([issue.prioridade,issue.status].filter(Boolean).join(' · '),75),
+          reportExcerpt_([issue.responsavel,issue.prazo&&reportValue_(issue.prazo)].filter(Boolean).join(' · '),75)
+        ]),[245,129,130]);
+        if(issues.length>4)reportParagraph_(body,'Mais '+(issues.length-4)+' ação(ões) no registro completo.',{color:REPORT_MUTED,before:4});
+      }
+      reportPhotos_(body,record);
+    }
     doc.saveAndClose();
     return folder.createFile(temporary.getAs(MimeType.PDF).setName(name+'.pdf'));
   }finally{temporary.setTrashed(true);}
@@ -206,12 +176,10 @@ function refreshReport_(input,user) {
   });
   try{
     const folder=DriveApp.getFolderById(config_().PDF_FOLDER_ID);
-    const name=id+'_'+claim.revision.hash.slice(0,12)+'_'+REPORT_VERSION;
-    const pdf=artifact_(folder,name+'.pdf',()=>{
-      const record=readJsonFile_(claim.revision.payloadId);
-      validate_(record);
-      return createPdf_(record,folder,name);
-    });
+    const record=readJsonFile_(claim.revision.payloadId);
+    validate_(record);
+    const name=reportDriveName_(record,claim.revision.hash);
+    const pdf=artifact_(folder,name+'.pdf',()=>createPdf_(record,folder,name));
     return withWriteLock_(()=>{
       if(privateValue_(lockKey)!==String(claim.until)||recordRevision_(id)?.hash!==claim.revision.hash){
         throw Error('A inspeção mudou durante a geração. Atualize os dados e tente novamente.');

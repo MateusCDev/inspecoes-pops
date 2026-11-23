@@ -259,3 +259,20 @@ body:has(.portal-login) .portal-actions { display: none; }
 :is(#google-schedule-heading, #google-history-heading) { scroll-margin-top: calc(var(--portal-header-height) + 1rem); }
 
 .asset-links a { text-decoration: none; }
+
+.asset-issues-dialog {
+  width: min(640px, calc(100% - 2rem));
+  max-height: min(80vh, 740px);
+  padding: clamp(1rem, 4vw, 1.75rem);
+  border: 1px solid var(--portal-line);
+  border-radius: 1rem;
+  color: var(--portal-ink);
+  box-shadow: 0 15px 52px #19233238;
+}
+.asset-issues-dialog::backdrop { background: #19233290; }
+.asset-issues-dialog .card-head p { margin: 0; }
+.asset-issues-dialog section { padding: .85rem 0; border-top: 1px solid var(--portal-line); }
+.asset-issues-dialog section h3 { margin-bottom: .35rem; }
+.asset-issues-dialog ul { margin: 0; padding-inline-start: 1.3rem; }
+.asset-issues-dialog li { margin-bottom: .35rem; overflow-wrap: anywhere; }
+.asset-issues-dialog [role="alert"] { color: var(--portal-red-dark); }

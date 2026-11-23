@@ -126,6 +126,24 @@ async function googleShowInventory(id){
       :'<p>Nenhum equipamento foi registrado nesta inspeção.</p>';
   }catch(error){if(session===googleSession&&dialog.open)content.innerHTML=`<p role="alert">${esc(error.message)}</p>`;}
 }
+function assetIssueGuidance(detail){
+  const message=String(detail||'');
+  if(/banco incompleto|banco com modelo/i.test(message)){
+    return 'Na inspeção original, confira as baterias do banco uma a uma. Marque o cadastro como completo depois da conferência e reenvie a inspeção.';
+  }
+  if(/carga gás|carga de gás/i.test(message)){
+    return 'Confira a carga na etiqueta do aparelho e a unidade. Se a implantação já foi atualizada e o valor informado está correto, use Reprocessar ativos.';
+  }
+  if(/data inválida/i.test(message)){
+    const date=message.match(/\b(\d{2})\/(\d{2})\/(\d{4})\b/);
+    if(date)return 'Se a data está correta, a implantação atual aceita esse formato. Reprocesse os ativos. Se precisar corrigir no formulário, use '+[date[3],date[2],date[1]].join('-')+'.';
+    return 'Confira a data no equipamento ou na documentação e corrija o campo na inspeção antes de reenviar.';
+  }
+  if(/a série diverge/i.test(message)){
+    return 'Compare etiqueta, patrimônio e cadastro central. Corrija um eventual erro de digitação na inspeção. Se o equipamento foi trocado, registre a substituição no cadastro de ativos com a Gestão.';
+  }
+  return '';
+}
 async function googleShowAssetIssues(id){
   const session=googleSession;
   const {dialog,content}=openGoogleAssetDialog('Pendências de conferência',id,'Carregando pendências…');
@@ -140,7 +158,7 @@ async function googleShowAssetIssues(id){
       if(!tabs.has(title))tabs.set(title,[]);
       tabs.get(title).push(entry.detail);
     }
-    content.innerHTML=tabs.size?[...tabs].map(([title,items])=>`<section><h3>${esc(title)}</h3><ul>${items.map(item=>`<li>${esc(item)}</li>`).join('')}</ul></section>`).join(''):'<p>Sem pendências nesta versão.</p>';
+    content.innerHTML=tabs.size?[...tabs].map(([title,items])=>`<section><h3>${esc(title)}</h3><ul>${items.map(item=>{const guidance=assetIssueGuidance(item);return `<li>${esc(item)}${guidance?`<p class="asset-issue-guidance">${esc(guidance)}</p>`:''}</li>`;}).join('')}</ul></section>`).join(''):'<p>Sem pendências nesta versão.</p>';
   }catch(error){
     if(session===googleSession&&dialog.open)content.innerHTML=`<p role="alert">${esc(error.message)}</p>`;
   }

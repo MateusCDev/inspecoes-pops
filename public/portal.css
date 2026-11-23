@@ -276,3 +276,8 @@ body:has(.portal-login) .portal-actions { display: none; }
 .asset-issues-dialog ul { margin: 0; padding-inline-start: 1.3rem; }
 .asset-issues-dialog li { margin-bottom: .35rem; overflow-wrap: anywhere; }
 .asset-issues-dialog [role="alert"] { color: var(--portal-red-dark); }
+
+.archived-pdf { margin-block: .45rem; }
+.archived-pdf summary { width: fit-content; margin-bottom: .35rem; cursor: pointer; font-size: .79rem; color: var(--portal-muted); }
+.archived-pdf summary:focus-visible { outline: 2px solid var(--portal-red); outline-offset: 3px; }
+.asset-issue-guidance { margin: .25rem 0 .55rem; color: var(--portal-muted); font-size: .875rem; }

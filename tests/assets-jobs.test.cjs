@@ -174,3 +174,18 @@ test('pendência de série legada oferece vínculo quando a divergência é só 
  assert.equal(result.action,'VINCULADO');
  assert.equal(value(h,'Ativos',1,'Nº Série'),'0004519107');
 });
+
+test('nova linha mantém campos opcionais vazios e recupera fórmulas ausentes na linha modelo',()=>{
+ const h=harness(),r=climateRecord(h);
+ const tab='Climatização_Voanet';
+ const nextMaintenance='=IF(RC[-1]="";"";RC[-1]+120)';
+ h.asset(tab,{'Estação':'Outra estação','Próxima Manutenção':nextMaintenance});
+ h.asset(tab,{'Estação':'Terceira estação'});
+ r.equipamentos.climatizadores[0].serie='N/A';
+ r.equipamentos.climatizadores[0].patrimonio='PAT-01';
+ assert.equal(h.send(r).assets.pending,0);
+ assert.equal(value(h,tab,2,'Nº Série'),'');
+ assert.equal(value(h,tab,2,'Última Manutenção'),'');
+ assert.equal(value(h,tab,2,'Próxima Manutenção'),nextMaintenance);
+ assert.equal(value(h,tab,2,'Patrimônio'),'PAT-01');
+});

@@ -186,7 +186,23 @@ function appendNativeAssetRow_(table){
   const source=table.sheet.getRange(target+1,1,1,table.width),destination=table.sheet.getRange(target,1,1,table.width);
   source.copyTo(destination,SpreadsheetApp.CopyPasteType.PASTE_FORMAT,false);
   source.copyTo(destination,SpreadsheetApp.CopyPasteType.PASTE_DATA_VALIDATION,false);
-  destination.clearContent();destination.setFormulasR1C1(source.getFormulasR1C1());
+  destination.clearContent();
+  const formulas=source.getFormulasR1C1()[0];
+  const calculatedHeader={Retificadores:'Status','Climatização_Voanet':'Próxima Manutenção'}[table.sheet.getName()];
+  const calculated=table.headers.indexOf(calculatedHeader);
+  if(calculated>=0&&!formulas[calculated]&&target>2){
+    const first=Math.max(2,target-10);
+    const previous=table.sheet.getRange(first,calculated+1,target-first,1).getFormulasR1C1();
+    formulas[calculated]=previous.reverse().find(([formula])=>formula)?.[0]||'';
+  }
+  // As células sem fórmula ficam vazias e continuam aptas a receber os dados da vistoria.
+  for(let start=0;start<formulas.length;start++){
+    if(!formulas[start])continue;
+    let end=start+1;
+    while(formulas[end])end++;
+    table.sheet.getRange(target,start+1,1,end-start).setFormulasR1C1([formulas.slice(start,end)]);
+    start=end-1;
+  }
   table.values.splice(target-1,0,Array(table.width).fill(''));return target;
 }
 function syncAssets_(r,version){

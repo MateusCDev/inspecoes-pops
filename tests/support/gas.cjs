@@ -20,7 +20,7 @@ function harness(){
    setValues(values){values.forEach((line,i)=>{data[row-1+i]||=[];line.forEach((v,j)=>data[row-1+i][col-1+j]=v)});return this},
    getValues(){return Array.from({length:n},(_,i)=>Array.from({length:w},(_,j)=>data[row-1+i]?.[col-1+j]??''))},
    getDisplayValues(){return this.getValues().map(r=>r.map(String))},
-   getFormulas(){return this.getValues().map(r=>r.map(v=>typeof v==='string'&&v.startsWith('=')?v:''))},getFormulasR1C1(){return this.getFormulas()},setFormulasR1C1(values){return this.setValues(values)},
+   getFormulas(){return this.getValues().map(r=>r.map(v=>typeof v==='string'&&v.startsWith('=')?v:''))},getFormulasR1C1(){return this.getFormulas()},setFormulasR1C1(values){return this.setValues(values.map(line=>line.map(formula=>formula||'=')))},
    getDataValidations(){return Array.from({length:n},(_,i)=>Array.from({length:w},(_,j)=>validation[name]?.[row-1+i]?.[col-1+j]||null))},
    clearContent(){return this.setValues(Array.from({length:n},()=>Array(w).fill('')))},
    copyTo(destination,type){if(type==='VALIDATION'){validation[name]||=[];validation[name][destination._row-1]=this.getDataValidations()[0].slice();}return this},

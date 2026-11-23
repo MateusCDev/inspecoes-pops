@@ -101,3 +101,76 @@ test('Gestão consulta equipamentos da inspeção arquivada sem alterar os ativo
  assert.deepEqual(inventory.groups.map(group=>group.label),['Transceivers','Climatização']);
  assert.equal(inventory.groups[1].items[0].name,'AC100');
 });
+
+function switchWithSerial(h, serial){
+ const r=h.record();
+ r.inventory=[{id:'SW1',tipo:'Switch',marca:'Datacom',modelo:'DM4170',serial,patrimonio:'16380',confirmacao:'Confirmado na etiqueta'}];
+ return r;
+}
+
+test('série com zeros à esquerda e mesmo patrimônio atualiza o mesmo ativo',()=>{
+ const h=harness(),record=switchWithSerial(h,'0004519107');
+ h.asset('Ativos',{Local:record.nome,Categoria:'Switch',Fabricante:'Datacom',Modelo:'DM4170','Nº Série':4519107,Patrimônio:16380});
+ const result=h.send(record);
+ assert.equal(result.assets.pending,0);
+ assert.equal(h.assets.Ativos.length,2);
+ assert.equal(value(h,'Ativos',1,'Nº Série'),'0004519107');
+ assert.equal(h.audit.some(row=>row[6]==='SUBSTITUIDO'),false);
+});
+
+test('Gestão compara a divergência e confirma a troca com auditoria; Operação fica sem acesso',()=>{
+ const h=harness(),r=switchWithSerial(h,'SERIE-NOVA');
+ const old=h.asset('Ativos',{Local:r.nome,Categoria:'Switch',Fabricante:'Datacom',Modelo:'DM4170','Nº Série':'SERIE-ANTIGA',Patrimônio:16380});
+ const report=h.send(r);
+ assert.equal(report.assets.pending,1);
+ const compare={action:'compareInspectionAssets',inspectionId:r.id};
+ assert.equal(h.request(compare).ok,false);
+ const items=h.request(compare,'manager').items;
+ assert.equal(items[0].matches[0].serial,'SERIE-ANTIGA');
+ assert.equal(items[0].matches[0].operation,'replace');
+ const decision={action:'applyAssetDecision',inspectionId:r.id,decisionToken:items[0].matches[0].token,reason:'Confirmado na OS fictícia'};
+ assert.equal(h.request(decision).ok,false);
+ old[h.assets.Ativos[0].indexOf('Observações')]='Nota adicionada depois da comparação';
+ assert.match(h.request(decision,'manager').error,/mudou/);
+ decision.decisionToken=h.request(compare,'manager').items[0].matches[0].token;
+ assert.equal(h.request(decision,'manager').action,'SUBSTITUIDO');
+ assert.equal(value(h,'Ativos',1,'Nº Série'),'SERIE-NOVA');
+ assert.equal(h.request({action:'assetIssues',inspectionId:r.id},'manager').issues.length,0);
+ assert.equal(h.request({action:'status',inspectionId:r.id},'manager').pdfUrl,report.pdfUrl);
+ assert.equal(h.request(decision,'manager').ok,false);
+ const event=h.audit.find(row=>row[6]==='SUBSTITUIDO');
+ assert.match(event[7],/gestor.*OS fictícia/);
+ assert.match(event[8],/SERIE-ANTIGA/);
+ assert.match(event[9],/SERIE-NOVA/);
+});
+
+test('banco incompleto é comparado, mas a contagem central exige conferência física',()=>{
+ const h=harness(),r=h.record();
+ h.asset('Controle_Baterias',{'Estação':r.nome,'Descrição':'Banco 01','Modelo':'B150','Quantidade':4,'Status':'NORMAL'});
+ r.invBatteryBanks=[{id:'B',identificacao:'Banco 01',baterias:[{id:'B1',modelo:'B150'}]}];
+ assert.ok(h.send(r).ok);
+ const request={action:'centralBatteryBanks'};
+ assert.equal(h.request(request).ok,false);
+ assert.equal(h.request(request,'manager').banks[0].quantity,'4');
+ const compare=h.request({action:'compareInspectionAssets',inspectionId:r.id},'manager');
+ assert.equal(compare.items[0].quantity,1);
+ assert.equal(compare.items[0].matches[0].quantity,4);
+ assert.equal(compare.items[0].matches[0].operation,undefined);
+});
+
+test('pendência de série legada oferece vínculo quando a divergência é só de zeros',()=>{
+ const h=harness(),r=switchWithSerial(h,'0004519107');
+ const legacy=h.asset('Ativos',{Local:r.nome,Categoria:'Switch',Fabricante:'Datacom',Modelo:'DM4170','Nº Série':4519107,Patrimônio:16380});
+ assert.equal(h.send(r).assets.pending,0);
+ legacy[h.assets.Ativos[0].indexOf('Nº Série')]=4519107;
+ const revision=JSON.parse(h.props['REVISION_'+h.digest(r.id)]);
+ const detail='Ativos · DM4170: A série diverge da identificação já cadastrada; confirme a substituição com a gestão.';
+ h.audit.push(['legado',new Date(),r.id,r.codigoPop,'Ativos','','PENDENCIA',detail,'{}','{}',revision.hash]);
+ const compare={action:'compareInspectionAssets',inspectionId:r.id};
+ const match=h.request(compare,'manager').items[0].matches[0];
+ assert.equal(match.operation,'link');
+ assert.ok(match.basis.includes('Série equivalente com zeros à esquerda'));
+ const result=h.request({action:'applyAssetDecision',inspectionId:r.id,decisionToken:match.token,reason:'Identificação confirmada na etiqueta'},'manager');
+ assert.equal(result.action,'VINCULADO');
+ assert.equal(value(h,'Ativos',1,'Nº Série'),'0004519107');
+});

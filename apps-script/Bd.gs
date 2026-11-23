@@ -120,7 +120,7 @@ function doPost(e) {
     if(!user)return reply_({ok:false,code:'AUTH',error:'Chave inválida, revogada ou ainda não vinculada a uma pessoa ativa.'});
     requirePrivateData_();
     if(input.version!==1)throw Error('Versão incompatível.');
-    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,accessAdmin:true,reportRefresh:true,assetInventory:true}});
+    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,accessAdmin:true,reportRefresh:true,assetInventory:true,assetReconciliation:true}});
     if(input.action==='fleetLoad'||input.action==='fleetSave')return reply_(fleetRequest_(input,user));
     if(input.action==='users')return reply_(listAccess_(user));
     if(input.action==='manageOperator')return reply_(manageOperator_(input,user));
@@ -132,6 +132,10 @@ function doPost(e) {
     if(input.action==='pdf')return reply_(downloadPdf_(input,user));
     if(input.action==='inspectionAssets')return reply_(inspectionAssets_(input,user));
     if(input.action==='assetIssues')return reply_(assetIssues_(input,user));
+    if(input.action==='centralBatteryBanks')return reply_(centralBatteryBanks_(user));
+    if(input.action==='centralAssetsForInspection')return reply_(centralAssetsForInspection_(input,user));
+    if(input.action==='compareInspectionAssets')return reply_(compareInspectionAssets_(input,user));
+    if(input.action==='applyAssetDecision')return reply_(applyAssetDecision_(input,user));
     if(input.action==='status')return reply_(inspectionStatus_(input,user));
     if(input.action==='process'){
       inspectionStatus_(input,user); // Verifica a autoria antes de qualquer processamento.
@@ -648,7 +652,12 @@ function assertAssetHeaders_(headers,name){
 }
 function normalizeAsset_(value){return String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase().replace(/\s+/g,' ');}
 function stationAssetKey_(value){return normalizeAsset_(value).replace(/^\w+[.-]\d+\s*[: -]\s*/,'').replace(/\bVOANET\b/g,'').replace(/[^A-Z0-9]/g,'');}
-function identityTokens_(value,prefix){return String(value||'').split(/[,;\n]+/).map(x=>normalizeAsset_(x)).filter(x=>x&&!['N/A','NA','NAO IDENTIFICADO','SEM SERIE','SEM PATRIMONIO','-'].includes(x)).map(x=>prefix+x);}
+function identityTokens_(value,prefix){return String(value||'').split(/[,;\n]+/).map(x=>normalizeAsset_(x)).filter(x=>x&&!x.startsWith('#')&&!['N/A','NA','NAO IDENTIFICADO','SEM SERIE','SEM PATRIMONIO','-'].includes(x)).map(x=>prefix+x);}
+function overlappingAssetIds_(a,b){return a.some(value=>b.includes(value));}
+function paddedSerialMatch_(a,b){
+  return a.length===1&&b.length===1&&/^S:\d+$/.test(a[0])&&/^S:\d+$/.test(b[0])
+    &&a[0]!==b[0]&&a[0].replace(/^S:0*/,'')===b[0].replace(/^S:0*/,'');
+}
 function reviewed_(r,group){return ['mantido','alterado'].includes(r.inventoryReview?.[group]);}
 function assetState_(v){return ({OPERACIONAL:'Operacional',ATENCAO:'Atenção','EM OBSERVACAO':'Atenção',CRITICO:'Crítico','SUBSTITUICAO RECOMENDADA':'Crítico',INATIVO:'Inativo',RETIRADA:'Inativo'})[normalizeAsset_(v)];}
 function assetDate_(value){
@@ -728,20 +737,24 @@ function findAssetRow_(table,candidate,r){
   });
   if(!matches.length){
     const model=normalizeAsset_(candidate.values.Modelo),maker=normalizeAsset_(candidate.values.Fabricante);
-    if(model&&maker)matches=rows.filter(x=>{
-      if(!sameAssetStation_(x.row,h,r,config)||normalizeAsset_(get(x.row,'Modelo'))!==model||normalizeAsset_(get(x.row,'Fabricante'))!==maker)return false;
-      if(candidate.tab==='Ativos'&&normalizeAsset_(get(x.row,'Categoria'))!==normalizeAsset_(candidate.values.Categoria))return false;
-      const existingSerial=identityTokens_(get(x.row,'Nº Série'),'S:');
-      if(existingSerial.length&&identityTokens_(candidate.serial,'S:').length&&!existingSerial.some(id=>incoming.includes(id)))return false;
-      return true;
-    });
+    if(model&&maker){
+      const similar=rows.filter(x=>sameAssetStation_(x.row,h,r,config)&&normalizeAsset_(get(x.row,'Modelo'))===model
+        &&normalizeAsset_(get(x.row,'Fabricante'))===maker&&(candidate.tab!=='Ativos'||normalizeAsset_(get(x.row,'Categoria'))===normalizeAsset_(candidate.values.Categoria)));
+      const serial=identityTokens_(candidate.serial,'S:'),patr=identityTokens_(candidate.patr,'P:');
+      matches=similar.filter(x=>{
+        const oldSerial=identityTokens_(get(x.row,'Nº Série'),'S:'),oldPatr=identityTokens_(get(x.row,'Patrimônio'),'P:');
+        return (!serial.length||!oldSerial.length||oldSerial.some(id=>serial.includes(id)))
+          &&(!patr.length||!oldPatr.length||oldPatr.some(id=>patr.includes(id)));
+      });
+    }
   }
   if(matches.length>1)throw Error('Mais de um equipamento corresponde à identificação.');
   if(matches.length&&!sameAssetStation_(matches[0].row,h,r,config))throw Error('O equipamento está vinculado a outro POP; movimentação exige conferência.');
   if(matches.length){const oldMaker=normalizeAsset_(get(matches[0].row,'Fabricante')),newMaker=normalizeAsset_(candidate.values.Fabricante);if(oldMaker&&newMaker&&oldMaker!==newMaker)throw Error('Fabricante divergente para a mesma identificação; solicite conferência.');}
   if(matches.length&&candidate.kind!=='Banco de baterias'){
     const oldSerial=identityTokens_(get(matches[0].row,'Nº Série'),'S:'),newSerial=identityTokens_(candidate.serial,'S:');
-    if(oldSerial.length&&newSerial.length&&!oldSerial.some(id=>newSerial.includes(id)))throw Error('A série diverge da identificação já cadastrada; confirme a substituição com a gestão.');
+    const samePatr=overlappingAssetIds_(identityTokens_(get(matches[0].row,'Patrimônio'),'P:'),identityTokens_(candidate.patr,'P:'));
+    if(oldSerial.length&&newSerial.length&&!overlappingAssetIds_(oldSerial,newSerial)&&!(samePatr&&paddedSerialMatch_(oldSerial,newSerial)))throw Error('A série diverge da identificação já cadastrada; confirme a substituição com a gestão.');
   }
   if(!matches.length&&!incoming.length)throw Error('Informe número de série ou patrimônio antes de criar o ativo.');
   return matches[0]||null;
@@ -767,12 +780,24 @@ function validatedAssetValue_(rule,value,header){
   }
   return value instanceof Date?value:text_(value);
 }
-function writeAssetPatch_(table,rowIndex,patch,warnings){
+function writeAssetPatch_(table,rowIndex,patch,warnings,strict=false){
   const range=table.sheet.getRange(rowIndex,1,1,table.width),formulas=range.getFormulas()[0],rules=range.getDataValidations()[0],before=range.getValues()[0],after=before.slice(),changed=[];
   for(const [header,value] of Object.entries(patch)){
-    const col=table.headers.indexOf(header);if(col<0||formulas[col])continue;
+    const col=table.headers.indexOf(header);
+    if(col<0)continue;
+    if(formulas[col]){
+      if(strict&&['Nº Série','Patrimônio'].includes(header)&&identityTokens_(value,'').length&&String(before[col])!==String(value)){
+        warnings.push(header+': a célula usa uma fórmula que precisa ser conferida na planilha.');
+      }
+      continue;
+    }
     try{const rule=rules[col]||assetFallbackRule_(table.sheet.getName(),header);const accepted=validatedAssetValue_(rule,value,header);if(accepted===undefined)continue;if(JSON.stringify(before[col])===JSON.stringify(accepted))continue;after[col]=accepted;changed.push(col);}
     catch(error){warnings.push(header+': '+error.message);}
+  }
+  if(strict&&warnings.length)throw Error(warnings.join(' · '));
+  for(const header of ['Nº Série','Patrimônio']){
+    const col=table.headers.indexOf(header);
+    if(changed.includes(col)&&typeof after[col]==='string')table.sheet.getRange(rowIndex,col+1).setNumberFormat('@');
   }
   changed.sort((a,b)=>a-b);
   for(let i=0;i<changed.length;){let j=i;while(j+1<changed.length&&changed[j+1]===changed[j]+1)j++;table.sheet.getRange(rowIndex,changed[i]+1,1,changed[j]-changed[i]+1).setValues([after.slice(changed[i],changed[j]+1)]);i=j+1;}
@@ -822,17 +847,26 @@ function syncAssets_(r,version){
       for(const warning of fieldWarnings){result.pending++;result.warnings.push(candidate.tab+' · '+candidate.label+': '+warning);log(candidate.tab,id,'PENDENCIA',warning);}
     }catch(error){const detail=candidate.tab+' · '+candidate.label+': '+error.message;result.pending++;result.warnings.push(detail);log(candidate.tab,candidate.ref,'PENDENCIA',detail);}
   }
-  const audit=book_(config_().ACCESS_SPREADSHEET_ID).getSheetByName(ASSET_AUDIT);if(!audit)throw Error('Histórico de ativos não preparado.');
-  const seen=new Set(audit.getLastRow()>1?audit.getRange(2,1,audit.getLastRow()-1,1).getValues().flat():[]),fresh=events.filter(e=>!seen.has(e[0]));
-  if(fresh.length){const target=audit.getLastRow()+1;if(target+fresh.length-1>audit.getMaxRows())audit.insertRowsAfter(audit.getMaxRows(),fresh.length+100);audit.getRange(target,1,fresh.length,AUDIT_HEADERS.length).setValues(fresh.map(row=>row.map(v=>v instanceof Date?v:text_(v))));}
+  appendAssetEvents_(events);
   // O resumo nas propriedades tem tamanho limitado; os detalhes integrais ficam no histórico privado.
   result.warnings=result.warnings.slice(0,12).map(x=>x.slice(0,220));return result;
 }
+function appendAssetEvents_(events){
+  const audit=book_(config_().ACCESS_SPREADSHEET_ID).getSheetByName(ASSET_AUDIT);if(!audit)throw Error('Histórico de ativos não preparado.');
+  const seen=new Set(audit.getLastRow()>1?audit.getRange(2,1,audit.getLastRow()-1,1).getValues().flat():[]),fresh=events.filter(e=>!seen.has(e[0]));
+  if(fresh.length){const target=audit.getLastRow()+1;if(target+fresh.length-1>audit.getMaxRows())audit.insertRowsAfter(audit.getMaxRows(),fresh.length+100);audit.getRange(target,1,fresh.length,AUDIT_HEADERS.length).setValues(fresh.map(row=>row.map(v=>v instanceof Date?v:text_(v))));}
+}
+function openAssetIssues_(id,revision){
+  const sheet=book_(config_().ACCESS_SPREADSHEET_ID).getSheetByName(ASSET_AUDIT);
+  const rows=sheet&&sheet.getLastRow()>1?sheet.getRange(2,1,sheet.getLastRow()-1,AUDIT_HEADERS.length).getValues():[];
+  const current=rows.filter(r=>r[2]===id&&r[10]===(revision?.assetAuditVersion||revision?.hash));
+  const closed=new Set(current.filter(r=>['VINCULADO','SUBSTITUIDO'].includes(r[6])).map(r=>r[7].split('|')[0]));
+  return current.filter(r=>r[6]==='PENDENCIA'&&!closed.has(r[0]));
+}
 function assetIssues_(input,user){
   const owner=recordOwner_(input.inspectionId);if(!owner||(owner!==user.email&&user.role!=='GESTAO'))throw Error('Registro indisponível.');
-  const revision=recordRevision_(input.inspectionId),sheet=book_(config_().ACCESS_SPREADSHEET_ID).getSheetByName(ASSET_AUDIT);
-  const rows=sheet&&sheet.getLastRow()>1?sheet.getRange(2,1,sheet.getLastRow()-1,AUDIT_HEADERS.length).getValues():[];
-  return {ok:true,issues:rows.filter(r=>r[2]===input.inspectionId&&r[6]==='PENDENCIA'&&r[10]===(revision?.assetAuditVersion||revision?.hash)).map(r=>({tab:r[4],detail:r[7]}))};
+  const revision=recordRevision_(input.inspectionId);
+  return {ok:true,issues:openAssetIssues_(input.inspectionId,revision).map(r=>({tab:r[4],detail:r[7]}))};
 }
 
 function inspectionAssets_(input,user){
@@ -859,6 +893,160 @@ function inspectionAssets_(input,user){
     }))
   }));
   return {ok:true,inspectionId:id,groups};
+}
+
+function centralBatteryBanks_(user){
+  if(user.role!=='GESTAO')throw Error('Consulta disponível para a Gestão.');
+  const {sheet,headers,values,width}=assetTable_('Controle_Baterias');
+  const rows=sheet.getRange(1,1,values.length,width).getDisplayValues().slice(1);
+  const banks=rows.flatMap(row=>{
+    const get=name=>row[headers.indexOf(name)];
+    const station=get('Estação'),model=get('Modelo'),name=get('Descrição');
+    if(!station||!model&&!name&&!get('Patrimônio'))return [];
+    return [{station,name,model,maker:get('Fabricante'),quantity:get('Quantidade'),
+      installed:get('Data Instalação'),age:get('Tempo de Uso (meses)'),
+      nextTest:get('Próxima Teste'),status:get('Status')}];
+  });
+  return {ok:true,banks};
+}
+
+function centralAssetsForInspection_(input,user){
+  const id=input.inspectionId;
+  if(!/^INSP-[A-Za-z0-9-]+$/.test(id||'')||user.role!=='GESTAO'||!recordOwner_(id))throw Error('Cadastro indisponível.');
+  const revision=recordRevision_(id);
+  if(!revision?.payloadId)throw Error('A identificação do POP desta vistoria está indisponível.');
+  const record=readJsonFile_(revision.payloadId);
+  const groups=Object.entries(ASSET_TABS).map(([tab,config])=>{
+    const {values,headers}=assetTable_(tab);
+    const items=values.slice(1).filter(row=>sameAssetStation_(row,headers,record,config)
+      &&stationAssetKey_(row[headers.indexOf(config.station)])===stationAssetKey_(record.nome)).map(row=>{
+      const get=name=>row[headers.indexOf(name)];
+      return {name:[get('Equipamento')||get('Descrição'),get('Fabricante'),get('Modelo')].filter(Boolean).join(' · '),
+        serial:get('Nº Série'),asset:get('Patrimônio'),status:get('Status')};
+    });
+    return {label:tab,items};
+  }).filter(group=>group.items.length);
+  return {ok:true,groups};
+}
+
+function comparisonAsset_(candidate,table,entry,record){
+  const {row}=entry,h=table.headers,get=name=>row[h.indexOf(name)];
+  const serial=identityTokens_(candidate.serial,'S:'),patr=identityTokens_(candidate.patr,'P:');
+  const previousSerial=identityTokens_(get('Nº Série'),'S:'),previousPatr=identityTokens_(get('Patrimônio'),'P:');
+  const samePatr=overlappingAssetIds_(patr,previousPatr);
+  const sameRawSerial=overlappingAssetIds_(serial,previousSerial);
+  const paddedSerial=paddedSerialMatch_(serial,previousSerial);
+  const sameSerial=sameRawSerial||(samePatr&&paddedSerial);
+  const serialDiff=serial.length>0&&previousSerial.length>0&&!sameSerial;
+  const patrDiff=patr.length>0&&previousPatr.length>0&&!samePatr;
+  const sameRef=Boolean(candidate.ref&&candidate.ref===get('ID_Ativo'));
+  const config=ASSET_TABS[candidate.tab];
+  const station=String(get(config.station)||'');
+  const sameStation=sameAssetStation_(row,h,record,config)&&stationAssetKey_(station)===stationAssetKey_(record.nome);
+  const maker=normalizeAsset_(candidate.values.Fabricante),oldMaker=normalizeAsset_(get('Fabricante'));
+  const model=normalizeAsset_(candidate.values.Modelo).replace(/[^A-Z0-9]/g,'');
+  const oldModel=normalizeAsset_(get('Modelo')).replace(/[^A-Z0-9]/g,'');
+  const sameModel=Boolean(model&&model===oldModel&&(!maker||!oldMaker||maker===oldMaker));
+  const bankLabel=candidate.tab==='Controle_Baterias'&&candidate.label&&normalizeAsset_(candidate.label)===normalizeAsset_(get('Descrição'));
+  const score=(sameRef?16:0)+(sameSerial?8:0)+(samePatr?6:0)+(sameStation&&(sameModel||bankLabel)?2:0);
+  if(!score)return null;
+  const basis=[sameRef&&'Vínculo anterior',sameRawSerial&&'Série igual',(sameSerial&&!sameRawSerial)&&'Série equivalente com zeros à esquerda',samePatr&&'Patrimônio igual',sameModel&&'Modelo igual',bankLabel&&'Banco com a mesma identificação'].filter(Boolean);
+  const date=dateKey_(get(config.date||'Data_Ultima_Inspecao'));
+  return {entry,score,sameStation,sameModel,sameRef,sameSerial,samePatr,serialDiff,patrDiff,
+    newer:date>record.data||(date===record.data&&String(get('Versao_Inspecao')||'')>record.updated),paddedSerial,
+    display:{station,model:get('Modelo'),maker:get('Fabricante'),serial:get('Nº Série'),patr:get('Patrimônio'),
+      name:get('Descrição'),quantity:get('Quantidade'),gas:get('Carga Gás'),installed:dateKey_(get('Data Instalação')),basis,serialDiff,patrDiff,
+      otherStation:!sameStation}};
+}
+
+function assetComparisonData_(id,user){
+  if(!/^INSP-[A-Za-z0-9-]+$/.test(id||'')||user.role!=='GESTAO'||!recordOwner_(id))throw Error('Conferência indisponível.');
+  const revision=recordRevision_(id);
+  if(!revision?.payloadId)throw Error('O inventário arquivado desta inspeção está indisponível.');
+  const issues=openAssetIssues_(id,revision);
+  const record=readJsonFile_(revision.payloadId);
+  const {candidates}=assetCandidates_(record);
+  for(const bank of record.invBatteryBanks||[]){
+    const label=bank.identificacao||bank.id;
+    if(candidates.some(item=>item.tab==='Controle_Baterias'&&item.label===label))continue;
+    const batteries=bank.baterias||[];
+    candidates.push({tab:'Controle_Baterias',label,serial:batteries.map(item=>item.serie).filter(Boolean).join(', '),
+      patr:batteries.map(item=>item.patrimonio).filter(Boolean).join(', '),values:{
+        Fabricante:commonBattery_(batteries,'fabricante'),Modelo:commonBattery_(batteries,'modelo'),Quantidade:batteries.length}});
+  }
+  const tables={},comparisons=[];
+  for(const candidate of candidates){
+    const prefix=candidate.tab+' · '+candidate.label+': ';
+    const related=issues.filter(issue=>issue[4]===candidate.tab
+      ? issue[7].startsWith(prefix)||(!issue[7].startsWith(candidate.tab+' · ')&&candidate.tab!=='Ativos')
+      : candidate.tab==='Controle_Baterias'&&!issue[4]&&issue[7].endsWith(': '+candidate.label));
+    if(!related.length)continue;
+    const table=tables[candidate.tab]||(tables[candidate.tab]=assetTable_(candidate.tab));
+    const matches=table.values.slice(1).map((row,i)=>comparisonAsset_(candidate,table,{row,index:i+2},record))
+      .filter(Boolean).sort((a,b)=>b.score-a.score);
+    const identityIssues=related.filter(issue=>issue[7].startsWith(prefix)&&/série diverge|mais de um equipamento|fabricante divergente/i.test(issue[7]));
+    const hasSerial=identityTokens_(candidate.serial,'S:').length===1;
+    const identity=JSON.stringify([candidate.tab,candidate.label,candidate.item?.id,candidate.serial,candidate.patr]);
+    for(const match of matches.slice(0,6)){
+      const stableIdentity=match.sameRef||match.sameSerial||match.samePatr;
+      const elsewhere=matches.some(other=>other!==match&&(other.sameSerial||other.samePatr));
+      const uniqueCandidate=candidates.filter(item=>item.tab===candidate.tab&&item.label===candidate.label).length===1;
+      const permitted=candidate.tab==='Ativos'&&uniqueCandidate&&identityIssues.length===1&&match.sameStation&&!match.newer&&!elsewhere;
+      if(permitted&&stableIdentity&&!match.serialDiff&&!match.patrDiff&&match.sameModel)match.operation='link';
+      if(permitted&&hasSerial&&match.serialDiff&&!match.paddedSerial&&!match.patrDiff&&(match.samePatr||match.sameModel))match.operation='replace';
+      if(match.operation){
+        match.issue=identityIssues[0];
+        match.token=hash_(JSON.stringify([id,revision.hash,match.issue[0],identity,match.entry.row,match.operation]));
+      }
+    }
+    comparisons.push({candidate,table,matches:matches.slice(0,6),related});
+  }
+  return {record,revision,issues,comparisons};
+}
+
+function compareInspectionAssets_(input,user){
+  const data=assetComparisonData_(input.inspectionId,user);
+  return {ok:true,items:data.comparisons.map(({candidate,matches,related})=>({
+    tab:candidate.tab,label:candidate.label,station:data.record.nome,model:candidate.values.Modelo,maker:candidate.values.Fabricante,
+    serial:candidate.serial,patr:candidate.patr,quantity:candidate.values.Quantidade,
+    gas:candidate.values['Carga Gás'],installed:candidate.values['Data Instalação'] instanceof Date
+      ? dateKey_(candidate.values['Data Instalação']) : candidate.values['Data Instalação']?._invalidDate,
+    issues:related.map(issue=>issue[7]),
+    matches:matches.map(match=>({...match.display,operation:match.operation,token:match.token}))
+  }))};
+}
+
+function applyAssetDecision_(input,user){
+  if(user.role!=='GESTAO')throw Error('Decisão disponível para a Gestão.');
+  const id=input.inspectionId,reason=String(input.reason||'').trim();
+  if(!/^INSP-[A-Za-z0-9-]+$/.test(id||'')||!/^[a-f0-9]{64}$/.test(input.decisionToken||''))throw Error('Abra a comparação novamente.');
+  if(reason.length<5||reason.length>300)throw Error('Informe o motivo da decisão (5 a 300 caracteres).');
+  return withWriteLock_(()=>{
+    if(privateValue_(jobKey_(id)))throw Error('A inspeção tem um processamento pendente. Aguarde e atualize a conferência.');
+    const data=assetComparisonData_(id,user);
+    const group=data.comparisons.find(item=>item.matches.some(match=>match.token===input.decisionToken));
+    if(!group)throw Error('O cadastro ou a pendência mudou. Abra a comparação novamente.');
+    const {candidate,table}=group,match=group.matches.find(item=>item.token===input.decisionToken);
+    const {record,revision}=data,{row,index}=match.entry;
+    const assetId=row[table.headers.indexOf('ID_Ativo')]||'AS-'+hash_('Ativos|'+record.codigoPop+'|'+input.decisionToken).slice(0,24);
+    const patch={...candidate.values,ID_Ativo:assetId,Codigo_POP:record.codigoPop,
+      'Nº Série':candidate.serial,'Patrimônio':candidate.patr,Data_Ultima_Inspecao:assetDate_(record.data),
+      ID_Ultima_Inspecao:id,Versao_Inspecao:record.updated};
+    const version=revision.assetAuditVersion||revision.hash;
+    const detail=match.issue[0]+'|'+user.email+'|'+reason;
+    const pendingEvent=[hash_(input.decisionToken+'|DECISAO'),new Date(),id,record.codigoPop,'Ativos',assetId,
+      'DECISAO',detail,JSON.stringify(row),JSON.stringify(patch),version];
+    appendAssetEvents_([pendingEvent]);
+    const written=writeAssetPatch_(table,index,patch,[],true);
+    SpreadsheetApp.flush();
+    const action=match.operation==='replace'?'SUBSTITUIDO':'VINCULADO';
+    appendAssetEvents_([[hash_(input.decisionToken+'|'+action),new Date(),id,record.codigoPop,'Ativos',assetId,
+      action,detail,JSON.stringify(written.before),JSON.stringify(written.after),version]]);
+    revision.assets={...revision.assets,pending:data.issues.length-1};
+    setPrivate_('REVISION_'+hash_(id),JSON.stringify(revision));
+    setPrivate_('DATA_VERSION',Utilities.getUuid());
+    return {ok:true,action};
+  });
 }
 
 function requireManager_(user){if(!user||user.role!=='GESTAO')throw Error('Acesso restrito à gestão.');}

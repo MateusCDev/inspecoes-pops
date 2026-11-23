@@ -89,8 +89,21 @@ async function googleLoadMore(){
 }
 async function googleReprocessAssets(id){
   const session=googleSession,key=googleAccessKey;
-  try{const result=await googleRpc('reprocessAssets',{inspectionId:id},key);if(session!==googleSession)return;alert('Atualização de ativos solicitada. O resultado aparecerá no painel.');if(result.pending)googleRpc('process',{inspectionId:id},key).then(()=>{if(session===googleSession)googleRefreshCentral();}).catch(()=>{});}
-  catch(error){if(session===googleSession)alert(error.message);}
+  const {dialog,content}=openGoogleAssetDialog('Reprocessar ativos',id,'Enviando a solicitação…');
+  const show=message=>{if(session===googleSession&&dialog.open)content.textContent=message;};
+  try{
+    const result=await googleRpc('reprocessAssets',{inspectionId:id},key);
+    if(session!==googleSession)return;
+    if(result.pending){
+      show('Solicitação recebida. O cadastro central está sendo reprocessado.');
+      const outcome=await googleRpc('process',{inspectionId:id},key);
+      if(outcome.pending){show('O reprocessamento está na fila. Atualize a consulta em instantes.');return;}
+    }
+    show('Reprocessamento concluído.');
+    if(session===googleSession)googleRefreshCentral();
+  }catch(error){
+    show(error.message);
+  }
 }
 function closeGoogleAssetIssues(){
   document.getElementById('google-asset-issues')?.close();
@@ -113,17 +126,19 @@ function openGoogleAssetDialog(title,id,loading){
   dialog.showModal();
   return {dialog,content:dialog.querySelector('[data-asset-issues-content]')};
 }
-async function googleShowInventory(id){
+async function googleShowInventory(id,central=false){
   const session=googleSession;
-  const {dialog,content}=openGoogleAssetDialog('Equipamentos da vistoria',id,'Consultando o inventário arquivado…');
+  const title=central?'Cadastro central do POP':'Equipamentos da vistoria';
+  const loading=central?'Consultando a planilha central…':'Consultando o inventário arquivado…';
+  const {dialog,content}=openGoogleAssetDialog(title,id,loading);
   try{
-    const result=await googleRpc('inspectionAssets',{inspectionId:id});
+    const result=await googleRpc(central?'centralAssetsForInspection':'inspectionAssets',{inspectionId:id});
     if(session!==googleSession||!dialog.open)return;
     if(!Array.isArray(result.groups))throw Error('O serviço não trouxe o inventário.');
     content.innerHTML=result.groups.length?result.groups.map(group=>`<section>
       <h3>${esc(group.label)}</h3><ul>${group.items.map(item=>`<li><strong>${esc(item.name)}</strong>
       ${esc([item.serial&&'Série '+item.serial,item.asset&&'Patrimônio '+item.asset,item.status].filter(Boolean).join(' · '))}</li>`).join('')}</ul></section>`).join('')
-      :'<p>Nenhum equipamento foi registrado nesta inspeção.</p>';
+      :central?'<p>Nenhum equipamento consta no cadastro central deste POP.</p>':'<p>Nenhum equipamento foi registrado nesta inspeção.</p>';
   }catch(error){if(session===googleSession&&dialog.open)content.innerHTML=`<p role="alert">${esc(error.message)}</p>`;}
 }
 function assetIssueGuidance(detail){
@@ -159,6 +174,9 @@ async function googleShowAssetIssues(id){
       tabs.get(title).push(entry.detail);
     }
     content.innerHTML=tabs.size?[...tabs].map(([title,items])=>`<section><h3>${esc(title)}</h3><ul>${items.map(item=>{const guidance=assetIssueGuidance(item);return `<li>${esc(item)}${guidance?`<p class="asset-issue-guidance">${esc(guidance)}</p>`:''}</li>`;}).join('')}</ul></section>`).join(''):'<p>Sem pendências nesta versão.</p>';
+    if(tabs.size&&googleUser?.role==='GESTAO'&&googleCapabilities.assetReconciliation){
+      content.insertAdjacentHTML('beforeend',button('googleCompare:'+id,'Conferir com a base central','primary tiny'));
+    }
   }catch(error){
     if(session===googleSession&&dialog.open)content.innerHTML=`<p role="alert">${esc(error.message)}</p>`;
   }
@@ -172,3 +190,92 @@ document.addEventListener('click',e=>{
 if(typeof window.setInterval==='function')window.setInterval(googlePollJobs,5000);
 
 document.addEventListener('change',e=>{if(e.target.dataset.bankComplete&&googleUser){const bank=cur()?.invBatteryBanks?.find(b=>b.id===e.target.dataset.bankComplete);if(bank){bank.cadastroCompleto=e.target.checked;change();}}});
+
+let googleBatteries={};
+async function googleRefreshBatteries(){
+  if(googleUser?.role!=='GESTAO'||!googleCapabilities.assetReconciliation)return;
+  const session=googleSession;
+  if(googleBatteries.session===session&&googleBatteries.busy)return;
+  googleBatteries={session,busy:true};
+  if(view==='assets')render();
+  try{
+    const result=await googleRpc('centralBatteryBanks');
+    if(session===googleSession)googleBatteries={session,banks:result.banks};
+  }catch(error){
+    if(session===googleSession)googleBatteries={session,error:error.message};
+  }
+  if(session===googleSession&&view==='assets')render();
+}
+
+function renderCentralBatteries(){
+  if(!isGoogleMode()||googleUser?.role!=='GESTAO'||!googleCapabilities.assetReconciliation)return '';
+  const state=googleBatteries.session===googleSession?googleBatteries:{};
+  const banks=state.banks;
+  const rows=banks?.map(bank=>`<tr><td>${esc(bank.station)}</td><td>${esc([bank.name,bank.maker,bank.model].filter(Boolean).join(' · '))}</td>
+    ${[bank.quantity,bank.installed,bank.age,bank.nextTest,bank.status].map(value=>`<td>${esc(value||'—')}</td>`).join('')}</tr>`).join('');
+  return `<section class="card"><div class="card-head"><div><h2>Bancos de baterias na base central</h2>
+    <p class="muted small">Instalação, tempo de uso e situação registrados na guia Controle_Baterias.</p></div>
+    ${button('googleRefreshBatteries','Atualizar bancos','tiny')}</div>
+    ${!banks?`<p role="status">${esc(state.error||'Consultando a planilha central…')}</p>`:`
+    <div class="table-scroll"><table class="data-table"><thead><tr><th>Estação</th><th>Banco</th><th>Quantidade</th>
+    <th>Instalação</th><th>Uso (meses)</th><th>Próximo teste</th><th>Situação</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="7">Nenhum banco cadastrado na guia central.</td></tr>'}</tbody></table></div>`}</section>`;
+}
+
+function assetComparisonCells(item){
+  const values=[item.station,[item.maker,item.model||item.name].filter(Boolean).join(' '),item.serial,item.patr,
+    item.quantity,item.gas,item.installed&&fmt(item.installed)];
+  return values.map(value=>`<td>${esc(value===''||value==null?'—':value)}</td>`).join('');
+}
+
+async function googleCompareAssets(id){
+  const session=googleSession;
+  const {dialog,content}=openGoogleAssetDialog('Conferir com a base central',id,'Cruzando a vistoria com a planilha…');
+  dialog.classList.add('asset-comparison-dialog');
+  const active=()=>session===googleSession&&dialog.open;
+  try{
+    const {items}=await googleRpc('compareInspectionAssets',{inspectionId:id});
+    if(!active())return;
+    content.innerHTML=items.length?items.map(item=>`<section>
+      <h3>${esc(item.label)}</h3><p class="small muted">${esc(item.tab)}</p>
+      <ul>${item.issues.map(detail=>`<li>${esc(detail)}</li>`).join('')}</ul>
+      <div class="table-scroll"><table class="data-table"><thead><tr><th>Origem</th><th>Estação</th><th>Equipamento</th><th>Série</th><th>Patrimônio</th><th>Qtd.</th><th>Carga de gás</th><th>Instalação</th></tr></thead>
+      <tbody><tr><th scope="row">Vistoria</th>${assetComparisonCells(item)}</tr>
+      ${item.matches.map((match,index)=>`<tr><th scope="row">Cadastro ${index+1}</th>${assetComparisonCells(match)}</tr>`).join('')
+        ||'<tr><td colspan="8">Nenhum cadastro semelhante encontrado.</td></tr>'}</tbody></table></div>
+      ${item.matches.map((match,index)=>`<p><strong>Cadastro ${index+1}</strong> ·
+        ${esc([...match.basis,match.serialDiff&&'Série divergente',match.patrDiff&&'Patrimônio divergente',match.otherStation&&'Outra estação'].filter(Boolean).join(' · '))}</p>
+        ${match.operation?`<details class="archived-pdf"><summary>${match.operation==='replace'?'Confirmar substituição':'Vincular ao mesmo equipamento'}</summary>
+        <form data-asset-decision="${esc(match.token)}">
+          <p class="small muted">${match.operation==='replace'?'Confirme pela etiqueta ou ordem de serviço antes de atualizar a série. A identificação anterior fica no histórico.':'Confirme os dados de identificação antes de atualizar a linha indicada.'}</p>
+          <label>Motivo da decisão <input name="reason" required minlength="5" maxlength="300"></label>
+          <button class="btn primary tiny" type="submit">Salvar decisão</button><p role="status"></p>
+        </form></details>`:''}`).join('')}</section>`).join(''):'<p>Nenhuma pendência com equipamento identificável para comparar nesta vistoria.</p>';
+  }catch(error){
+    if(active())content.innerHTML=`<p role="alert">${esc(error.message)}</p>`;
+  }
+  dialog.addEventListener('submit',async event=>{
+    const form=event.target;
+    if(!form.dataset.assetDecision)return;
+    event.preventDefault();
+    const button=form.querySelector('button'),status=form.querySelector('[role="status"]');
+    if(button.disabled||!active())return;
+    button.disabled=true;
+    status.textContent='Salvando decisão…';
+    try{
+      const result=await googleRpc('applyAssetDecision',{inspectionId:id,decisionToken:form.dataset.assetDecision,reason:form.elements.reason.value});
+      if(session!==googleSession)return;
+      if(active())content.innerHTML=`<p role="status">${result.action==='SUBSTITUIDO'?'Substituição registrada.':'Vínculo confirmado.'} O cadastro central e o histórico foram atualizados.</p>`;
+      googleRefreshCentral();
+    }catch(error){
+      if(active()){status.textContent=error.message;button.disabled=false;}
+    }
+  });
+}
+document.addEventListener('click',event=>{
+  if(googleUser?.role!=='GESTAO'||!googleCapabilities.assetReconciliation)return;
+  const action=event.target.closest('[data-action]')?.dataset.action;
+  if(action==='googleRefreshBatteries')googleRefreshBatteries();
+  if(action?.startsWith('googleCatalog:'))googleShowInventory(action.slice('googleCatalog:'.length),true);
+  if(action?.startsWith('googleCompare:'))googleCompareAssets(action.slice('googleCompare:'.length));
+});

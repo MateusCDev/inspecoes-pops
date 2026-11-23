@@ -1,4 +1,4 @@
-const REPORT_VERSION = 'tecnico-v5';
+const REPORT_VERSION = 'tecnico-v6';
 const REPORT_INK = '#192638';
 const REPORT_MUTED = '#526277';
 const REPORT_RED = '#b9142a';
@@ -114,7 +114,7 @@ function reportEvidencePage_(body,record,checks,section){
   evidence.forEach((photo,index)=>{
     const cell=grid.getCell(Math.floor(index/2),index%2);
     try{
-      const image=cell.getChild(0).asParagraph().setText('').appendInlineImage(photo.blob);
+      const image=cell.getChild(0).asParagraph().appendInlineImage(photo.blob);
       const width=image.getWidth(),height=image.getHeight();
       const scale=Math.min(228/width,183/height,1);
       image.setWidth(Math.max(1,Math.round(width*scale))).setHeight(Math.max(1,Math.round(height*scale)));
@@ -139,7 +139,7 @@ function createPdf_(record,folder,name) {
     brand.setColumnWidth(0,300).setColumnWidth(1,214);
     const logoCell=brand.getCell(0,0);
     if(typeof REPORT_LOGO==='string'){
-      const logo=logoCell.getChild(0).asParagraph().setText('').appendInlineImage(
+      const logo=logoCell.getChild(0).asParagraph().appendInlineImage(
         Utilities.newBlob(Utilities.base64Decode(REPORT_LOGO),'image/png','voanet.png'));
       logo.setWidth(132).setHeight(27);
     }else{

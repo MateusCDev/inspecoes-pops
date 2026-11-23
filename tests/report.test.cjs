@@ -24,7 +24,7 @@ test('Gestão atualiza somente o PDF de uma inspeção recebida e preserva o arq
  assert.equal(h.request({action:'refreshReport',inspectionId:record.id},'manager').pdfUrl,result.pdfUrl);
  assert.equal(h.files.size,count+1);
  assert.equal(h.request({action:'pdf',inspectionId:record.id}).fileName,'POP fictício - 16-11-2026.pdf');
- assert.match([...h.files.keys()].find(name=>name.endsWith('tecnico-v5.pdf')), /^POP fictício - 16-11-2026 - /);
+ assert.match([...h.files.keys()].find(name=>name.endsWith('tecnico-v6.pdf')), /^POP fictício - 16-11-2026 - /);
 });
 
 test('limita textos longos no relatório e usa estação e data no nome',()=>{
@@ -42,11 +42,12 @@ test('monta o relatório técnico com seções, ações e fotos vinculadas',()=>
  }
  function paragraph(value){
   return {setHeading(){return this},setSpacingBefore(){return this},setSpacingAfter(){return this},
-   setLineSpacing(){return this},setAlignment(){return this},appendInlineImage(blob){entries.push(blob);return {getWidth:()=>800,getHeight:()=>600,setWidth(){return this},setHeight(){return this}}},setText(next){entries.push(next);return this},editAsText:text};
+   setLineSpacing(){return this},setAlignment(){return this},appendInlineImage(blob){entries.push(blob);return {getWidth:()=>800,getHeight:()=>600,setWidth(){return this},setHeight(){return this}}},
+   setText(next){if(next==='')throw Error('Não é possível inserir um elemento de texto vazio.');entries.push(next);return this},editAsText:text};
  }
  function section(){
   return {
-   appendParagraph(value){entries.push(value);return paragraph(value)},
+   appendParagraph(value){if(value==='')throw Error('Não é possível inserir um elemento de texto vazio.');entries.push(value);return paragraph(value)},
    appendPageBreak(){entries.push('PAGE_BREAK')},
    appendImage(blob){entries.push(blob);return {getWidth:()=>800,getHeight:()=>600,setWidth(){return this},setHeight(){return this}}},
    appendTable(rows){

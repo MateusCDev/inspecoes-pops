@@ -133,7 +133,26 @@ function googleCentralView(){
   const latest=new Map();for(const item of googleSummary?.latest||items){const key=String(item.stationCode||'')+'|'+item.station,old=latest.get(key);if(!old||String(item.date)+String(item.updated)>String(old.date)+String(old.updated))latest.set(key,item);}
   const upcoming=[...latest.values()].filter(r=>!googleStations.some(s=>s.inactive&&s.code===String(r.stationCode)&&s.name===r.station)).sort((a,b)=>String(a.due||'9999').localeCompare(String(b.due||'9999')));
   const scheduleHTML=`<div class="card"><h2>Próximas inspeções — última vistoria de cada POP</h2><div class="table-scroll"><table class="data-table"><thead><tr><th>POP</th><th>Última vistoria</th><th>Prazo</th><th>Próxima inspeção</th><th>Situação</th></tr></thead><tbody>${upcoming.map(r=>{const days=daysUntil(r.due),status=days===null?'Sem programação':days<0?'Vencida há '+Math.abs(days)+' dia(s)':days===0?'Vence hoje':'Faltam '+days+' dia(s)';return `<tr><td>${esc(r.station)}</td><td>${esc(fmt(r.date))}</td><td>${Number(r.period)||'—'} dias</td><td>${esc(fmt(r.due))}</td><td>${esc(status)}</td></tr>`;}).join('')||'<tr><td colspan="5">Sem inspeções recebidas.</td></tr>'}</tbody></table></div></div>`;
-  return `<div class="shell" style="display:block;max-width:1160px">${googleProfilePanel()}<div class="card"><div class="card-head"><div><h1>${manager?'Painel central da equipe':'Minhas inspeções enviadas'}</h1><p>Fonte: planilha central · ${googleCentralUpdated?'Atualizado em '+esc(googleCentralUpdated):'Aguardando consulta'}</p></div><div class="btnrow">${button('googleRefresh',googleCentralBusy?'Atualizando…':'Atualizar dados','primary tiny')}${button('home','Voltar','tiny')}</div></div><p class="small muted">${manager?'Histórico das inspeções de toda a equipe.':'Somente registros vinculados à sua chave individual.'} Registros locais ainda não enviados aparecem na tela inicial.</p></div><div class="grid3"><div class="stat"><strong>${googleSummary?.total??items.length}</strong><span>Inspeções recebidas</span></div><div class="stat"><strong>${nc}</strong><span>Não conformidades registradas</span></div><div class="stat"><strong>${c+nc?(100*c/(c+nc)).toFixed(1)+'%':'—'}</strong><span>Conformidade: C ÷ (C + NC)</span></div></div>${ranking.length?`<div class="card"><h2>Não conformidades acumuladas por POP</h2>${ranking.map(([station,n])=>`<p>${esc(station)} · ${n}</p><div style="height:10px;background:#e5e7eb;margin-bottom:12px"><div style="height:10px;background:#c90018;width:${100*n/max}%"></div></div>`).join('')}</div>`:''}${scheduleHTML}<div class="card"><h2>Histórico de inspeções</h2><p>Exibindo ${items.length} de ${googleSummary?.total??items.length} registros.</p><div class="table-scroll"><table class="data-table"><thead><tr><th>POP / data</th><th>Técnico / autor</th><th>Criticidade</th><th>NC</th><th>Próxima inspeção</th><th>Relatório e ativos</th></tr></thead><tbody>${items.map(r=>`<tr><td>${esc(r.station)}<br>${esc(fmt(r.date))}</td><td>${esc(r.technician)}<br>${esc(r.owner)}</td><td>${esc(r.criticality)}</td><td>${Number(r.nc)||0}</td><td>${esc(fmt(r.due))}</td><td>${button('googlePdf:'+r.id,'Baixar PDF','tiny')}${r.assets?`<p>${esc(googleAssetText(r.assets))}</p>`:''}${r.assets?.pending?button('googleIssues:'+r.id,'Ver pendências','tiny')+button('googleAssets:'+r.id,'Reprocessar ativos','tiny'):''}</td></tr>`).join('')||'<tr><td colspan="6">Nenhuma inspeção recebida nesta consulta.</td></tr>'}</tbody></table></div>${googleNextCursor!==null?button('googleLoadMore','Carregar mais inspeções','tiny'):''}</div></div>`;
+  return `<div class="shell" style="display:block;max-width:1160px">${googleProfilePanel()}<div class="card"><div class="card-head"><div><h1>${manager?'Painel central da equipe':'Minhas inspeções enviadas'}</h1><p>Fonte: planilha central · ${googleCentralUpdated?'Atualizado em '+esc(googleCentralUpdated):'Aguardando consulta'}</p></div><div class="btnrow">${button('googleRefresh',googleCentralBusy?'Atualizando…':'Atualizar dados','primary tiny')}${button('home','Voltar','tiny')}</div></div><p class="small muted">${manager?'Histórico das inspeções de toda a equipe.':'Somente registros vinculados à sua chave individual.'} Registros locais ainda não enviados aparecem na tela inicial.</p></div><div class="grid3"><div class="stat"><strong>${googleSummary?.total??items.length}</strong><span>Inspeções recebidas</span></div><div class="stat"><strong>${nc}</strong><span>Não conformidades registradas</span></div><div class="stat"><strong>${c+nc?(100*c/(c+nc)).toFixed(1)+'%':'—'}</strong><span>Conformidade: C ÷ (C + NC)</span></div></div>${ranking.length?`<div class="card"><h2>Não conformidades acumuladas por POP</h2>${ranking.map(([station,n])=>`<p>${esc(station)} · ${n}</p><div style="height:10px;background:#e5e7eb;margin-bottom:12px"><div style="height:10px;background:#c90018;width:${100*n/max}%"></div></div>`).join('')}</div>`:''}${scheduleHTML}<div class="card"><h2>Histórico de inspeções</h2><p>Exibindo ${items.length} de ${googleSummary?.total??items.length} registros.</p><div class="table-scroll"><table class="data-table"><thead><tr><th>POP / data</th><th>Técnico / autor</th><th>Criticidade</th><th>NC</th><th>Próxima inspeção</th><th>Relatório e ativos</th></tr></thead><tbody>${items.map(r=>`<tr><td>${esc(r.station)}<br>${esc(fmt(r.date))}</td><td>${esc(r.technician)}<br>${esc(r.owner)}</td><td>${esc(r.criticality)}</td><td>${Number(r.nc)||0}</td><td>${esc(fmt(r.due))}</td><td>${button('googlePdf:'+r.id,'Baixar PDF','tiny')}${manager&&googleCapabilities.reportRefresh?button('googleRefreshReport:'+r.id,'Gerar PDF atualizado','tiny'):''}${r.assets?`<p>${esc(googleAssetText(r.assets))}</p>`:''}${r.assets?.pending?button('googleIssues:'+r.id,'Ver pendências','tiny')+button('googleAssets:'+r.id,'Reprocessar ativos','tiny'):''}</td></tr>`).join('')||'<tr><td colspan="6">Nenhuma inspeção recebida nesta consulta.</td></tr>'}</tbody></table></div>${googleNextCursor!==null?button('googleLoadMore','Carregar mais inspeções','tiny'):''}</div></div>`;
+}
+let googleReportRequest=null;
+async function googleRefreshReport(id,trigger){
+  if(googleUser?.role!=='GESTAO'||googleReportRequest===googleSession)return;
+  if(!confirm('Gerar o PDF com o layout atual e atualizar o link deste relatório?'))return;
+  const session=googleSession;
+  googleReportRequest=session;
+  trigger.disabled=true;
+  trigger.textContent='Gerando PDF…';
+  try{
+    const result=await googleRpc('refreshReport',{inspectionId:id});
+    if(session!==googleSession)return;
+    if(result.inspectionId!==id||!result.pdfUrl)throw Error('Atualização do PDF não confirmada.');
+    await googleDownloadPdf(id);
+  }catch(error){if(session===googleSession)alert(error.message);}
+  finally{
+    if(googleReportRequest===session)googleReportRequest=null;
+    if(trigger.isConnected){trigger.disabled=false;trigger.textContent='Gerar PDF atualizado';}
+  }
 }
 async function googleDownloadPdf(id){
   const session=googleSession;
@@ -145,11 +164,12 @@ async function googleDownloadPdf(id){
 }
 document.addEventListener('submit',e=>{if(e.target.id==='googleAccessLogin'){e.preventDefault();googleLogin(e.target);}});
 document.addEventListener('click',e=>{
-  const action=e.target.closest('[data-action]')?.dataset.action;
+  const trigger=e.target.closest('[data-action]'),action=trigger?.dataset.action;
   if(action==='googleExit')return googleLogout();if(!googleUser)return;
   if(action==='googleCentral'){view='googleCentral';render();googleRefreshCentral();}
   if(action==='googleRefresh')googleRefreshCentral();
   if(action?.startsWith('googlePdf:'))googleDownloadPdf(action.slice(10));
+  if(action?.startsWith('googleRefreshReport:'))googleRefreshReport(action.slice('googleRefreshReport:'.length),trigger);
 });
 window.addEventListener('online',()=>{if(isGoogleMode()&&googleUser)googleSendPending();});
 if(typeof window.setInterval==='function')window.setInterval(()=>{

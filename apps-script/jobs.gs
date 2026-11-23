@@ -52,7 +52,8 @@ function processJob_(id){
     const record=readJsonFile_(job.payloadId);validate_(record);if(!job.reprocess)validatePhotoRefs_(record,job.actor);
     const folder=DriveApp.getFolderById(config_().PDF_FOLDER_ID),name=id+'_'+job.hash.slice(0,12);
     // Conversão e imagens ficam fora do bloqueio de gravação compartilhado.
-    const pdf=artifact_(folder,name+'.pdf',()=>createPdf_(record,folder,name));
+    const reportName=name+'_'+REPORT_VERSION;
+    const pdf=artifact_(folder,reportName+'.pdf',()=>createPdf_(record,folder,reportName));
     const clean=JSON.parse(JSON.stringify(record));delete clean.photoFiles;
     const backup=artifact_(folder,name+'.json',()=>folder.createFile(name+'.json',JSON.stringify(clean),MimeType.PLAIN_TEXT));
     return withWriteLock_(()=>{

@@ -72,50 +72,6 @@ function validate_(r) {
     ids.add(p.id);
   });
 }
-function addObject_(body, heading, value) {
-  if (!value || (typeof value === 'object' && !Object.keys(value).length)) return;
-  body.appendParagraph(heading).setHeading(DocumentApp.ParagraphHeading.HEADING2);
-  if (typeof value !== 'object') {body.appendParagraph(String(value)); return;}
-  if (Array.isArray(value)) {value.forEach((item,i)=>addObject_(body,heading+' — '+(i+1),item)); return;}
-  const scalar = Object.entries(value).filter(([,v])=>v === null || typeof v !== 'object').map(([k,v])=>[k,String(v??'')]);
-  if (scalar.length) body.appendTable(scalar);
-  Object.entries(value).filter(([,v])=>v && typeof v === 'object').forEach(([k,v])=>addObject_(body,k,v));
-}
-function createPdf_(r, folder, name) {
-  const doc = DocumentApp.create(name);
-  const temporary = DriveApp.getFileById(doc.getId());
-  try {
-    // O documento temporário recebe as permissões da pasta de destino.
-    temporary.moveTo(folder);
-    const body = doc.getBody();
-    body.appendParagraph('VOANET — Inspeção de infraestrutura').setHeading(DocumentApp.ParagraphHeading.TITLE);
-    body.appendParagraph(r.id);
-    body.appendTable(fields.map(([k,label])=>[label,String(r[k]??'')]));
-    addObject_(body,'Programação',{periodicidade:r.schedulePeriod,dataBase:r.scheduleBaseDate,proxima:r.scheduleDueDate});
-    groups.forEach(g=>{
-      body.appendParagraph(g.title).setHeading(DocumentApp.ParagraphHeading.HEADING1);
-      body.appendTable([['Item','Situação','Observação'],...g.items.map(([id,title])=>[id+' — '+title,String(r.checks?.[id]?.status||'NV'),String(r.checks?.[id]?.note||'')])]);
-    });
-    body.appendParagraph('C = Conforme · NC = Não conforme · NA = Não se aplica · NV = Não verificado');
-    addObject_(body,'Interligações',r.interligacoes);
-    body.appendParagraph('Leituras').setHeading(DocumentApp.ParagraphHeading.HEADING1);
-    body.appendTable(readings.map(([k,label])=>[label,String(r.readings?.[k]??'')]));
-    // Todos os demais campos são preservados no PDF, inclusive inventários e conferências.
-    const skip = new Set([...fields.map(([k])=>k),'checks','readings','interligacoes','photos','photoFiles','id']);
-    Object.keys(r).filter(k=>!skip.has(k)).forEach(k=>addObject_(body,k,r[k]));
-    body.appendParagraph('Evidências fotográficas').setHeading(DocumentApp.ParagraphHeading.HEADING1);
-    r.photos.forEach((p,index)=>{
-      const photo = r.photoFiles.find(f=>f.id===p.id);
-      body.appendParagraph((index+1)+'. '+String(p.name||p.id));
-      body.appendParagraph(JSON.stringify(p));
-      const image = body.appendImage(photoBlob_(photo));
-      const scale = Math.min(1,450/image.getWidth(),500/image.getHeight());
-      image.setWidth(Math.round(image.getWidth()*scale)).setHeight(Math.round(image.getHeight()*scale));
-    });
-    doc.saveAndClose();
-    return folder.createFile(temporary.getAs(MimeType.PDF).setName(name+'.pdf'));
-  } finally { temporary.setTrashed(true); }
-}
 function reply_(data) {return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);}
 function doPost(e) {
   try {
@@ -125,7 +81,7 @@ function doPost(e) {
     if(!user)return reply_({ok:false,code:'AUTH',error:'Chave inválida, revogada ou ainda não vinculada a uma pessoa ativa.'});
     requirePrivateData_();
     if(input.version!==1)throw Error('Versão incompatível.');
-    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,accessAdmin:true}});
+    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,accessAdmin:true,reportRefresh:true}});
     if(input.action==='fleetLoad'||input.action==='fleetSave')return reply_(fleetRequest_(input,user));
     if(input.action==='users')return reply_(listAccess_(user));
     if(input.action==='manageOperator')return reply_(manageOperator_(input,user));
@@ -133,6 +89,7 @@ function doPost(e) {
     if(input.action==='list')return reply_(listInspections_(input,user));
     if(input.action==='dashboard')return reply_(dashboard_(input,user));
     if(input.action==='photo')return reply_(stagePhoto_(input,user));
+    if(input.action==='refreshReport')return reply_(refreshReport_(input,user));
     if(input.action==='pdf')return reply_(downloadPdf_(input,user));
     if(input.action==='assetIssues')return reply_(assetIssues_(input,user));
     if(input.action==='status')return reply_(inspectionStatus_(input,user));

@@ -12,6 +12,8 @@ const BdInspecoesPOPs = (() => {
 'use strict';
 ${read('schema.gs')}
 ${read('Code.gs')}
+const REPORT_LOGO = '${fs.readFileSync(path.join(root, 'public', 'voanet.png')).toString('base64')}';
+${read('report.gs')}
 ${read('access.gs')}
 ${read('scheduling.gs')}
 ${read('runtime.gs')}

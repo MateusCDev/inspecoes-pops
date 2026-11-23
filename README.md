@@ -20,6 +20,12 @@ A aba **Frota** do arquivo **DADOS CENTRALIZADOS (INFRA)** recebe a lista operac
 
 É possível importar um backup da Frota Infra V2.3 pela tela de configurações na primeira revisão. A integração mantém até 12 MB de acervo por gravação, incluindo imagens e PDFs. Use imagens reduzidas e acompanhe o volume em homologação. Rascunhos de checklist permanecem na sessão atual. Duas pessoas podem consultar o acervo ao mesmo tempo. Em caso de gravações conflitantes, atualize a tela antes de refazer a alteração.
 
+## Relatório de inspeção
+
+O PDF traz a identidade VOANET, um resumo da vistoria, a identificação do POP, o checklist, as medições, o plano de ação, o inventário e a galeria de evidências. O identificador da inspeção aparece no rodapé. As fotos vinculadas ao checklist são agrupadas pela seção e exibem o código do item e a legenda disponível.
+
+Depois de atualizar o `Bd.gs` e implantar nova versão no endereço usado por **Inspeções POPs**, a Gestão pode usar **Gerar PDF atualizado** no histórico do **Painel central da equipe**. A função reutiliza o envio arquivado no Drive, atualiza o link da inspeção, preserva o PDF anterior e não repete a consolidação dos ativos. Inspeções novas já usam o layout atualizado.
+
 ## Cadastro de operadores pela interface
 
 Depois de atualizar o serviço, qualquer um dos cinco gestores pode abrir **Gerenciar acessos** na tela inicial. Basta informar o e-mail e clicar em **Cadastrar e gerar chave**. A chave aparece para cópia e entrega privada, sem acessar a planilha ou o Apps Script. A tela também permite reemitir chaves de operadores e desativar acessos; o histórico das inspeções permanece intacto. Reemissão invalida a chave anterior. A chave recém-gerada fica somente na memória da tela e é removida ao sair ou trocar de usuário, sem ser salva no navegador ou no histórico.

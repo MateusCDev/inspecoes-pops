@@ -255,3 +255,5 @@ body:has(.portal-login) .portal-actions { display: none; }
   .portal-brand { gap: .5rem; }
   .portal-brand span { padding-inline-start: .5rem; }
 }
+
+#google-schedule-heading { scroll-margin-top: calc(var(--portal-header-height) + 1rem); }

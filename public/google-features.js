@@ -8,7 +8,9 @@ function googleApplyReceipt(r,result,version,session){
     if(result.inspectionId!==r.id||!/^https:\/\/drive\.google\.com\//.test(result.pdfUrl||''))throw Error('Confirmação de processamento inválida.');
     if(result.schedule&&r.updated===version){r.schedulePeriod=result.schedule.days;r.scheduleBaseDate=result.schedule.baseDate;r.scheduleDueDate=result.schedule.dueDate;r.popCriticality=result.schedule.criticality;}
     r.syncedAt=result.receivedAt;r.syncState=r.updated===version?'sincronizado':'pendente';r.googleAssets=result.assets;
-    googleProgress(r,googleAssetText(result.assets));delete r.googleJobHash;delete r.googleSubmittedVersion;
+    googleProgress(r,version===null
+      ? 'A versão anterior foi concluída. Use Enviar pendentes para sincronizar esta versão.'
+      : googleAssetText(result.assets));delete r.googleJobHash;delete r.googleSubmittedVersion;
   }
   r.googleError='';saveAll();if(view==='home'||view==='googleCentral'||(cur()?.id===r.id&&view==='resumo'))render();
 }
@@ -38,10 +40,25 @@ async function googleSendV2(r){
     googleApplyReceipt(r,result,version,session);
     if(result.pending){
       // A chamada adianta o processamento; o acionador do Google continua se a página for fechada.
-      googleRpc('process',{inspectionId:r.id},key).then(done=>{if(done?.ok)googleApplyReceipt(r,done,version,session);}).catch(()=>{});
+      googleRpc('process',{inspectionId:r.id},key).then(done=>{
+        if(done?.ok&&r.syncState==='processando'&&r.googleJobHash===result.hash)googleApplyReceipt(r,done,version,session);
+      }).catch(()=>{});
     }
     return true;
-  }catch(error){if(session===googleSession){r.syncState='erro';r.googleError=error.message;saveAll();render();alert(error.message);}return false;}
+  }catch(error){
+    if(session!==googleSession)return false;
+    if(error.message.includes('A versão anterior ainda está em processamento.')){
+      try{
+        const previous=await googleRpc('status',{inspectionId:r.id},key);
+        if(session!==googleSession)return false;
+        const submittedVersion=previous.hash&&previous.hash===r.googleJobHash ? (r.googleSubmittedVersion??null) : null;
+        googleApplyReceipt(r,previous,submittedVersion,session);
+        return true;
+      }catch(statusError){error=statusError;}
+    }
+    if(session===googleSession){r.syncState='erro';r.googleError=error.message;saveAll();render();alert(error.message);}
+    return false;
+  }
   finally{googleSending=false;}
 }
 async function googlePollJobs(){
@@ -50,7 +67,7 @@ async function googlePollJobs(){
   try{
     for(const r of records.filter(x=>x.syncState==='processando')){
       if(session!==googleSession)break;
-      try{const result=await googleRpc('status',{inspectionId:r.id});if(session!==googleSession)break;googleApplyReceipt(r,result,r.googleSubmittedVersion||r.updated,session);}
+      try{const result=await googleRpc('status',{inspectionId:r.id});if(session!==googleSession)break;googleApplyReceipt(r,result,r.googleSubmittedVersion??null,session);}
       catch(error){if(session===googleSession){r.syncState='erro';r.googleError=error.message;saveAll();render();}}
     }
   }finally{googleJobsPolling=false;}

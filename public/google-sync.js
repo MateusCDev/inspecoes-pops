@@ -97,11 +97,17 @@ async function googleSendPending(){
 }
 async function googleFinalize(){
   if(googleSending||!googleUser)return;const r=cur();
+  if(r?.syncState==='processando'){
+    if(typeof googlePollJobs==='function')await googlePollJobs();
+    if(cur()?.id===r.id&&r.syncState==='processando')alert('A inspeção já foi recebida. Aguarde a geração do PDF.');
+    return;
+  }
   if(!r?.nome?.trim()||!r.inspetor?.trim()||!r.data)return alert('Informe estação, Técnico 01 e data.');
   const station=googleStation(r);if(!station?.days)return alert('Selecione um POP cadastrado com criticidade ALTA ou MÉDIA.');
   if(!confirm('Finalizar e enviar a inspeção e o PDF? Sem conexão, o envio ficará pendente.'))return;
   r.nome=station.name;r.popCriticality=station.criticality;r.schedulePeriod=station.days;
-  r.finalizedAt=new Date().toISOString();r.scheduleBaseDate=r.data;r.scheduleDueDate=addLocalDays(r.data,station.days);r.syncState='pendente';r.updated=new Date().toISOString();
+  if(!r.finalizedAt){r.finalizedAt=new Date().toISOString();r.updated=r.finalizedAt;}
+  r.scheduleBaseDate=r.data;r.scheduleDueDate=addLocalDays(r.data,station.days);r.syncState='pendente';
   if(!saveAll())return;render();const session=googleSession,sent=await googleSend(r);
   if(session===googleSession)alert(sent?(r.syncState==='sincronizado'?'Dados e PDF confirmados. Próxima inspeção: '+fmt(r.scheduleDueDate)+'.':r.syncState==='processando'?'Inspeção recebida. O PDF e os ativos estão em processamento; você pode continuar usando o aplicativo.':'Versão enviada. Há alterações recentes pendentes.'):'Inspeção salva neste dispositivo. Confira o painel para reenviar.');
 }

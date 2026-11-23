@@ -18,8 +18,28 @@ async function googleRpc(action,data={},key=googleAccessKey){
   if(!result.ok)throw Error(result.error||'Operação não confirmada.');
   return result;
 }
-function googleLoginView(){return `<div class="shell" style="display:block;max-width:640px"><div class="card"><h1>Inspeções POPs</h1><p>Entre com sua chave individual. O serviço confirmará seu perfil.</p>${googleReady()?'':'<p role="status">Aguardando a ativação do serviço Google e a configuração da URL da implantação.</p>'}<form id="googleAccessLogin" class="grid"><div class="field"><label for="google-key">Chave individual</label><input id="google-key" name="key" type="password" autocomplete="off" required ${googleReady()?'':'disabled'}></div><button type="submit" class="btn primary" ${googleReady()?'':'disabled'}>Entrar</button></form><p id="google-login-error" role="alert"></p><p class="small muted">A chave fica apenas na memória enquanto esta página estiver aberta.</p></div></div>`;}
-function googleProfilePanel(){return `<div class="notice"><b>${googleUser.role==='GESTAO'?'Gestão':'Operação'}</b> · ${esc(googleUser.email)} ${button('googleExit','Sair','tiny')}<p>${googleUser.role==='GESTAO'?'Consulta central das inspeções de toda a equipe.':'Consulta e envio somente das suas inspeções.'}</p>${googleUser.role==='GESTAO'&&!googleCapabilities.assetsSync?'<p>Atualização automática dos ativos ainda não habilitada neste serviço. Atualize o Apps Script.</p>':''}</div>`;}
+function googleLoginView(){
+  const ready=googleReady();
+  return `<main class="portal-login"><div class="portal-login-card"><div class="portal-login-body">
+    <h1>Inspeções POPs</h1>
+    <p>Entre com sua chave individual para acessar as inspeções.</p>
+    ${ready?'':'<p role="status">Aguardando a configuração do serviço Google.</p>'}
+    <form id="googleAccessLogin">
+      <label for="google-key">Chave individual</label>
+      <input id="google-key" name="key" type="password" autocomplete="off" required ${ready?'':'disabled'}>
+      <button type="submit" class="btn primary" ${ready?'':'disabled'}>Entrar</button>
+    </form>
+    <p id="google-login-error" class="portal-login-error" role="alert"></p>
+  </div></div></main>`;
+}
+function googleProfilePanel(){
+  const manager=googleUser.role==='GESTAO';
+  return `<div class="portal-profile">
+    <div class="portal-profile-account"><strong>${manager?'Gestão':'Operação'}</strong><span>${esc(googleUser.email)}</span></div>
+    ${button('googleExit','Sair','tiny')}
+    ${manager&&!googleCapabilities.assetsSync?'<p class="notice">Atualização automática dos ativos ainda não habilitada neste serviço. Atualize o Apps Script.</p>':''}
+  </div>`;
+}
 async function googleLogin(form){
   const key=form.elements.key.value.trim();if(!key)return;
   const submit=form.querySelector('button');submit.disabled=true;const session=++googleSession;

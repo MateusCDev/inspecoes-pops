@@ -30,14 +30,16 @@ async function fleetRpc(action, data, key = fleetKey) {
 }
 
 function fleetLoginView() {
-  $('root').innerHTML = `<main class="content" style="max-width:640px;margin:auto">
-    <form class="panel" id="fleet-login">
-      <h1>Frota Infra</h1><p>Entre com sua chave individual de Gestão das Inspeções POPs.</p>
-      <label>Chave individual<input name="key" type="password" autocomplete="off" required></label>
+  $('root').innerHTML = `<main class="portal-login"><div class="portal-login-card"><div class="portal-login-body">
+    <h1>Frota Infra</h1>
+    <p>Entre com a mesma chave de Gestão das Inspeções POPs.</p>
+    <form id="fleet-login">
+      <label for="fleet-key">Chave individual</label>
+      <input id="fleet-key" name="key" type="password" autocomplete="off" required>
       <button class="btn" type="submit">Entrar</button>
-      <p role="alert" id="fleet-error"></p>
     </form>
-  </main>`;
+    <p id="fleet-error" class="portal-login-error" role="alert"></p>
+  </div></div></main>`;
   $('fleet-login').addEventListener('submit',fleetLogin);
 }
 

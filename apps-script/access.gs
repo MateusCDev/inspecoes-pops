@@ -96,7 +96,7 @@ function downloadPdf_(input,user) {
   if(!pdfId)throw Error('PDF ainda não vinculado pelo serviço.');
   const file=DriveApp.getFileById(pdfId);
   if(file.getSize()>15*1024*1024)throw Error('PDF maior que 15 MB. Solicite o arquivo à gestão.');
-  const suffix=/ - [a-f0-9]{12} - gerencial-v\d+\.pdf$/;
+  const suffix=/ - [a-f0-9]{12} - (?:gerencial|tecnico)-v\d+\.pdf$/;
   const name=file.getName();
   const base=suffix.test(name)?name.replace(suffix,'') : reportFileBase_(row[headers.indexOf('nome')],row[headers.indexOf('data')],input.inspectionId);
   return {ok:true,fileName:base+'.pdf',base64:Utilities.base64Encode(file.getBlob().getBytes())};

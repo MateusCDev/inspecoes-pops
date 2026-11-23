@@ -29,7 +29,7 @@ A aba **Frota** do arquivo **DADOS CENTRALIZADOS (INFRA)** recebe a lista operac
 
 ## Relatório de inspeção
 
-O PDF gerencial traz a identidade VOANET, um resumo de uma página da vistoria, os principais achados e as ações prioritárias. O nome do arquivo começa pela estação e pela data da vistoria. O checklist, o inventário e todas as fotos continuam no envio arquivado para consulta técnica.
+O resumo gerencial de uma página está disponível no histórico da Gestão. O PDF técnico arquivado traz identificação, diagnóstico e não conformidades, seguidos de ações, medições e até quatro evidências quando disponíveis. O nome do arquivo começa pela estação e pela data da vistoria. O envio original conserva todos os dados e fotos.
 
 Depois de atualizar o `Bd.gs` e implantar nova versão no endereço usado por **Inspeções POPs**, a Gestão pode usar **Gerar PDF atualizado** no histórico do **Painel central da equipe**. A função reutiliza o envio arquivado no Drive, atualiza o link da inspeção, preserva o PDF anterior e não repete a consolidação dos ativos. Inspeções novas já usam o layout atualizado.
 

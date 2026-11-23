@@ -256,6 +256,6 @@ body:has(.portal-login) .portal-actions { display: none; }
   .portal-brand span { padding-inline-start: .5rem; }
 }
 
-#google-schedule-heading { scroll-margin-top: calc(var(--portal-header-height) + 1rem); }
+:is(#google-schedule-heading, #google-history-heading) { scroll-margin-top: calc(var(--portal-header-height) + 1rem); }
 
 .asset-links a { text-decoration: none; }

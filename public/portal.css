@@ -257,3 +257,5 @@ body:has(.portal-login) .portal-actions { display: none; }
 }
 
 #google-schedule-heading { scroll-margin-top: calc(var(--portal-header-height) + 1rem); }
+
+.asset-links a { text-decoration: none; }

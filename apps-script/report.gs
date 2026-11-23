@@ -1,4 +1,4 @@
-const REPORT_VERSION = 'gerencial-v3';
+const REPORT_VERSION = 'gerencial-v4';
 const REPORT_INK = '#192638';
 const REPORT_MUTED = '#526277';
 const REPORT_RED = '#b9142a';
@@ -68,39 +68,6 @@ function reportDriveName_(record,hash) {
   return reportFileBase_(record.nome,record.data,record.id)+' - '+hash.slice(0,12)+' - '+REPORT_VERSION;
 }
 
-function reportPhotoSelection_(record) {
-  const photos=record.photos||[];
-  const checks=new Map(groups.flatMap(group=>group.items.map(([code,label])=>[code,code+' · '+label])));
-  const photoIndex=photos.map((photo,index)=>{
-    const target=String(photo.target||'');
-    const code=target.startsWith('check:')?target.slice(6):'';
-    return {photo,index:index+1,label:checks.get(code)||'',finding:record.checks?.[code]?.status==='NC',target};
-  });
-  const uniqueFindings=photoIndex.filter((item,i,items)=>item.finding&&items.findIndex(other=>other.target===item.target&&other.finding)===i);
-  return [...uniqueFindings,...photoIndex.filter(item=>!uniqueFindings.includes(item))].slice(0,2);
-}
-
-function reportPhotos_(body,record) {
-  const selected=reportPhotoSelection_(record);
-  if(!selected.length)return;
-  const references=new Map(record.photoFiles.map(ref=>[ref.id,ref]));
-  reportHeading_(body,'Evidências selecionadas');
-  reportParagraph_(body,'Exibindo '+selected.length+' de '+record.photos.length+' fotos. As evidências completas estão arquivadas com a inspeção.',{color:REPORT_MUTED});
-  const gallery=body.appendTable([['','']]).setBorderWidth(.5).setBorderColor(REPORT_LINE);
-  gallery.setColumnWidth(0,252).setColumnWidth(1,252);
-  selected.forEach(({photo,index,label},col)=>{
-    const cell=gallery.getCell(0,col);
-    cell.getChild(0).asParagraph().setText('Foto '+String(index).padStart(2,'0'))
-      .editAsText().setFontSize(9).setBold(true).setForegroundColor(REPORT_RED);
-    if(label)reportParagraph_(cell,reportExcerpt_(label,110),{size:9,bold:true});
-    const image=cell.appendImage(photoBlob_(references.get(photo.id)));
-    const scale=Math.min(1,225/image.getWidth(),155/image.getHeight());
-    image.setWidth(Math.max(1,Math.round(image.getWidth()*scale))).setHeight(Math.max(1,Math.round(image.getHeight()*scale)));
-    const caption=reportExcerpt_(photo.caption||photo.name,120);
-    if(caption)reportParagraph_(cell,caption,{size:9,color:REPORT_MUTED,before:3});
-  });
-}
-
 function createPdf_(record,folder,name) {
   const doc=DocumentApp.create(name);
   const temporary=DriveApp.getFileById(doc.getId());
@@ -116,7 +83,7 @@ function createPdf_(record,folder,name) {
       reportParagraph_(header,'VOANET  |  INFRAESTRUTURA E OPERAÇÕES',{color:REPORT_RED,bold:true,size:9});
     }
     reportParagraph_(doc.addFooter(),record.id+'  ·  Relatório gerencial de inspeção',{color:REPORT_MUTED,size:8});
-    reportParagraph_(body,'Relatório gerencial de inspeção',{heading:'TITLE',size:25,bold:true,after:7});
+    reportParagraph_(body,'Resumo gerencial de inspeção',{heading:'TITLE',size:25,bold:true,after:7});
     reportParagraph_(body,reportExcerpt_([record.codigoPop,record.nome].filter(Boolean).join(' · '),105),{size:17,bold:true,color:REPORT_RED});
     reportTable_(body,['Vistoria','Técnico responsável','Próxima inspeção'],
       [[record.data,reportExcerpt_(record.inspetor,75),record.scheduleDueDate]],[130,244,130]);
@@ -129,11 +96,7 @@ function createPdf_(record,folder,name) {
     const findings=checks.filter(item=>item.status==='NC');
     reportHeading_(body,'Resumo da vistoria');
     reportTable_(body,Object.values(REPORT_STATUS),[Object.keys(REPORT_STATUS).map(status=>checks.filter(item=>item.status===status).length)],[126,126,126,126]);
-    if(record.sintese)reportParagraph_(body,reportExcerpt_(record.sintese,390),{before:8});
-    if(record.investimentos){
-      reportHeading_(body,'Recomendações',2);
-      reportParagraph_(body,reportExcerpt_(record.investimentos,260));
-    }
+    if(record.sintese)reportParagraph_(body,reportExcerpt_(record.sintese,260),{before:8});
     reportHeading_(body,'Não conformidades',2);
     if(findings.length){
       reportTable_(body,['Item','Observação'],findings.slice(0,4).map(item=>[reportExcerpt_(item.title,95),reportExcerpt_(item.note,105)]),[240,264]);
@@ -141,20 +104,19 @@ function createPdf_(record,folder,name) {
     }else reportParagraph_(body,'Nenhuma não conformidade registrada.');
 
     const issues=record.issues||[];
-    if(issues.length||record.photos?.length){
-      body.appendPageBreak();
-      if(issues.length){
-        reportHeading_(body,'Plano de ação');
-        const order=issue=>Number(String(issue.prioridade||'').match(/^P([0-9])/i)?.[1]||9);
-        const priority=issues.slice().sort((a,b)=>order(a)-order(b));
-        reportTable_(body,['Ação','Prioridade e situação','Responsável e prazo'],priority.slice(0,4).map(issue=>[
-          reportExcerpt_([issue.titulo,issue.acao].filter(Boolean).join(' · '),150),
-          reportExcerpt_([issue.prioridade,issue.status].filter(Boolean).join(' · '),75),
-          reportExcerpt_([issue.responsavel,issue.prazo&&reportValue_(issue.prazo)].filter(Boolean).join(' · '),75)
-        ]),[245,129,130]);
-        if(issues.length>4)reportParagraph_(body,'Mais '+(issues.length-4)+' ação(ões) no registro completo.',{color:REPORT_MUTED,before:4});
-      }
-      reportPhotos_(body,record);
+    if(issues.length){
+      reportHeading_(body,'Ações prioritárias',2);
+      const order=issue=>Number(String(issue.prioridade||'').match(/^P([0-9])/i)?.[1]||9);
+      const priority=issues.slice().sort((a,b)=>order(a)-order(b));
+      reportTable_(body,['Ação','Prioridade e situação','Responsável e prazo'],priority.slice(0,3).map(issue=>[
+        reportExcerpt_([issue.titulo,issue.acao].filter(Boolean).join(' · '),105),
+        reportExcerpt_([issue.prioridade,issue.status].filter(Boolean).join(' · '),50),
+        reportExcerpt_([issue.responsavel,issue.prazo&&reportValue_(issue.prazo)].filter(Boolean).join(' · '),50)
+      ]),[245,129,130]);
+      if(issues.length>3)reportParagraph_(body,'Mais '+(issues.length-3)+' ação(ões) no registro completo.',{color:REPORT_MUTED,before:4});
+    }else if(record.investimentos){
+      reportHeading_(body,'Recomendações',2);
+      reportParagraph_(body,reportExcerpt_(record.investimentos,215));
     }
     doc.saveAndClose();
     return folder.createFile(temporary.getAs(MimeType.PDF).setName(name+'.pdf'));

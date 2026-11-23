@@ -24,24 +24,17 @@ test('Gestão atualiza somente o PDF de uma inspeção recebida e preserva o arq
  assert.equal(h.request({action:'refreshReport',inspectionId:record.id},'manager').pdfUrl,result.pdfUrl);
  assert.equal(h.files.size,count+1);
  assert.equal(h.request({action:'pdf',inspectionId:record.id}).fileName,'POP fictício - 16-11-2026.pdf');
- assert.match([...h.files.keys()].find(name=>name.endsWith('gerencial-v3.pdf')), /^POP fictício - 16-11-2026 - /);
+ assert.match([...h.files.keys()].find(name=>name.endsWith('gerencial-v4.pdf')), /^POP fictício - 16-11-2026 - /);
 });
 
-test('seleciona no máximo duas fotos com prioridade para não conformidades distintas',()=>{
+test('limita textos longos no resumo e usa estação e data no nome',()=>{
  const {c}=harness();
- const selected=c.reportPhotoSelection_({
-  checks:{'EL-01':{status:'NC'},'EL-02':{status:'NC'}},
-  photos:[
-   {id:'A',target:'check:EL-01'}, {id:'B',caption:'Acesso'}, {id:'C',target:'check:EL-01'},
-   {id:'D',target:'check:EL-02'}, {id:'E',target:'interligacoes:planilha'}
-  ]
- });
- assert.deepEqual(Array.from(selected,item=>item.index),[1,4]);
- assert.match(selected[1].label,/EL-02/);
+ const excerpt=c.reportExcerpt_('ação prioritária '.repeat(50),105);
+ assert.ok(excerpt.length<=105);
+ assert.match(excerpt,/…$/);
  assert.equal(c.reportFileBase_('POP Sul / Norte','2026-11-21','INSP-01'),'POP Sul Norte - 21-11-2026');
 });
-
-test('monta o PDF com cabeçalho VOANET, resumo, galeria e dados de vistoria',()=>{
+test('monta o resumo em uma única folha, com identidade VOANET e as ações prioritárias',()=>{
  const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
  const entries=[];
  function text(){
@@ -78,11 +71,13 @@ test('monta o PDF com cabeçalho VOANET, resumo, galeria e dados de vistoria',()
  vm.runInContext(['schema.gs','report.gs'].map(name=>fs.readFileSync(path.join(dir,name),'utf8')).join('\n'),environment);
  const report={id:'INSP-TESTE',nome:'Estação fictícia',codigoPop:'TESTE',data:'2026-11-21',inspetor:'Técnico fictício',
   sintese:'A vistoria está registrada.',checks:{'EL-01':{status:'NC',note:'Evidência registrada'}},
+  issues:[{titulo:'Identificar o quadro',acao:'Etiquetar os disjuntores',prioridade:'P1'}],
   photos:[{id:'foto-1',target:'check:EL-01',caption:'Quadro de energia'}],photoFiles:[{id:'foto-1'}]};
  assert.equal(environment.createPdf_(report,{createFile:name=>name},'homologacao'),'homologacao.pdf');
- for(const expected of ['voanet.png','Relatório gerencial de inspeção','Resumo da vistoria','Não conformidades','Evidências selecionadas',
-  'Quadro de energia','foto-1','21/11/2026','Não conforme']){
+ for(const expected of ['voanet.png','Resumo gerencial de inspeção','Resumo da vistoria','Não conformidades','Ações prioritárias',
+  'Etiquetar os disjuntores','21/11/2026','Não conforme']){
   assert.ok(JSON.stringify(entries).includes(expected),expected);
  }
- assert.equal(entries.filter(entry=>entry==='PAGE_BREAK').length,1);
+ assert.equal(entries.filter(entry=>entry==='PAGE_BREAK').length,0);
+ assert.ok(!JSON.stringify(entries).includes('foto-1'));
 });

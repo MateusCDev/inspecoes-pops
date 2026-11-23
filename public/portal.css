@@ -235,3 +235,23 @@ body:has(.portal-login) .portal-actions { display: none; }
 .portal-profile-account { display: flex; align-items: baseline; flex-wrap: wrap; gap: .25rem .65rem; }
 .portal-profile-account span { color: var(--portal-muted); overflow-wrap: anywhere; font-size: .875rem; }
 .portal-profile .notice { grid-column: 1/-1; margin: 0; }
+
+#app[hidden], #portal-fleet-pane[hidden], #portal-signout[hidden] { display: none; }
+[data-portal-module="frota"] .portal-actions :is(#goHome, #save) { display: none; }
+.portal-fleet-frame {
+  display: block;
+  width: 100%;
+  height: calc(100dvh - var(--portal-header-height));
+  border: 0;
+}
+.portal-embedded { --portal-header-height: 0px; }
+.portal-module-status {
+  max-width: 46rem;
+  padding: clamp(1.25rem, 5vw, 3rem);
+  margin-inline: auto;
+}
+@media (max-width: 440px) {
+  .portal-actions #goHome { display: none; }
+  .portal-brand { gap: .5rem; }
+  .portal-brand span { padding-inline-start: .5rem; }
+}

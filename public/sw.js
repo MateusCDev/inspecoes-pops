@@ -1,7 +1,7 @@
 const BUILD = '__BUILD_ID__';
 const BASE = new URL('./', self.location.href);
 const CACHE = 'voanet-google:'+BASE.pathname+':'+BUILD;
-const FILES = ['index.html','portal.css?v='+BUILD,'voanet.png','config.js?v='+BUILD,'google-sync.js?v='+BUILD,'google-features.js?v='+BUILD,'google-access.js?v='+BUILD,'entra-client.js','manifest.webmanifest','icon-192.png','icon-512.png'].map(p=>new URL(p,BASE).href);
+const FILES = ['index.html','portal.css?v='+BUILD,'portal.js?v='+BUILD,'voanet.png','config.js?v='+BUILD,'google-sync.js?v='+BUILD,'google-features.js?v='+BUILD,'google-access.js?v='+BUILD,'entra-client.js','manifest.webmanifest','icon-192.png','icon-512.png'].map(p=>new URL(p,BASE).href);
 const PATHS = new Set(FILES.map(url=>new URL(url).pathname));
 self.addEventListener('install',e=>e.waitUntil((async()=>{
   const cache=await caches.open(CACHE);

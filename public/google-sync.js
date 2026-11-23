@@ -21,8 +21,8 @@ async function googleRpc(action,data={},key=googleAccessKey){
 function googleLoginView(){
   const ready=googleReady();
   return `<main class="portal-login"><div class="portal-login-card"><div class="portal-login-body">
-    <h1>Inspeções POPs</h1>
-    <p>Entre com sua chave individual para acessar as inspeções.</p>
+    <h1>Portal de Infraestrutura</h1>
+    <p>Entre com sua chave individual para acessar as aplicações do seu perfil.</p>
     ${ready?'':'<p role="status">Aguardando a configuração do serviço Google.</p>'}
     <form id="googleAccessLogin">
       <label for="google-key">Chave individual</label>
@@ -51,15 +51,17 @@ async function googleLogin(form){
     googleStations=catalog.stations;googleCapabilities=result.capabilities||{};
     googleAccessKey=key;googleUser=result.user;records=loadAll();activeId=null;view='home';photosCache.clear();
     googleCentralItems=[];googleSummary=null;googleNextCursor=null;googleCentralUpdated='';render();if(typeof googlePollJobs==='function')googlePollJobs();
+    window.VOANET_PORTAL?.refresh();
     if(navigator.onLine&&records.some(r=>r.finalizedAt&&!['sincronizado','processando'].includes(r.syncState)))googleSendPending();
   }catch(error){if(session===googleSession){const node=document.getElementById('google-login-error');if(node)node.textContent=error.message;}}
-  finally{if(submit.isConnected)submit.disabled=false;}
+  finally{form.elements.key.value='';if(submit.isConnected)submit.disabled=false;}
 }
 function googleLogout(){
   if(typeof googleClearAccessState==='function')googleClearAccessState();
   if(typeof flushLocalSave==='function')flushLocalSave();googleCapabilities={};googleSummary=null;googleNextCursor=null;
   googleSession++;googleAccessKey='';googleUser=null;records=[];activeId=null;view='home';
   googleCentralItems=[];googleStations=[];googleCentralUpdated='';googleCentralBusy=false;photosCache.clear();render();
+  window.VOANET_PORTAL?.refresh();
 }
 function googleStation(record){return googleStations.find(s=>s.code===String(record.codigoPop??'').trim()&&!s.duplicate&&!s.inactive);}
 function googleStationField(r){return `<div class="field full"><label>POP cadastrado — prazo por criticidade</label><select data-google-station><option value="">Selecione o POP</option>${googleStations.filter(s=>!s.inactive).map(s=>`<option value="${esc(s.code)}" ${r.codigoPop===s.code?'selected':''} ${s.duplicate||!s.days?'disabled':''}>${esc(s.code+' — '+s.name+' · '+s.criticality+(s.duplicate?' — código duplicado':s.days?' · '+s.days+' dias':' — regra não definida'))}</option>`).join('')}</select></div>`;}

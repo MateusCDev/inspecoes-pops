@@ -8,7 +8,7 @@ O site está conectado ao serviço Google. A versão v2 acrescenta processamento
 
 ## Frota Infra
 
-O portal oferece as abas **Inspeções POPs** e **Frota**. Cada módulo usa sua URL de implantação do Apps Script, configurada em `public/config.js`. A Frota usa as chaves individuais de Gestão já emitidas quando as duas implantações pertencem ao mesmo projeto Apps Script. Nesta versão, só o perfil **Gestão** pode consultar ou gravar o acervo de Frota. A chave deve ser informada ao entrar no módulo.
+O portal oferece as abas **Inspeções POPs** e **Frota**. Cada módulo usa sua URL de implantação do Apps Script, configurada em `public/config.js`. A Frota usa as chaves individuais de Gestão já emitidas quando as duas implantações pertencem ao mesmo projeto Apps Script. Nesta versão, só o perfil **Gestão** pode consultar ou gravar o acervo de Frota. A chave é informada uma vez por sessão no portal. As duas abas preservam as telas abertas enquanto o portal estiver aberto. A opção **Sair do portal** encerra os dois acessos. Ao recarregar ou fechar a página, a chave em memória é descartada.
 
 A aba **Frota** do arquivo **DADOS CENTRALIZADOS (INFRA)** recebe a lista operacional de veículos, checklists, avarias e devoluções. A descrição nessa lista é padronizada. O acervo completo, inclusive os cadastros de condutores, fotos, documentos e histórico de gravações, é guardado no Drive restrito. A aba é atualizada pelo aplicativo. Edições manuais nos registros da Frota podem ser substituídas na próxima gravação. O compartilhamento já configurado da planilha permite acesso direto à lista operacional.
 

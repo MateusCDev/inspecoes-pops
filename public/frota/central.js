@@ -29,18 +29,13 @@ async function fleetRpc(action, data, key = fleetKey) {
   return result;
 }
 
-function fleetLoginView() {
-  $('root').innerHTML = `<main class="portal-login"><div class="portal-login-card"><div class="portal-login-body">
+function fleetConnectionView(message, retry = false) {
+  $('root').innerHTML = `<main class="portal-module-status">
     <h1>Frota Infra</h1>
-    <p>Entre com a mesma chave de Gestão das Inspeções POPs.</p>
-    <form id="fleet-login">
-      <label for="fleet-key">Chave individual</label>
-      <input id="fleet-key" name="key" type="password" autocomplete="off" required>
-      <button class="btn" type="submit">Entrar</button>
-    </form>
-    <p id="fleet-error" class="portal-login-error" role="alert"></p>
-  </div></div></main>`;
-  $('fleet-login').addEventListener('submit',fleetLogin);
+    <p role="${retry?'alert':'status'}">${h(message)}</p>
+    ${retry?'<button class="btn" type="button" id="fleet-retry">Tentar novamente</button>':''}
+  </main>`;
+  $('fleet-retry')?.addEventListener('click',fleetConnect);
 }
 
 function fleetUse(result) {
@@ -50,39 +45,29 @@ function fleetUse(result) {
   fleetConflict = false;
 }
 
-async function fleetLogin(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const button = form.querySelector('button');
-  const key = form.elements.key.value.trim();
-  button.disabled = true;
+async function fleetConnect() {
+  fleetConnectionView('Verificando seu acesso à Frota…');
   try {
-    const {user} = await fleetRpc('session',{},key);
-    if (user?.role !== 'GESTAO') throw Error('A Frota está disponível para o perfil Gestão nesta implantação.');
-    fleetUse(await fleetRpc('fleetLoad',{},key));
+    const session = window.parent.VOANET_PORTAL?.fleetSession(window);
+    if (!session) throw Error('Abra a aba Frota pelo Portal de Infraestrutura.');
+    const {user} = await fleetRpc('session',{},session.key);
+    if (user?.role !== 'GESTAO' || user.email !== session.email) {
+      throw Error('O serviço da Frota precisa confirmar o mesmo usuário de Gestão.');
+    }
+    fleetUse(await fleetRpc('fleetLoad',{},session.key));
     fleetUser = user;
-    fleetKey = key;
+    fleetKey = session.key;
     page = 'dashboard';
     render();
     openQRRoute();
   } catch (error) {
-    $('fleet-error').textContent = error.message;
-  } finally {
-    form.elements.key.value = '';
-    button.disabled = false;
+    const message = error.code === 'AUTH' ? 'O serviço da Frota recusou a chave da sessão. Confira se as duas implantações usam o mesmo projeto Apps Script.' : error.message;
+    fleetConnectionView(message,true);
   }
 }
 
 function fleetLogout() {
-  if (fleetSaving) return;
-  fleetKey = '';
-  fleetUser = null;
-  fleetRevision = 0;
-  fleetConflict = false;
-  fleetCommitted = fresh();
-  state = fresh();
-  clearDraft();
-  fleetLoginView();
+  if (!fleetSaving) window.parent.VOANET_PORTAL?.fleetLogout(window);
 }
 
 async function fleetRefresh() {
@@ -149,4 +134,4 @@ function auditScreen() {
 window.addEventListener('unhandledrejection', event => {
   if (event.reason instanceof Error) notify(event.reason.message);
 });
-fleetLoginView();
+if (window.parent !== window) fleetConnect();

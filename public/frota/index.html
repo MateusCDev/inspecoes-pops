@@ -11,16 +11,16 @@
 @media(max-width:1050px){.brand{padding:3px 0 22px}.brand img{padding:4px;width:60px}.brand small{display:none}.mobile-brand{display:block;width:124px;height:auto;margin-bottom:12px}.sidebar-bottom{display:none}}
 @media(max-width:640px){.sidebar{overflow:visible}.nav{justify-content:flex-start}.nav button{flex:0 0 48px}.top{flex-wrap:wrap}.mobile-brand{width:130px}.metric{padding:13px}.btn{min-height:44px}.btn.small{min-height:40px}.top .right{width:100%}.top .right .btn{flex:1}.content{padding-bottom:90px}.modal{max-height:90vh}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
-</style><link rel="stylesheet" href="../portal.css?v=__BUILD_ID__"></head><body class="portal-fleet">
-<header class="portal-header">
-  <div class="portal-bar">
-    <a class="portal-brand" href="../"><img src="../voanet.png" alt="VOANET" width="1116" height="229"><span>Infraestrutura</span></a>
-    <nav class="portal-tabs" aria-label="Aplicações">
-      <a href="../">Inspeções POPs</a>
-      <a href="./" aria-current="page">Frota</a>
-    </nav>
-  </div>
-</header>
+</style><link rel="stylesheet" href="../portal.css?v=__BUILD_ID__">
+<script>
+  if(window.parent===window){
+    const portal=new URL('../',location.href);
+    portal.searchParams.set('modulo','frota');
+    portal.hash=location.hash;
+    location.replace(portal);
+  }
+</script>
+</head><body class="portal-fleet portal-embedded">
 <div id="root"></div>
 <script src="../config.js?v=__BUILD_ID__"></script>
 <script>
@@ -1361,7 +1361,7 @@ module.exports = QRCode;
 }};const cache={};function require(name){if(!cache[name]){const m={exports:{}};cache[name]=m;modules[name](m,m.exports,require)}return cache[name].exports}return {QR:require("./index"),level:require("./QRErrorCorrectLevel").M}})();
 
 // V2.3: identidade visual VOANET aplicada; recursos locais, sem autenticação ou sincronização.
-function qrPayload(id){let base=state.settings?.qrBase||(/^https?:$/.test(location.protocol)?location.href.split('#')[0]:'');if(!base)return 'FROTA-INFRA:'+id;const u=new URL(base);if(!['https:','http:'].includes(u.protocol))throw Error('Endereço inválido');u.hash='veiculo='+encodeURIComponent(id);return u.href}
+function qrPayload(id){let base=state.settings?.qrBase||(/^https?:$/.test(location.protocol)?new URL('./',location.href).href:'');if(!base)return 'FROTA-INFRA:'+id;const u=new URL(base);if(!['https:','http:'].includes(u.protocol))throw Error('Endereço inválido');u.hash='veiculo='+encodeURIComponent(id);return u.href}
 function qrModal(id){let v=vehicle(id);if(!v)return;try{let payload=qrPayload(id),q=new qrLibrary.QR(-1,qrLibrary.level);q.addData(payload);q.make();let n=q.getModuleCount(),path='';for(let y=0;y<n;y++)for(let x=0;x<n;x++)if(q.isDark(y,x))path+=`M${x+4} ${y+4}h1v1h-1z`;let svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n+8} ${n+8}" width="260" height="260" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="white"/><path d="${path}" fill="black"/></svg>`;openModal(`<h2>QR Code · ${h(v.plate)}</h2><div style="text-align:center">${svg}</div><p style="overflow-wrap:anywhere">${h(payload)}</p><p class="help">${payload.startsWith('FROTA-INFRA:')?'Modo local: o código identifica o veículo, mas não abre uma página web. Configure a URL da aplicação após hospedagem.':'O link localiza o veículo se ele existir neste navegador. Não há sincronização nem autenticação real.'}</p><div class="flex"><button class="btn" id="qr_download">Baixar SVG para impressão</button><button class="btn secondary" onclick="vehicleDetail('${id}')">Voltar à ficha</button></div>`);$('qr_download').onclick=()=>download('QR-'+v.plate+'.svg',svg,'image/svg+xml')}catch(e){notify('QR indisponível: '+e.message)}}
 function openQRRoute(){const m=location.hash.match(/^#veiculo=(.+)$/);if(!m)return;try{let id=decodeURIComponent(m[1]);if(vehicle(id)){go('vehicles');vehicleDetail(id)}else notify('Veículo não encontrado nos dados deste navegador.')}catch(e){notify('Código inválido.')}}
 window.addEventListener('hashchange',openQRRoute);

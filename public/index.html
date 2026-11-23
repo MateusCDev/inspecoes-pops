@@ -28,15 +28,18 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.52 system-ui,-ap
 <body class="portal-inspections">
 <header class="portal-header">
   <div class="portal-bar">
-    <a class="portal-brand" href="./"><img src="./voanet.png" alt="VOANET" width="1116" height="229"><span>Infraestrutura</span></a>
+    <a class="portal-brand" href="./" data-module="inspecoes"><img src="./voanet.png" alt="VOANET" width="1116" height="229"><span>Infraestrutura</span></a>
     <nav class="portal-tabs" aria-label="Aplicações">
-      <a href="./" aria-current="page">Inspeções POPs</a>
-      <a href="./frota/">Frota</a>
+      <a href="./" data-module="inspecoes" aria-current="page">Inspeções POPs</a>
+      <a href="./frota/" data-module="frota">Frota</a>
     </nav>
-    <div class="portal-actions"><span id="save" role="status">Dados neste dispositivo</span><button class="btn tiny" type="button" id="goHome">Estações</button></div>
+    <div class="portal-actions"><span id="save" role="status">Dados neste dispositivo</span><button class="btn tiny" type="button" id="goHome">Estações</button><button id="portal-signout" class="btn tiny" type="button" hidden>Sair do portal</button></div>
   </div>
 </header>
 <div id="app"></div>
+<section id="portal-fleet-pane" aria-label="Frota" hidden>
+  <div class="portal-module-status" id="portal-fleet-status" role="status" hidden></div>
+</section>
 <script src="./config.js?v=__BUILD_ID__"></script>
 <script src="./google-sync.js?v=__BUILD_ID__"></script>
 <script src="./google-features.js?v=__BUILD_ID__"></script>
@@ -591,4 +594,6 @@ window.addEventListener('online',()=>{if(syncUser&&syncOrg)enviarPendentes()});
 document.getElementById('goHome').onclick=()=>navigate('home');
 render();iniciarSync();
 if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {navigator.serviceWorker.register("./sw.js?v=__BUILD_ID__",{updateViaCache:'none'}).catch(console.warn)}
-</script></body></html>
+</script>
+<script src="./portal.js?v=__BUILD_ID__"></script>
+</body></html>

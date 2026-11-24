@@ -242,7 +242,7 @@ function renderCentralAssets(){
     ${googleCapabilities.assetInventory?'':'<p class="small muted">A lista de equipamentos por vistoria requer a versão atual do Apps Script.</p>'}
     <div class="table-scroll"><table class="data-table"><thead><tr><th>Estação</th><th>Vistoria</th><th>Cadastro central</th><th>Consulta</th></tr></thead>
       <tbody>${rows||'<tr><td colspan="4">Nenhum resultado disponível nesta consulta.</td></tr>'}</tbody></table></div>
-    ${googleNextCursor!==null?button('googleLoadMore','Carregar mais inspeções','tiny'):''}</section>`;
+    ${googleMoreButton()}</section>`;
 }
 
 function renderAssetsOverview(){

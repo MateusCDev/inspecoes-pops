@@ -253,34 +253,41 @@ function renderFttx(){
   return `<main class="shell fttx-shell">
     <div class="home-hero"><div><h1>Levantamento FTTx</h1>
       <p>Calcule os materiais do projeto e exporte a lista para o almoxarifado.</p></div>${isGoogleMode()?'':button('home','Voltar à Gestão','primary')}</div>
+    <nav class="fttx-navigation" aria-label="Etapas do levantamento">
+      <button type="button" class="btn tiny" data-fttx-jump="fttx-project-heading">Projeto e cabos</button>
+      <button type="button" class="btn tiny" data-fttx-jump="fttx-route-heading">Postes e ferragens</button>
+      <button type="button" class="btn tiny" data-fttx-jump="fttx-box-heading">Caixas e acessórios</button>
+      <button type="button" class="btn tiny" data-fttx-jump="fttx-catalog-heading">Catálogo</button>
+      <button type="button" class="btn tiny" data-fttx-jump="fttx-list-heading">Lista e estimativa</button>
+    </nav>
     <section class="card">
-      <div class="card-head"><h2>Projeto e trechos de cabo</h2><p class="small muted" id="fttx-save" role="status">${fttxSaveError?'Armazenamento local indisponível.':'Rascunho neste dispositivo'}</p></div>
+      <div class="card-head"><h2 id="fttx-project-heading" tabindex="-1">Projeto e trechos de cabo</h2><p class="small muted" id="fttx-save" role="status">${fttxSaveError?'Armazenamento local indisponível.':'Rascunho neste dispositivo'}</p></div>
       <label class="fttx-field fttx-project"><span>Nome do projeto</span><input maxlength="100" data-fttx-field="name" value="${esc(fttxDraft.name??'')}"></label>
       <p class="small muted">Distribua as caixas pela bitola em que entra a reserva. O cálculo usa 22 m por CTO comum, 12,5 m por CTO de ponta, 20 m por CEO e 50 m por bloco completo de 500 m lançados em cada bitola.</p>
       <div class="table-scroll"><table class="data-table fttx-cable-table">
-        <thead><tr><th>Bitola</th>${FTTX_CABLE_FIELDS.map(([,label])=>`<th>${label}</th>`).join('')}</tr></thead>
+        <thead><tr><th scope="col">Bitola</th>${FTTX_CABLE_FIELDS.map(([,label])=>`<th scope="col">${label}</th>`).join('')}</tr></thead>
         <tbody>${FTTX_FIBERS.map(fibers=>{
           const label=String(fibers).padStart(2,'0')+' FO';
-          return `<tr><th scope="row">${label}</th>${FTTX_CABLE_FIELDS.map(([field,title])=>`<td><input type="number"
+          return `<tr><th scope="row">${label}</th>${FTTX_CABLE_FIELDS.map(([field,title])=>`<td><label class="fttx-cable-field"><span aria-hidden="true">${title}</span><input type="number"
               min="0" step="${field==='meters'?'0.01':'1'}" inputmode="${field==='meters'?'decimal':'numeric'}"
               aria-label="${title} · ${label}" data-fttx-fiber="${fibers}" data-fttx-field="${field}"
-              value="${esc(fttxDraft.cables?.[fibers]?.[field]??'')}" placeholder="0"></td>`).join('')}</tr>`;
+              value="${esc(fttxDraft.cables?.[fibers]?.[field]??'')}" placeholder="0"></label></td>`).join('')}</tr>`;
         }).join('')}</tbody>
       </table></div>
     </section>
     <section class="card">
-      <h2>Postes, ferragens e lançamento</h2>
+      <h2 id="fttx-route-heading" tabindex="-1">Postes, ferragens e lançamento</h2>
       <p class="small muted">Conte cada poste uma vez. Cada poste com CTO recebe um olhal e cada poste com AS recebe uma BAP. Conte como adicionais os demais olhais, inclusive os das extremidades dos grupos de três postes, curvas e cruzamentos.</p>
       <p class="small muted">Considere para dielétrico apenas grupos com olhal nas duas extremidades e suporte no meio, após conferir vegetação, curvas e vãos longos.</p>
       <div class="fttx-fields">${FTTX_ROUTE_FIELDS.map(([field,label])=>fttxInput(field,label)).join('')}</div>
     </section>
     <section class="card">
-      <h2>Caixas de emenda e acessórios</h2>
+      <h2 id="fttx-box-heading" tabindex="-1">Caixas de emenda e acessórios</h2>
       <p class="small muted">Informe a metragem de cordoalha conferida no traçado, considerando os pontos previstos a cada 100 m.</p>
       <div class="fttx-fields">${FTTX_BOX_FIELDS.map(([field,label])=>fttxInput(field,label,field==='strand')).join('')}</div>
     </section>
     <section class="card">
-      <h2>Catálogo de materiais complementares</h2>
+      <h2 id="fttx-catalog-heading" tabindex="-1">Catálogo de materiais complementares</h2>
       <form id="fttx-catalog-form" class="fttx-fields">
         <label class="fttx-field"><span>Buscar no catálogo</span><input type="search" id="fttx-search" placeholder="Ex.: DIO, OLT ou microduto"></label>
         <label class="fttx-field"><span id="fttx-material-label">Material</span><select id="fttx-catalog-item" aria-labelledby="fttx-material-label" required>${fttxCatalogOptions()}</select></label>
@@ -290,7 +297,7 @@ function renderFttx(){
       <p class="small muted" id="fttx-catalog-status" role="status">Informe zero para retirar um material complementar da lista.</p>
     </section>
     <section class="card">
-      <div class="card-head"><div><h2>Lista para o almoxarifado</h2><p class="small muted">Exportação em CSV compatível com Excel.</p></div>
+      <div class="card-head"><div><h2 id="fttx-list-heading" tabindex="-1">Lista para o almoxarifado</h2><p class="small muted">Exportação em CSV compatível com Excel.</p></div>
         <button type="button" class="btn primary" data-action="exportFttx" ${result.alerts.length||!result.groups.some(group=>group.items.length)?'disabled':''}>Exportar materiais</button></div>
       <div id="fttx-results">${fttxResults(result)}</div>
     </section>
@@ -302,7 +309,9 @@ function persistFttx(){
     localStorage.setItem(fttxDraftKey,JSON.stringify(fttxDraft));
     fttxSaveError=false;
   }catch(_){fttxSaveError=true;}
-  document.getElementById('fttx-save').textContent=fttxSaveError?'Não foi possível salvar o rascunho neste dispositivo.':'Rascunho salvo neste dispositivo';
+  const status=document.getElementById('fttx-save');
+  const message=fttxSaveError?'Não foi possível salvar o rascunho neste dispositivo.':'Rascunho salvo neste dispositivo';
+  if(status.textContent!==message)status.textContent=message;
 }
 
 function saveFttx(event){
@@ -338,6 +347,13 @@ function exportFttx(){
 }
 
 document.addEventListener('input',saveFttx);
+document.addEventListener('click',event=>{
+  const jump=event.target.closest('[data-fttx-jump]');
+  if(!jump)return;
+  const heading=document.getElementById(jump.dataset.fttxJump);
+  heading.focus({preventScroll:true});
+  heading.scrollIntoView({block:'start'});
+});
 document.addEventListener('input',event=>{
   if(event.target.id==='fttx-search'){
     document.getElementById('fttx-catalog-item').innerHTML=fttxCatalogOptions(event.target.value);

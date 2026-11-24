@@ -73,19 +73,39 @@ async function googlePollJobs(){
   }finally{googleJobsPolling=false;}
 }
 async function googleRefreshSummary(){
-  if(googleCentralBusy||!googleUser)return;googleCentralBusy=true;googleCentralError='';const session=googleSession;googleRenderCentralData();
+  if(googleCentralBusy||googlePageBusy||!googleUser)return;
+  googleCentralBusy=true;googleCentralError='';googlePageError='';const session=googleSession;googleRenderCentralData();
   try{
     const result=await googleRpc('dashboard');if(session!==googleSession)return;
-    if(!Array.isArray(result.items)||!result.summary)throw Error('Resumo central inválido.');
+    if(!Array.isArray(result.items)||!result.summary||
+      (result.nextCursor!==null&&!Number.isInteger(result.nextCursor)))throw Error('Resumo central inválido.');
     googleCentralItems=result.items;googleSummary=result.summary;googleNextCursor=result.nextCursor;googleCentralUpdated=new Date().toLocaleString('pt-BR');
   }catch(error){if(session===googleSession)googleCentralError=error.message;}
   finally{if(session===googleSession){googleCentralBusy=false;googleRenderCentralData();}}
 }
 async function googleLoadMore(){
-  if(googleCentralBusy||googleNextCursor===null)return;googleCentralBusy=true;const session=googleSession;
-  try{const page=await googleRpc('list',{cursor:googleNextCursor});if(session!==googleSession)return;const ids=new Set(googleCentralItems.map(x=>x.id));googleCentralItems.push(...page.items.filter(x=>!ids.has(x.id)));googleNextCursor=page.nextCursor;}
-  catch(error){if(session===googleSession)alert(error.message);}
-  finally{if(session===googleSession){googleCentralBusy=false;render();}}
+  if(googleCentralBusy||googlePageBusy||googleNextCursor===null||!googleUser)return;
+  const session=googleSession,cursor=googleNextCursor;
+  googlePageBusy=true;
+  googlePageError='';
+  googleRenderCentralData();
+  try{
+    const page=await googleRpc('list',{cursor});
+    if(session!==googleSession)return;
+    if(!Array.isArray(page.items)||(page.nextCursor!==null&&
+      (!Number.isInteger(page.nextCursor)||page.nextCursor>=cursor)))throw Error('A página recebida é inválida.');
+    const items=new Map(googleCentralItems.map(record=>[record.id,record]));
+    for(const record of page.items)if(!items.has(record.id))items.set(record.id,record);
+    googleCentralItems=[...items.values()];
+    googleNextCursor=page.nextCursor;
+  }catch(error){if(session===googleSession)googlePageError=error.message;}
+  finally{if(session===googleSession){googlePageBusy=false;googleRenderCentralData();}}
+}
+function googleMoreButton(){
+  return `<div class="central-pagination">
+    ${googleNextCursor!==null?`<button type="button" data-action="googleLoadMore" class="btn tiny"
+      aria-disabled="${googlePageBusy||googleCentralBusy}">${googlePageBusy?'Carregando…':'Carregar mais inspeções'}</button>`:''}
+    <p class="small" role="status">${esc(googlePageError)}</p></div>`;
 }
 function googleActionPlansView(items){
   const rows=items.filter(item=>Number(item.issues)>0).map(item=>`<tr>
@@ -96,7 +116,7 @@ function googleActionPlansView(items){
   return `<section class="card"><h2>Ações das vistorias da equipe</h2>
     ${rows?`<div class="table-scroll"><table class="data-table"><thead><tr><th>POP</th><th>Vistoria</th><th>Técnico</th><th>Ações</th><th>Consulta</th></tr></thead><tbody>${rows}</tbody></table></div>`
       :`<p role="status">${empty}</p>`}
-    ${googleNextCursor!==null?button('googleLoadMore','Carregar mais inspeções','tiny'):''}</section>`;
+    ${googleMoreButton()}</section>`;
 }
 
 async function googleReprocessAssets(id){

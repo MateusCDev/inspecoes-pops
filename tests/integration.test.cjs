@@ -104,3 +104,24 @@ test('data impossível, código ausente ou criticidade sem regra são rejeitados
  r.data='2026-02-28';r.codigoPop='';assert.equal(h.send(r).ok,false);
  r.codigoPop='TEST-HIGH';h.stations[1][8]='BAIXA';assert.equal(h.send(r).ok,false);
 });
+
+test('Gestão consulta ações recebidas de um operador com os dados arquivados e fallback legado',()=>{
+ const h=harness(),r=h.record();
+ const action={titulo:'Identificar circuitos',acao:'Etiquetar os disjuntores',prioridade:'P2',responsavel:'O&M',prazo:'2026-11-30',status:'Pendente',evidencia:'EL-01'};
+ r.issues=[action];
+ assert.equal(h.send(r).ok,true);
+ const query={action:'inspectionActionPlan',inspectionId:r.id};
+ const dashboard=h.request({action:'dashboard'},'manager');
+ assert.equal(dashboard.items[0].issues,1);
+ assert.deepEqual(h.request(query,'manager').issues,[action]);
+ assert.equal(h.request(query).ok,false);
+ assert.equal(h.request(query,'other').ok,false);
+ assert.equal(h.request({...query,inspectionId:'INSP-INEXISTENTE'},'manager').ok,false);
+
+ const column=h.rows[0].indexOf('pendencias_json');
+ h.rows[1][column]='[]';
+ assert.deepEqual(h.request(query,'manager').issues,[action]);
+ delete h.props['REVISION_'+h.digest(r.id)];
+ h.rows[1][column]=JSON.stringify([action]);
+ assert.deepEqual(h.request(query,'manager').issues,[action]);
+});

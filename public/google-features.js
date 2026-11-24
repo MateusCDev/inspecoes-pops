@@ -87,6 +87,22 @@ async function googleLoadMore(){
   catch(error){if(session===googleSession)alert(error.message);}
   finally{if(session===googleSession){googleCentralBusy=false;render();}}
 }
+function googleActionPlansView(items){
+  const supported=googleCapabilities.actionPlans;
+  const rows=items.filter(item=>Number(item.issues)>0).map(item=>`<tr>
+    <td>${esc(item.station)}</td><td>${esc(fmt(item.date))}</td><td>${esc(item.technician||'—')}</td>
+    <td>${Number(item.issues)}</td><td>${supported
+      ?button('googleActionPlan:'+esc(item.id),'Ver plano de ação','tiny')
+      :button('googlePdf:'+esc(item.id),'Baixar relatório arquivado','tiny')}</td></tr>`).join('');
+  const empty=googleCentralBusy?'Consultando as inspeções recebidas…':googleCentralError?'Consulta indisponível. Use Atualizar dados para tentar novamente.':
+    googleNextCursor!==null?'Nenhum plano nesta página. Carregue mais inspeções para continuar a consulta.':'Nenhum plano registrado nas inspeções recebidas.';
+  return `<section class="card"><h2>Ações das vistorias da equipe</h2>
+    ${supported?'':'<p class="small muted">O detalhamento no portal será habilitado após a atualização do Apps Script. Os relatórios arquivados estão disponíveis na lista.</p>'}
+    ${rows?`<div class="table-scroll"><table class="data-table"><thead><tr><th>POP</th><th>Vistoria</th><th>Técnico</th><th>Ações</th><th>Consulta</th></tr></thead><tbody>${rows}</tbody></table></div>`
+      :`<p role="status">${empty}</p>`}
+    ${googleNextCursor!==null?button('googleLoadMore','Carregar mais inspeções','tiny'):''}</section>`;
+}
+
 async function googleReprocessAssets(id){
   const session=googleSession,key=googleAccessKey;
   const {dialog,content}=openGoogleAssetDialog('Reprocessar ativos',id,'Enviando a solicitação…');
@@ -125,6 +141,25 @@ function openGoogleAssetDialog(title,id,loading){
   document.body.append(dialog);
   dialog.showModal();
   return {dialog,content:dialog.querySelector('[data-asset-issues-content]')};
+}
+async function googleOpenActionPlan(id){
+  if(googleUser?.role!=='GESTAO'||!googleCapabilities.actionPlans)return;
+  const session=googleSession;
+  const {dialog,content}=openGoogleAssetDialog('Plano de ação da vistoria',id,'Consultando ações da vistoria…');
+  try{
+    const {issues}=await googleRpc('inspectionActionPlan',{inspectionId:id});
+    if(session!==googleSession||!dialog.open)return;
+    if(!Array.isArray(issues))throw Error('A consulta não retornou as ações da vistoria.');
+    content.innerHTML=issues.length?issues.map(issue=>`<section>
+      <h3>${esc(issue.titulo||'Ação registrada')}</h3>
+      <p style="white-space:pre-line">${esc(issue.acao||'—')}</p>
+      <p class="small muted"><strong>Prioridade</strong> ${esc(issue.prioridade||'—')} · <strong>Situação</strong> ${esc(issue.status||'—')}</p>
+      <p class="small muted"><strong>Responsável</strong> ${esc(issue.responsavel||'—')} · <strong>Prazo</strong> ${esc(fmt(issue.prazo))}</p>
+      ${issue.evidencia?`<p class="small muted"><strong>Evidência</strong> ${esc(issue.evidencia)}</p>`:''}
+    </section>`).join(''):'<p>Nenhuma ação registrada nessa vistoria.</p>';
+  }catch(error){
+    if(session===googleSession&&dialog.open)content.innerHTML=`<p role="alert">${esc(error.message)}</p>`;
+  }
 }
 async function googleShowInventory(id,central=false){
   const session=googleSession;
@@ -184,6 +219,7 @@ async function googleShowAssetIssues(id){
 document.addEventListener('click',e=>{
   const action=e.target.closest('[data-action]')?.dataset.action;if(!googleUser)return;
   if(action==='googleLoadMore')googleLoadMore();if(action?.startsWith('googleAssets:'))googleReprocessAssets(action.slice(13));
+  if(action?.startsWith('googleActionPlan:'))googleOpenActionPlan(action.slice('googleActionPlan:'.length));
   if(action?.startsWith('googleInventory:'))googleShowInventory(action.slice('googleInventory:'.length));
   if(action?.startsWith('googleIssues:'))googleShowAssetIssues(action.slice(13));
 });

@@ -115,7 +115,8 @@ async function googleFinalize(){
 }
 let googleCentralSection='dashboard';
 async function openGoogleCentral(section=googleUser?.role==='GESTAO'?'dashboard':'history'){
-  if(!googleUser||!['dashboard','history','schedule'].includes(section))return;
+  if(!googleUser||!['dashboard','history','schedule','plans'].includes(section))return;
+  if(section==='plans'&&googleUser.role!=='GESTAO')return;
   googleCentralSection=section;
   navigate('googleCentral');
   await googleRefreshCentral();
@@ -153,10 +154,10 @@ function googleCentralView(){
   const scheduleHTML=`<div class="card"><h2 id="google-schedule-heading" tabindex="-1">Próximas inspeções — última vistoria de cada POP</h2><div class="table-scroll"><table class="data-table"><thead><tr><th>POP</th><th>Última vistoria</th><th>Prazo</th><th>Próxima inspeção</th><th>Situação</th></tr></thead><tbody>${upcoming.map(r=>{const days=daysUntil(r.due),status=days===null?'Sem programação':days<0?'Vencida há '+Math.abs(days)+' dia(s)':days===0?'Vence hoje':'Faltam '+days+' dia(s)';return `<tr><td>${esc(r.station)}</td><td>${esc(fmt(r.date))}</td><td>${Number(r.period)||'—'} dias</td><td>${esc(fmt(r.due))}</td><td>${esc(status)}</td></tr>`;}).join('')||'<tr><td colspan="5">Sem inspeções recebidas.</td></tr>'}</tbody></table></div></div>`;
   const section=googleCentralSection;
   const title={dashboard:manager?'Dashboard Gerencial':'Minhas inspeções enviadas',
-    history:manager?'Inspeções Recebidas':'Minhas inspeções enviadas',schedule:'Cronograma de inspeções'}[section];
+    history:manager?'Inspeções Recebidas':'Minhas inspeções enviadas',schedule:'Cronograma de inspeções',plans:'Planos de Ação'}[section];
   const description={dashboard:'Indicadores das inspeções sincronizadas.',history:'Consulte as vistorias recebidas e baixe os relatórios.',
-    schedule:'Acompanhe a próxima vistoria prevista para cada POP.'}[section];
-  const sections=manager?[['dashboard','Dashboard'],['history','Inspeções recebidas'],['schedule','Cronograma']]:
+    schedule:'Acompanhe a próxima vistoria prevista para cada POP.',plans:'Consulte as ações registradas nas vistorias enviadas pela equipe.'}[section];
+  const sections=manager?[['dashboard','Dashboard'],['history','Inspeções recebidas'],['schedule','Cronograma'],['plans','Planos de Ação']]:
     [['history','Inspeções enviadas'],['schedule','Cronograma']];
   const nav=sections.map(([id,label])=>`<button type="button" class="btn tiny ${id===section?'primary':''}" data-action="centralSection:${id}" ${id===section?'aria-current="page"':''}>${label}</button>`).join('');
   const dashboardHTML=`<div class="grid3"><div class="stat"><strong>${googleSummary?.total??items.length}</strong><span>Inspeções recebidas</span></div><div class="stat"><strong>${nc}</strong><span>Não conformidades registradas</span></div><div class="stat"><strong>${c+nc?(100*c/(c+nc)).toFixed(1)+'%':'—'}</strong><span>Conformidade: C ÷ (C + NC)</span></div></div>${ranking.length?`<div class="card"><h2>Não conformidades acumuladas por POP</h2>${ranking.map(([station,n])=>`<p>${esc(station)} · ${n}</p><div style="height:10px;background:#e5e7eb;margin-bottom:12px"><div style="height:10px;background:#c90018;width:${100*n/max}%"></div></div>`).join('')}</div>`:''}`;
@@ -167,7 +168,7 @@ function googleCentralView(){
       </div><div class="btnrow">${button('googleRefresh',googleCentralBusy?'Atualizando…':'Atualizar dados','primary tiny')}${button('home','Voltar','tiny')}</div></div>
       <nav class="btnrow" aria-label="Visões da base central">${nav}</nav>
     </div>
-    ${{dashboard:dashboardHTML,history:historyHTML,schedule:scheduleHTML}[section]}
+    ${section==='plans'?googleActionPlansView(items):{dashboard:dashboardHTML,history:historyHTML,schedule:scheduleHTML}[section]}
   </div>`;
 }
 let googleReportRequest=null;

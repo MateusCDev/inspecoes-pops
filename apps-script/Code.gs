@@ -81,13 +81,14 @@ function doPost(e) {
     if(!user)return reply_({ok:false,code:'AUTH',error:'Chave inválida, revogada ou ainda não vinculada a uma pessoa ativa.'});
     requirePrivateData_();
     if(input.version!==1)throw Error('Versão incompatível.');
-    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,accessAdmin:true,reportRefresh:true,assetInventory:true,assetReconciliation:true}});
+    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,accessAdmin:true,reportRefresh:true,assetInventory:true,assetReconciliation:true,actionPlans:true}});
     if(input.action==='fleetLoad'||input.action==='fleetSave')return reply_(fleetRequest_(input,user));
     if(input.action==='users')return reply_(listAccess_(user));
     if(input.action==='manageOperator')return reply_(manageOperator_(input,user));
     if(input.action==='stations')return reply_({ok:true,stations:stations_()});
     if(input.action==='list')return reply_(listInspections_(input,user));
     if(input.action==='dashboard')return reply_(dashboard_(input,user));
+    if(input.action==='inspectionActionPlan')return reply_(inspectionActionPlan_(input,user));
     if(input.action==='photo')return reply_(stagePhoto_(input,user));
     if(input.action==='refreshReport')return reply_(refreshReport_(input,user));
     if(input.action==='pdf')return reply_(downloadPdf_(input,user));

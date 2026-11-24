@@ -315,7 +315,7 @@ function renderHome(){
   [isGoogleMode()?'googleCentral':'dashboard','▦','Dashboard Gerencial','Consulta central das inspeções recebidas'],
   [isGoogleMode()?'homeReceived':'homeStations','▤','Inspeções Recebidas',isGoogleMode()?'Histórico das inspeções sincronizadas pela equipe':'Consultar registros deste dispositivo'],
   ['homeSchedule','▣','Cronograma','Acompanhar inspeções previstas e vencidas'],
-  ['homeIssues','☑','Planos de Ação','Abrir inspeções para consultar pendências'],
+  ['homeIssues','☑','Planos de Ação',isGoogleMode()?'Consultar ações das inspeções recebidas da equipe':'Consultar ações das inspeções deste dispositivo'],
   ['homeAssets','▥','Gestão de Ativos','Inventário, transceivers e alertas de baterias'],
   ['new','＋','Nova Inspeção','Realizar vistoria quando necessário']
  ];
@@ -454,6 +454,7 @@ if(s.startsWith('openInventory:')){
  if(records.some(record=>record.id===id)){activeId=id;return navigate('inventario')}
  return;
 }
+if(s==='homeIssues'&&isGoogleMode()&&googleUser?.role==='GESTAO')return openGoogleCentral('plans');
 if(s==='homeIssues'||s==='homeReports'){document.getElementById('estacoes')?.scrollIntoView({behavior:'smooth',block:'start'});alert('Abra uma inspeção da lista para consultar '+(s==='homeIssues'?'o plano de ação.':'o relatório com fotos.'));return}
 if(s==='homePending'){document.getElementById('sync-section')?.scrollIntoView({behavior:'smooth'});alert('Confira a seção de sincronização nesta página. A confirmação de envio exige servidor corporativo configurado.');return}
 if(s==='homeAccess'){alert('O cadastro de identidades, papéis e permissões será realizado pelo TI no Microsoft Entra ID e pela API corporativa. Esta tela é apenas uma demonstração.');return}

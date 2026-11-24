@@ -84,6 +84,21 @@ function listInspections_(input,user) {
   }
   return {ok:true,items,nextCursor:cursor>1?cursor:null};
 }
+function inspectionActionPlan_(input,user) {
+  const id=input.inspectionId;
+  if(user.role!=='GESTAO'||!/^INSP-[A-Za-z0-9-]+$/.test(id||''))throw Error('Plano de ação indisponível.');
+  const sheet=sheet_(),last=sheet.getLastRow();
+  const matches=last>1?sheet.getRange(2,1,last-1,1).createTextFinder(id).matchEntireCell(true).findAll():[];
+  if(matches.length!==1)throw Error('Inspeção indisponível.');
+  const revision=recordRevision_(id);
+  const record=revision?.payloadId?readJsonFile_(revision.payloadId):null;
+  if(record&&record.id!==id)throw Error('Plano de ação indisponível.');
+  const archived=record?record.issues:JSON.parse(String(sheet.getRange(matches[0].getRow(),headers_().indexOf('pendencias_json')+1).getValue()||'[]'));
+  if(archived!=null&&!Array.isArray(archived))throw Error('Plano de ação inválido.');
+  const fields=['titulo','acao','prioridade','responsavel','prazo','status','evidencia'];
+  const issues=(archived||[]).map(issue=>Object.fromEntries(fields.map(field=>[field,String(issue?.[field]??'')])));
+  return {ok:true,issues};
+}
 function downloadPdf_(input,user) {
   if(!/^INSP-[A-Za-z0-9-]+$/.test(input.inspectionId||''))throw Error('Registro indisponível.');
   const sheet=sheet_(),headers=headers_();

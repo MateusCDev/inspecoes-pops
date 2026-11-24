@@ -120,13 +120,14 @@ function doPost(e) {
     if(!user)return reply_({ok:false,code:'AUTH',error:'Chave inválida, revogada ou ainda não vinculada a uma pessoa ativa.'});
     requirePrivateData_();
     if(input.version!==1)throw Error('Versão incompatível.');
-    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,accessAdmin:true,reportRefresh:true,assetInventory:true,assetReconciliation:true}});
+    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,accessAdmin:true,reportRefresh:true,assetInventory:true,assetReconciliation:true,actionPlans:true}});
     if(input.action==='fleetLoad'||input.action==='fleetSave')return reply_(fleetRequest_(input,user));
     if(input.action==='users')return reply_(listAccess_(user));
     if(input.action==='manageOperator')return reply_(manageOperator_(input,user));
     if(input.action==='stations')return reply_({ok:true,stations:stations_()});
     if(input.action==='list')return reply_(listInspections_(input,user));
     if(input.action==='dashboard')return reply_(dashboard_(input,user));
+    if(input.action==='inspectionActionPlan')return reply_(inspectionActionPlan_(input,user));
     if(input.action==='photo')return reply_(stagePhoto_(input,user));
     if(input.action==='refreshReport')return reply_(refreshReport_(input,user));
     if(input.action==='pdf')return reply_(downloadPdf_(input,user));
@@ -495,6 +496,21 @@ function listInspections_(input,user) {
     }
   }
   return {ok:true,items,nextCursor:cursor>1?cursor:null};
+}
+function inspectionActionPlan_(input,user) {
+  const id=input.inspectionId;
+  if(user.role!=='GESTAO'||!/^INSP-[A-Za-z0-9-]+$/.test(id||''))throw Error('Plano de ação indisponível.');
+  const sheet=sheet_(),last=sheet.getLastRow();
+  const matches=last>1?sheet.getRange(2,1,last-1,1).createTextFinder(id).matchEntireCell(true).findAll():[];
+  if(matches.length!==1)throw Error('Inspeção indisponível.');
+  const revision=recordRevision_(id);
+  const record=revision?.payloadId?readJsonFile_(revision.payloadId):null;
+  if(record&&record.id!==id)throw Error('Plano de ação indisponível.');
+  const archived=record?record.issues:JSON.parse(String(sheet.getRange(matches[0].getRow(),headers_().indexOf('pendencias_json')+1).getValue()||'[]'));
+  if(archived!=null&&!Array.isArray(archived))throw Error('Plano de ação inválido.');
+  const fields=['titulo','acao','prioridade','responsavel','prazo','status','evidencia'];
+  const issues=(archived||[]).map(issue=>Object.fromEntries(fields.map(field=>[field,String(issue?.[field]??'')])));
+  return {ok:true,issues};
 }
 function downloadPdf_(input,user) {
   if(!/^INSP-[A-Za-z0-9-]+$/.test(input.inspectionId||''))throw Error('Registro indisponível.');

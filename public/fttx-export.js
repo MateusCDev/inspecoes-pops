@@ -4,7 +4,7 @@ const FTTX_EXPORT_HEADERS = [
   'Projeto', 'Etapa', 'Material', 'Unidade', 'Quantidade', 'Preço unitário estimado (R$)',
   'Subtotal estimado (R$)', 'Origem', 'Data da referência', 'URL da referência'
 ];
-const FTTX_COST_NOTE = 'Estimativa de materiais. O subtotal cobre os itens com preço informado e não inclui mão de obra nem frete.';
+const FTTX_COST_NOTE = 'Levantamento preliminar. Confira as quantidades em campo. O subtotal considera materiais precificados, sem mão de obra e frete.';
 let fttxExcelLibrary;
 
 function loadFttxExcelLibrary() {

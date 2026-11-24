@@ -327,7 +327,7 @@ body:has(.portal-login) .portal-actions { display: none; }
 .portal-inspections .fttx-shell { display: block; max-width: 1160px; }
 .fttx-navigation { display: flex; flex-wrap: wrap; gap: .4rem; margin: 0 0 1rem; }
 .fttx-navigation .btn { min-height: 42px; }
-.fttx-shell h2[id] { scroll-margin-top: calc(var(--portal-header-height) + 1.5rem); }
+.fttx-shell :is(h2[id],summary[id]) { scroll-margin-top: calc(var(--portal-header-height) + 1.5rem); }
 .fttx-shell h3 { margin: 1.25rem 0 .65rem; }
 .fttx-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 225px), 1fr)); gap: .9rem 1.2rem; margin-top: 1rem; }
 .fttx-field { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; align-content: end; gap: .4rem; font-weight: 650; font-size: .875rem; }
@@ -344,9 +344,51 @@ body:has(.portal-login) .portal-actions { display: none; }
 }
 .fttx-shell :is(input,select):focus-visible { outline: 2px solid var(--portal-red); outline-offset: 2px; }
 .fttx-project { max-width: 34rem; margin: 1rem 0; }
-.fttx-cable-table { min-width: 480px; }
-.fttx-cable-table input { min-width: 4rem; }
-.fttx-cable-field > span { display: none; }
+.fttx-step {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+}
+.fttx-step span {
+  display: grid;
+  place-items: center;
+  flex: 0 0 1.9rem;
+  height: 1.9rem;
+  border-radius: .45rem;
+  background: var(--portal-red-soft);
+  color: var(--portal-red-dark);
+  font-size: .875rem;
+}
+.fttx-shell fieldset {
+  min-inline-size: 0;
+  padding: .7rem .85rem .8rem;
+  margin: .65rem 0 0;
+  border: 1px solid var(--portal-line);
+  border-radius: .65rem;
+}
+.fttx-cable-group legend { padding-inline: .25rem; font-weight: 750; font-size: .85rem; }
+.fttx-cable-inputs { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,12rem),1fr)); gap: .6rem .85rem; }
+.fttx-other-cables { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,15rem),1fr)); gap: .65rem; }
+.fttx-options { margin-top: 1rem; }
+.fttx-options:not(.card) { border-top: 1px solid var(--portal-line); padding-top: .65rem; }
+.fttx-options summary { cursor: pointer; font-weight: 700; padding-block: .3rem; }
+.fttx-options[open] summary { margin-bottom: .5rem; }
+.fttx-suggestion { margin: .75rem 0 .35rem; }
+.fttx-field small { color: var(--portal-muted); font-weight: 400; font-size: .8rem; line-height: 1.4; }
+.fttx-stage-total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .25rem 1rem;
+  margin: 1.25rem 0 .55rem;
+}
+.fttx-stage-total h3 { margin: 0; }
+.fttx-stage-total span { color: var(--portal-muted); font-size: .87rem; }
+.fttx-stage-total strong { color: var(--portal-ink); margin-inline-start: .25rem; }
+.fttx-budget-table { min-width: 520px; }
+.portal-inspections .fttx-budget-table tbody th { background: transparent; }
+.portal-inspections .fttx-budget-table :is(td,th):nth-child(n+3) { text-align: right; white-space: nowrap; }
 .fttx-totals { margin: 1rem 0; }
 .fttx-alert { padding: .8rem 1rem .8rem 2rem; background: #fff7e8; border: 1px solid #efd79c; border-radius: .65rem; color: #61420a; }
 .fttx-prices { margin-top: 1.5rem; }
@@ -354,30 +396,6 @@ body:has(.portal-login) .portal-actions { display: none; }
 .fttx-price-table { min-width: 650px; }
 .fttx-price-input { min-width: 7rem; }
 #fttx-catalog-form > .btn { align-self: end; justify-self: start; }
-
-@media (max-width: 600px) {
-  .fttx-cable-table, .fttx-cable-table tbody { display: block; min-width: 0; }
-  .fttx-cable-table thead {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-  }
-  .fttx-cable-table tr {
-    display: grid;
-    grid-template-columns: repeat(2,minmax(0,1fr));
-    gap: .65rem;
-    padding: .75rem;
-    margin: 0 0 .65rem;
-    border: 1px solid var(--portal-line);
-    border-radius: .65rem;
-  }
-  .portal-inspections .fttx-cable-table :is(th,td) { padding: 0; border: 0; background: none; white-space: normal; }
-  .fttx-cable-table th { grid-column: 1 / -1; }
-  .fttx-cable-field { display: grid; gap: .25rem; }
-  .fttx-cable-field > span { display: block; font-size: .75rem; }
-}
 
 .fttx-cost-summary:not(:empty) {
   display: flex;

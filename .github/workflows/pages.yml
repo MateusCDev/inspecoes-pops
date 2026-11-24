@@ -2,7 +2,9 @@ name: Publicar aplicação no GitHub Pages
 on:
   push:
     branches: [main]
-    paths: ['public/**', 'tools/prepare-pages.cjs', '.github/workflows/pages.yml']
+    paths: ['public/**', 'tools/prepare-pages.cjs', 'tools/refresh-fttx-prices.cjs', 'tools/fttx-sources.json', '.github/workflows/pages.yml']
+  schedule:
+    - cron: '17 10 * * *'
   workflow_dispatch:
 permissions:
   contents: read
@@ -20,6 +22,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - name: Atualizar referências públicas do levantamento FTTx
+        run: node tools/refresh-fttx-prices.cjs --previous
       - name: Identificar a versão dos arquivos estáticos
         run: node tools/prepare-pages.cjs
       - uses: actions/upload-pages-artifact@v3

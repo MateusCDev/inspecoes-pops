@@ -285,3 +285,30 @@ body:has(.portal-login) .portal-actions { display: none; }
 .archived-pdf summary { width: fit-content; margin-bottom: .35rem; cursor: pointer; font-size: .79rem; color: var(--portal-muted); }
 .archived-pdf summary:focus-visible { outline: 2px solid var(--portal-red); outline-offset: 3px; }
 .asset-issue-guidance { margin: .25rem 0 .55rem; color: var(--portal-muted); font-size: .875rem; }
+
+.portal-inspections .fttx-shell { display: block; max-width: 1160px; }
+.fttx-shell h3 { margin: 1.25rem 0 .65rem; }
+.fttx-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 225px), 1fr)); gap: .9rem 1.2rem; margin-top: 1rem; }
+.fttx-field { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; align-content: end; gap: .4rem; font-weight: 650; font-size: .875rem; }
+.fttx-field :is(input,select) { min-width: 0; }
+.fttx-shell :is(input,select) {
+  width: 100%;
+  min-height: 2.5rem;
+  padding: .45rem .65rem;
+  border: 1px solid #c9d4e2;
+  border-radius: .5rem;
+  background: var(--portal-surface);
+  color: var(--portal-ink);
+  font: inherit;
+}
+.fttx-shell :is(input,select):focus-visible { outline: 2px solid var(--portal-red); outline-offset: 2px; }
+.fttx-project { max-width: 34rem; margin: 1rem 0; }
+.fttx-cable-table { min-width: 480px; }
+.fttx-cable-table input { min-width: 4rem; }
+.fttx-totals { margin: 1rem 0; }
+.fttx-alert { padding: .8rem 1rem .8rem 2rem; background: #fff7e8; border: 1px solid #efd79c; border-radius: .65rem; color: #61420a; }
+.fttx-prices { margin-top: 1.5rem; }
+.fttx-prices summary { cursor: pointer; font-size: 1rem; font-weight: 700; padding-block: .5rem; }
+.fttx-price-table { min-width: 650px; }
+.fttx-price-input { min-width: 7rem; }
+#fttx-catalog-form > .btn { align-self: end; justify-self: start; }

@@ -1,0 +1,116 @@
+{
+  "references": {
+    "Alça pré-formada para cabo de 36 FO": {
+      "price": 2.85,
+      "store": "BaixadaNet Telecom",
+      "url": "https://baixadanet.com/produto/alca-pre-formada-cabo-optico-36fo-108mm-a-116mm-verde",
+      "details": "Para cabos de 10,8 a 11,6 mm",
+      "checkedOn": "2026-11-24"
+    },
+    "Parafuso": {
+      "price": 9.7,
+      "store": "Power Network Store",
+      "url": "https://www.powernetworkstore.com.br/redes-opticas/ferragens-e-ancoragem/parafuso-m12-x-35",
+      "details": "M12 × 35 · pacote com 10",
+      "checkedOn": "2026-11-24"
+    },
+    "Fecho de aço 3/4″": {
+      "price": 0.45,
+      "store": "Power Network Store",
+      "url": "https://www.powernetworkstore.com.br/redes-opticas/ferragens-e-ancoragem/fecho-de-aco-para-fita-de-aco-34-100un",
+      "details": "3/4″ · pacote com 100",
+      "checkedOn": "2026-11-24"
+    },
+    "Fita de aço 3/4″": {
+      "price": 1.96,
+      "store": "Power Network Store",
+      "url": "https://www.powernetworkstore.com.br/redes-opticas/ferragens-e-ancoragem/fita-de-aco-galvanizado-34-x-0-5cm-25m",
+      "details": "Galvanizada 3/4″ · rolo de 25 m",
+      "checkedOn": "2026-11-24"
+    },
+    "Alça pré-formada para cordoalha": {
+      "price": 3.85,
+      "store": "Power Network Store",
+      "url": "https://www.powernetworkstore.com.br/redes-opticas/ferragens-e-ancoragem/alca-preformada-para-cordoalha-4-8mm",
+      "details": "Cordoalha de aço 4,8 mm · pacote com 100",
+      "checkedOn": "2026-11-24"
+    },
+    "CEO": {
+      "price": 166.58,
+      "store": "Unicaserv",
+      "url": "https://www.unicaserv.com.br/fibras-opticas/dios-e-caixas-de-emenda/ceo-caixa-de-emenda-optica-24-fibras-aereasubterranea-2-flex",
+      "details": "Caixa de emenda de 24 FO",
+      "checkedOn": "2026-11-24"
+    },
+    "CTO": {
+      "price": 96.9,
+      "store": "Loja PIVNET",
+      "url": "https://lojapivnet.com.br/produtos/caixa-de-atendimento-cto-1x16-vazia-duas-travas-e-chave-preta-bencabos/",
+      "details": "CTO de 16 portas, vazia",
+      "checkedOn": "2026-11-24"
+    },
+    "Cabo óptico 12 FO": {
+      "price": 2.33,
+      "store": "BaixadaNet Telecom",
+      "url": "https://baixadanet.com/produto/cabo-optico-speed-star-transcend-asu80-tubo-unico-12fo-advantage-mt",
+      "details": "ASU80 · preço por metro · pedido mínimo de 3.000",
+      "checkedOn": "2026-11-24"
+    },
+    "Suporte para BAP": {
+      "price": 3.3,
+      "store": "Isamig Telecom",
+      "url": "https://isamigtelecom.com.br/produtos/suporte-p-bap-m12-kit-10un/",
+      "details": "M12 · pacote com 10",
+      "checkedOn": "2026-11-24"
+    },
+    "Suporte dielétrico": {
+      "price": 6.4,
+      "store": "Isamig Telecom",
+      "url": "https://isamigtelecom.com.br/produtos/10-un-suporte-dieletrico-conico-duplo-8-mm-p-bap/",
+      "details": "Cônico duplo de 8 mm para BAP · pacote com 10",
+      "checkedOn": "2026-11-24"
+    },
+    "Splitter 1:2": {
+      "price": 20.5,
+      "store": "Loja PIVNET",
+      "url": "https://lojapivnet.com.br/produtos/splitter-optico-1x2-balanceado-sem-conector-2f-fsplit-x2-2flex/",
+      "details": "Balanceado, sem conector",
+      "checkedOn": "2026-11-24"
+    },
+    "Splitter 1:8": {
+      "price": 32.9,
+      "store": "Loja PIVNET",
+      "url": "https://lojapivnet.com.br/produtos/splitter-optico-1x8-plc-sem-conector-2f-fsplit-x8-10196-1dfvj/",
+      "details": "PLC, sem conector",
+      "checkedOn": "2026-11-24"
+    },
+    "Splitter 1:16": {
+      "price": 52.4,
+      "store": "Loja PIVNET",
+      "url": "https://lojapivnet.com.br/produtos/splitter-optico-1x16-plc-sem-conector-o-tech/",
+      "details": "PLC, sem conector",
+      "checkedOn": "2026-11-24"
+    },
+    "OLT GPON": {
+      "price": 8693.9,
+      "store": "Loja PIVNET",
+      "url": "https://lojapivnet.com.br/produtos/olt-gpon-pon-4-portas-pon-v1600gt-v-sol1/",
+      "details": "V-SOL V1600GT · 4 portas PON",
+      "checkedOn": "2026-11-24"
+    },
+    "Conector de montagem em campo SC/APC": {
+      "price": 6.3,
+      "store": "Loja PIVNET",
+      "url": "https://lojapivnet.com.br/produtos/conector-de-campo-optico-click-apc-3-posicoes-2flex-2f-fcon-sc-apc-n-14b64/",
+      "details": "SC/APC · 2Flex",
+      "checkedOn": "2026-11-24"
+    },
+    "Cabo óptico 06 FO": {
+      "price": 1.8434,
+      "store": "RS Connect",
+      "url": "https://rsconnect.com.br/produtos/cabo_de_fibra_optica_asu80_6fo_bobina_3km/",
+      "details": "ASU80 · bobina de 3.000 m",
+      "checkedOn": "2026-11-24"
+    }
+  }
+}

@@ -48,6 +48,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.52 system-ui,-ap
 <script src="./google-pdf.js?v=__BUILD_ID__"></script>
 <script src="./google-access.js?v=__BUILD_ID__"></script>
 <script src="./fttx-catalog.js?v=__BUILD_ID__"></script>
+<script src="./fttx-export.js?v=__BUILD_ID__"></script>
 <script src="./fttx.js?v=__BUILD_ID__"></script>
 <script src="./entra-client.js"></script>
 
@@ -447,7 +448,6 @@ async function makeReport(){const r=cur();let photoHtml='';const categories=new 
 async function report(open){if(isBusy)return;isBusy=true;let tab=null;if(open)tab=window.open('','_blank');try{const r=cur();const html=await makeReport();if(open&&tab){tab.document.open();tab.document.write(html);tab.document.close()}else download(html,`VOANET_Relatorio_${issueId(r)}_${r.data||'vistoria'}.html`,'text/html;charset=utf-8')}catch(e){console.error(e);if(tab)tab.close();alert('Não foi possível gerar o relatório.')}finally{isBusy=false}}
 function handleAction(s){
 if(s==='homeFttx')return openFttx();
-if(s==='exportFttx'&&fttxActive())return exportFttx();
 if(s==='homeStations'){document.getElementById('estacoes')?.scrollIntoView({behavior:'smooth',block:'start'});return}
 if(s==='homeReceived'&&isGoogleMode())return openGoogleCentral('history');
 if(s==='homeSchedule'){if(isGoogleMode())return openGoogleCentral('schedule');dashboardFilter='alerta';return navigate('dashboard')}

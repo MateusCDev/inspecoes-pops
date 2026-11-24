@@ -160,13 +160,15 @@ function fttxPriceTable(groups){
   for(const {items} of groups){
     for(const [name,unit,qty] of items){
       const key=fttxMaterialKey(name),previous=materials.get(key);
-      materials.set(key,{unit,qty:(previous?.qty??0)+qty});
+      const {cents}=fttxEstimate(name,qty);
+      materials.set(key,{unit,qty:(previous?.qty??0)+qty,cents:cents===null?null:(previous?.cents??0)+cents});
     }
   }
   if(!materials.size)return '';
   let missing=0,cents=0;
-  const rows=[...materials].map(([name,{unit,qty}])=>{
+  const rows=[...materials].map(([name,{unit,qty,cents:lineCents}])=>{
     const quote=fttxEstimate(name,qty);
+    quote.cents=lineCents;
     if(quote.cents===null)missing++;
     else cents+=quote.cents;
     const {reference}=quote;
@@ -199,6 +201,7 @@ function updateFttxPrices(){
   current.querySelectorAll(selector).forEach((node,index)=>node.replaceChildren(...fresh[index].childNodes));
   const inputs=next.content.querySelectorAll('[data-fttx-price]');
   current.querySelectorAll('[data-fttx-price]').forEach((node,index)=>{node.placeholder=inputs[index].placeholder;});
+  document.getElementById('fttx-cost-summary').innerHTML=fttxCostSummary(calculateFttx(fttxDraft).groups);
 }
 
 function updateFttxResults(){
@@ -207,7 +210,8 @@ function updateFttxResults(){
   if(!target)return;
   fttxPriceOpen=target.querySelector('.fttx-prices')?.open??fttxPriceOpen;
   target.innerHTML=fttxResults(result);
-  document.querySelector('[data-action="exportFttx"]').disabled=Boolean(result.alerts.length)||!result.groups.some(group=>group.items.length);
+  const disabled=result.alerts.length>0||!result.groups.some(group=>group.items.length);
+  document.querySelectorAll('[data-fttx-export]').forEach(button=>{button.disabled=disabled;});
 }
 
 function fttxInput(field,label,decimal=false){
@@ -234,6 +238,7 @@ function fttxResults({cables,groups,cableTotal,reserveTotal,routeTotal,alerts}){
     <div class="stat"><strong>${f(reserveTotal)} m</strong><span>Reserva técnica</span></div>
     <div class="stat"><strong>${f(cableTotal)} m</strong><span>Total de cabo</span></div>
   </div>
+  <div id="fttx-cost-summary" class="fttx-cost-summary">${fttxCostSummary(groups)}</div>
   ${alerts.length?`<ul class="fttx-alert" role="status">${alerts.map(alert=>`<li>${alert}</li>`).join('')}</ul>`:''}
   ${shown.length?`<h3>Reserva por bitola</h3><div class="table-scroll"><table class="data-table">
     <thead><tr><th>Bitola</th><th>CTOs</th><th>CEOs</th><th>A cada 500 m</th><th>Reserva</th><th>Cabo total</th></tr></thead>
@@ -297,8 +302,11 @@ function renderFttx(){
       <p class="small muted" id="fttx-catalog-status" role="status">Informe zero para retirar um material complementar da lista.</p>
     </section>
     <section class="card">
-      <div class="card-head"><div><h2 id="fttx-list-heading" tabindex="-1">Lista para o almoxarifado</h2><p class="small muted">Exportação em CSV compatível com Excel.</p></div>
-        <button type="button" class="btn primary" data-action="exportFttx" ${result.alerts.length||!result.groups.some(group=>group.items.length)?'disabled':''}>Exportar materiais</button></div>
+      <div class="card-head"><h2 id="fttx-list-heading" tabindex="-1">Lista para o almoxarifado</h2>
+        <div class="btnrow" aria-label="Exportar materiais">${[['pdf','Baixar PDF','primary'],['xlsx','Baixar Excel',''],['csv','Baixar CSV','']]
+          .map(([format,label,style])=>`<button type="button" class="btn ${style}" data-fttx-export="${format}"
+          ${result.alerts.length||!result.groups.some(group=>group.items.length)?'disabled':''}>${label}</button>`).join('')}</div></div>
+      <p id="fttx-export-status" class="small muted fttx-export-status" role="status"></p>
       <div id="fttx-results">${fttxResults(result)}</div>
     </section>
   </main>`;
@@ -326,25 +334,73 @@ function saveFttx(event){
   updateFttxResults();
 }
 
-function exportFttx(){
-  const {groups,alerts}=calculateFttx(fttxDraft);
-  if(alerts.length||!groups.some(group=>group.items.length))return;
-  const project=fttxDraft.name?.trim()||'Projeto FTTx';
+function fttxCostRows(groups){
+  let cents=0,missing=0;
+  const items=groups.flatMap(group=>group.items.map(([name,unit,quantity])=>{
+    const quote=fttxEstimate(name,quantity);
+    if(quote.cents===null)missing++;
+    else cents+=quote.cents;
+    const url=quote.reference?.url||'';
+    return {group:group.title,name,unit,quantity,price:quote.unit,subtotal:quote.cents===null?null:quote.cents/100,
+      source:quote.source,checkedOn:quote.reference?.checkedOn||'',url:/^https:\/\//.test(url)?url:''};
+  }));
+  return {items,missing,subtotal:items.length===missing?null:cents/100};
+}
+
+function fttxCostSummary(groups){
+  const {items,missing,subtotal}=fttxCostRows(groups);
+  if(!items.length)return '';
+  return `<div><h3>Estimativa de materiais</h3><strong>${subtotal===null?'Sem preços informados':fttxCurrency.format(subtotal)}</strong></div>
+    <p>${missing?`${missing} de ${items.length} linhas sem preço. O subtotal cobre os itens com valor informado. `:''}Mão de obra e frete ficam fora da estimativa.</p>`;
+}
+
+function buildFttxCsv(report){
   const number=value=>value==null?'':String(value).replace('.',',');
-  const rows=[['Projeto','Etapa','Material','Unidade','Quantidade','Preço unitário estimado (R$)','Subtotal estimado (R$)','Origem','Data da referência','URL da referência'],
-    ...groups.flatMap(group=>group.items.map(([name,unit,qty])=>{
-      const quote=fttxEstimate(name,qty);
-      return [project,group.title,name,unit,number(qty),number(quote.unit),number(quote.cents===null?null:quote.cents/100),
-        quote.source,quote.reference?.checkedOn||'',quote.reference?.url||''];
-    }))];
+  const rows=[FTTX_EXPORT_HEADERS,...report.items.map(item=>[
+    report.project,item.group,item.name,item.unit,number(item.quantity),number(item.price),number(item.subtotal),
+    item.source,item.checkedOn,item.url])];
   const quote=value=>{
     const safe=/^[\s]*[=+\-@]/.test(value)?"'"+value:value;
     return '"'+safe.replaceAll('"','""')+'"';
   };
-  const contents='\uFEFF'+rows.map(row=>row.map(quote).join(';')).join('\r\n');
-  const filename=project.replace(/[<>:"/\\|?*\x00-\x1f]/g,' ').trim()||'Projeto FTTx';
-  download(contents,filename+' - Lista de materiais.csv','text/csv;charset=utf-8');
+  return '\uFEFF'+rows.map(row=>row.map(quote).join(';')).join('\r\n');
 }
+
+let fttxExportRequest;
+async function exportFttx(format){
+  const {groups,alerts,routeTotal,reserveTotal,cableTotal}=calculateFttx(fttxDraft);
+  const costs=fttxCostRows(groups);
+  if(alerts.length||!costs.items.length||fttxExportRequest?.session===googleSession)return;
+  const status=document.getElementById('fttx-export-status');
+  const request={session:googleSession};
+  fttxExportRequest=request;
+  const project=fttxDraft.name?.trim()||'Projeto FTTx';
+  const date=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo'}).format();
+  const report={...costs,project,date,routeTotal,reserveTotal,cableTotal};
+  const filename=project.replace(/[<>:"/\\|?*\x00-\x1f\x7f]/g,' ').trim()||'Projeto FTTx';
+  const exports={
+    pdf:[buildFttxPdf,'application/pdf'],
+    xlsx:[buildFttxWorkbook,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+    csv:[buildFttxCsv,'text/csv;charset=utf-8']
+  };
+  try{
+    status.textContent='Preparando o arquivo…';
+    const [build,mime]=exports[format];
+    const contents=await build(report);
+    if(googleSession!==request.session)return;
+    download(contents,filename+' - Lista de materiais.'+format,mime);
+    status.textContent='Arquivo gerado.';
+  }catch(error){
+    if(googleSession===request.session)status.textContent='Falha ao gerar o arquivo. '+error.message;
+  }finally{
+    if(fttxExportRequest===request)fttxExportRequest=null;
+  }
+}
+
+document.addEventListener('click',event=>{
+  const exportButton=event.target.closest('[data-fttx-export]');
+  if(exportButton&&fttxActive())exportFttx(exportButton.dataset.fttxExport);
+});
 
 document.addEventListener('input',saveFttx);
 document.addEventListener('click',event=>{

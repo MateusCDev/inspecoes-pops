@@ -1,8 +1,8 @@
 const BUILD = '__BUILD_ID__';
 const BASE = new URL('./', self.location.href);
 const CACHE = 'voanet-google:'+BASE.pathname+':'+BUILD;
-const FILES = ['index.html','portal.css?v='+BUILD,'portal.js?v='+BUILD,'voanet.png','config.js?v='+BUILD,'google-sync.js?v='+BUILD,'google-features.js?v='+BUILD,'google-pdf.js?v='+BUILD,'google-access.js?v='+BUILD,'fttx-catalog.js?v='+BUILD,'fttx.js?v='+BUILD,'fttx-prices.json','entra-client.js','manifest.webmanifest','icon-192.png','icon-512.png'].map(p=>new URL(p,BASE).href);
-const PATHS = new Set(FILES.map(url=>new URL(url).pathname));
+const FILES = ['index.html','portal.css?v='+BUILD,'portal.js?v='+BUILD,'voanet.png','config.js?v='+BUILD,'google-sync.js?v='+BUILD,'google-features.js?v='+BUILD,'google-pdf.js?v='+BUILD,'google-access.js?v='+BUILD,'fttx-catalog.js?v='+BUILD,'fttx-export.js?v='+BUILD,'fttx.js?v='+BUILD,'fttx-prices.json','entra-client.js','manifest.webmanifest','icon-192.png','icon-512.png'].map(p=>new URL(p,BASE).href);
+const PATHS = new Set([...FILES, 'vendor/pdf-lib-1.17.1.min.js', 'vendor/exceljs-4.4.0.min.js'].map(url=>new URL(url,BASE).pathname));
 self.addEventListener('install',e=>e.waitUntil((async()=>{
   const cache=await caches.open(CACHE);
   await cache.addAll(FILES.map(url=>new Request(url,{cache:'reload'})));

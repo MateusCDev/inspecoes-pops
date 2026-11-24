@@ -180,7 +180,7 @@ function inv13View(r){inv13(r);
  const txCards=r.invTransceivers.map((t,i)=>`<div class="card" style="border-color:#e1e6ec"><div class="card-head"><h3>Transceiver ${i+1} · ${esc(t.tipo||'Não identificado')}</h3>${button('inv13-del-tx:'+t.id,'Remover','danger tiny')}</div><div class="grid">
  ${inv13Select('tx',t.id,'equipamentoId',t.equipamentoId,'Equipamento vinculado',['',...options.map(x=>x.id)])}
  ${inv13Input('tx',t.id,'porta',t.porta,'Porta / interface (ex.: xe-0/0/0)')}
- ${inv13Select('tx',t.id,'tipo',t.tipo,'Tipo',['SFP','SFP+','QSFP+','QSFP28','Outro'])}
+ ${inv13Select('tx',t.id,'tipo',t.tipo,'Tipo',['SFP','SFP+','QSFP+','QSFP28','GPON','Outro'])}
  ${inv13Input('tx',t.id,'velocidade',t.velocidade,'Velocidade nominal (Gbps)','number')}
  ${inv13Input('tx',t.id,'fabricante',t.fabricante,'Fabricante')}
  ${inv13Input('tx',t.id,'modelo',t.modelo,'Modelo / part number')}

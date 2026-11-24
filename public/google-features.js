@@ -161,6 +161,10 @@ async function googleOpenActionPlan(id){
     }else content.innerHTML=`<p role="alert">${esc(error.message)}</p>`;
   }
 }
+function googleAssetValue(value){
+  const text=String(value??'').trim();
+  return text.replace(/(^|\s)#(?:ERROR!|ERRO!|REF!|DIV\/0!|VALUE!|N\/A|NUM!|NAME\?|NULL!)(?=\s|$)/gi,'$1Dado indisponível');
+}
 async function googleShowInventory(id,central=false){
   const session=googleSession;
   const title=central?'Cadastro central do POP':'Equipamentos da vistoria';
@@ -171,8 +175,9 @@ async function googleShowInventory(id,central=false){
     if(session!==googleSession||!dialog.open)return;
     if(!Array.isArray(result.groups))throw Error('O serviço não trouxe o inventário.');
     content.innerHTML=result.groups.length?result.groups.map(group=>`<section>
-      <h3>${esc(group.label)}</h3><ul>${group.items.map(item=>`<li><strong>${esc(item.name)}</strong>
-      ${esc([item.serial&&'Série '+item.serial,item.asset&&'Patrimônio '+item.asset,item.status].filter(Boolean).join(' · '))}</li>`).join('')}</ul></section>`).join('')
+      <h3>${esc(group.label)}</h3><ul>${group.items.map(item=>`<li><strong>${esc(googleAssetValue(item.name))}</strong>
+      ${esc([item.serial&&'Série '+item.serial,item.asset&&'Patrimônio '+item.asset,item.status].filter(Boolean).map(googleAssetValue).join(' · '))}
+      ${item.observation?`<div class="small muted">${esc(googleAssetValue(item.observation))}</div>`:''}</li>`).join('')}</ul></section>`).join('')
       :central?'<p>Nenhum equipamento consta no cadastro central deste POP.</p>':'<p>Nenhum equipamento foi registrado nesta inspeção.</p>';
   }catch(error){if(session===googleSession&&dialog.open)content.innerHTML=`<p role="alert">${esc(error.message)}</p>`;}
 }

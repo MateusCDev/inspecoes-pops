@@ -216,7 +216,7 @@ test('corrige Outro em porta GPON de OLT sem alterar os outros tipos ou o envio 
  r.inventory=[{id:'OLT-1',tipo:'OLT DA1',modelo:'DM4615',serial:'OLT-S1',confirmacao:'Confirmado na etiqueta'}];
  r.inventoryReview={transceivers:'alterado'};
  r.invTransceivers=[
-  {id:'TX1',tipo:'Outro',modelo:'M1',serie:'S1',equipamentoId:'OLT-1',porta:'GPON 1/1/1'},
+  {id:'TX1',tipo:'Outro',modelo:'M1',serie:'S1',equipamentoId:'OLT-1',porta:'GPON 1/1/1',estado:'Instalado'},
   {id:'TX2',tipo:'Outro',modelo:'M2',serie:'S2',equipamentoId:'OLT-1',porta:'Ten-Gigabit-ethernet 1/1/1'},
   {id:'TX3',tipo:'SFP+',modelo:'M3',serie:'S3',equipamentoId:'OLT-1',porta:'GPON 1/1/3'}
  ];
@@ -225,6 +225,10 @@ test('corrige Outro em porta GPON de OLT sem alterar os outros tipos ou o envio 
  assert.deepEqual(inventory.transceivers.map(item=>item.tipo),['GPON','Outro','SFP+']);
  const detail=h.request({action:'inspectionAssets',inspectionId:r.id},'manager');
  assert.equal(detail.groups.find(g=>g.label==='Transceivers').items[0].name,'M1 · GPON');
+ const central=h.request({action:'centralAssetsForInspection',inspectionId:r.id},'manager');
+ const transceiver=central.groups.find(g=>g.label==='Ativos').items.find(item=>item.serial==='S1');
+ assert.equal(transceiver.status,'');
+ assert.equal(transceiver.observation,'Situação na vistoria: Instalado.');
  assert.equal(h.request({action:'reprocessAssets',inspectionId:r.id},'manager').pending,true);
  assert.equal(h.request({action:'process',inspectionId:r.id},'manager').ok,true);
  const assets=h.assets.Ativos;

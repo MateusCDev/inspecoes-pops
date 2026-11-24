@@ -66,7 +66,15 @@ function assetCandidates_(r){
     push('Retificadores',item,{'Estação':r.nome,'Modelo':item.modelo,'Fabricante':item.fabricante,'Módulos':item.urInstaladas,'Corrente (A) (TOTAL)':item.capacidadeCC,'Tensão (V)':item.tensao,'UR 01':item.ur01,'UR 02':item.ur02,'UR 03':item.ur03,'UR 04':item.ur04,'Data de Verficação':assetDate_(r.data),'Proxima Verificação':assetDate_(r.scheduleDueDate),'Observações':item.observacao},'Retificadora');
   }
   for(const item of r.equipamentos?.dios||[]){if(reviewed_(r,'dios'))generic(item,'Transmissão','DIO');else warnings.push('DIO não conferido: '+(item.identificacao||item.id));}
-  for(const item of classifiedTransceivers_(r)){if(reviewed_(r,'transceivers'))generic(item,'Transmissão','Transceiver '+(item.tipo||''));else warnings.push('Transceiver não conferido: '+(item.serie||item.id));}
+  for(const item of classifiedTransceivers_(r)){
+    if(!reviewed_(r,'transceivers')){
+      warnings.push('Transceiver não conferido: '+(item.serie||item.id));
+      continue;
+    }
+    const condition=String(item.estado??'').trim();
+    const observation=condition&&!assetState_(condition)?'Situação na vistoria: '+condition+'.':undefined;
+    generic(item,'Transmissão','Transceiver '+(item.tipo||''),{'Observações':item.observacao||item.observacoes||observation});
+  }
   for(const bank of r.invBatteryBanks||[]){
     const units=bank.baterias||[];
     const label=bank.identificacao||bank.id;
@@ -241,6 +249,9 @@ function syncAssets_(r,version){
       const row=found?.index||appendNativeAssetRow_(table),fieldWarnings=[];
       const patch={...candidate.values,ID_Ativo:id,Codigo_POP:r.codigoPop,'Nº Série':candidate.serial,'Patrimônio':candidate.patr,[ASSET_TABS[candidate.tab].date||'Data_Ultima_Inspecao']:assetDate_(r.data),ID_Ultima_Inspecao:r.id,Versao_Inspecao:r.updated};
       if(candidate.tab==='Controle_Baterias'&&found?.row[h.indexOf('Descrição')])delete patch.Descrição;
+      const previousNote=found?.row[h.indexOf('Observações')];
+      if(previousNote&&/^Transceiver /.test(candidate.values.Equipamento||'')&&!candidate.item.observacao&&!candidate.item.observacoes
+        &&!/^Situação na vistoria: [^.]+\.$/.test(previousNote))delete patch.Observações;
       const written=writeAssetPatch_(table,row,patch,fieldWarnings);
       const action=!found?'CRIADO':written.changed?'ATUALIZADO':'SEM_ALTERACAO';
       if(!found)result.created++;else if(written.changed)result.updated++;else result.unchanged++;
@@ -324,7 +335,7 @@ function centralAssetsForInspection_(input,user){
       &&stationAssetKey_(row[headers.indexOf(config.station)])===stationAssetKey_(record.nome)).map(row=>{
       const get=name=>row[headers.indexOf(name)];
       return {name:[get('Equipamento')||get('Descrição'),get('Fabricante'),get('Modelo')].filter(Boolean).join(' · '),
-        serial:get('Nº Série'),asset:get('Patrimônio'),status:get('Status')};
+        serial:get('Nº Série'),asset:get('Patrimônio'),status:get('Status'),observation:get('Observações')};
     });
     return {label:tab,items};
   }).filter(group=>group.items.length);

@@ -1,6 +1,12 @@
 'use strict';
 
 const FTTX_FIBERS=[6,12,24,36];
+const FTTX_STEPS=[
+  ['Lançamento','fttx-project-heading'],
+  ['CTO','fttx-cto-heading'],
+  ['CEO / CEP','fttx-box-heading'],
+  ['Revisão e exportação','fttx-list-heading']
+];
 const FTTX_CABLE_FIELDS=[['meters','Cabo lançado (m)'],['cto','CTOs comuns'],['endCto','CTOs de ponta'],['ceo','CEOs']];
 const FTTX_ROUTE_FIELDS=[
   ['poles','Postes no trajeto','Conte cada poste uma vez. O sistema inclui uma plaqueta de cabo por poste.'],
@@ -88,19 +94,19 @@ function calculateFttx(draft){
     ...FTTX_CATALOG.map(([title,items])=>({title,items:items.map(([name,unit])=>[name,unit,getExtra(name,unit)])}))
   ].map(group=>({...group,items:group.items.filter(item=>item[2]>0)}));
   function getExtra(name,unit){return fttxQuantity(draft.extras?.[name],unit!=='un');}
-  const alerts=[];
+  const issues=[];
   if(Math.max(asPoles,ctoPoles,guidePoles)>poles||guidePoles+Math.max(asPoles,ctoPoles)>poles){
-    alerts.push('Confira os totais de postes. Os postes classificados precisam caber no total do trajeto.');
+    issues.push({step:1,text:'Confira os totais. Os postes com CTO, cabo AS ou guia precisam caber no total de postes do trajeto.'});
   }
   if(ctoTotal&&(!ctoPoles||ctoPoles>ctoTotal)){
-    alerts.push('Informe os postes distintos com CTO. A contagem precisa ser de pelo menos um poste e não pode exceder o número de CTOs.');
+    issues.push({step:2,text:'Informe de 1 a '+ctoTotal+' postes com CTO. Se for uma caixa por poste, use o atalho na etapa CTO.'});
   }else if(ctoPoles&&!ctoTotal){
-    alerts.push('Distribua as CTOs por bitola para calcular as reservas e os acessórios.');
+    issues.push({step:2,text:'Informe quantas CTOs comuns e de ponta há em cada bitola.'});
   }
   if(get('dielectricGroups')&&poles<3){
-    alerts.push('A configuração padrão de suporte dielétrico precisa de pelo menos três postes.');
+    issues.push({step:1,text:'Confira os suportes dielétricos. Cada grupo informado precisa de pelo menos três postes no trajeto.'});
   }
-  return {cables,groups,cableTotal:fttxQuantity(cableTotal,true),reserveTotal,routeTotal:fttxQuantity(routeTotal,true),alerts};
+  return {cables,groups,cableTotal:fttxQuantity(cableTotal,true),reserveTotal,routeTotal:fttxQuantity(routeTotal,true),issues,alerts:issues.map(issue=>issue.text)};
 }
 
 function loadFttxDraft(){
@@ -201,26 +207,92 @@ function updateFttxPrices(){
   const current=document.querySelector('.fttx-prices');
   if(!current)return;
   const next=document.createElement('template');
-  next.innerHTML=fttxResults(calculateFttx(fttxDraft));
+  const result=calculateFttx(fttxDraft);
+  next.innerHTML=fttxResults(result);
   const selector='summary,[data-fttx-price-result]';
   const fresh=next.content.querySelector('.fttx-prices').querySelectorAll(selector);
   current.querySelectorAll(selector).forEach((node,index)=>node.replaceChildren(...fresh[index].childNodes));
   const inputs=next.content.querySelectorAll('[data-fttx-price]');
   current.querySelectorAll('[data-fttx-price]').forEach((node,index)=>{node.placeholder=inputs[index].placeholder;});
+  updateFttxOverview(result);
   for(const selector of ['#fttx-cost-summary','.fttx-materials']){
     const fresh=next.content.querySelectorAll(selector);
     document.querySelectorAll(selector).forEach((node,index)=>node.replaceWith(fresh[index]));
   }
 }
 
+function currentFttxStep(){
+  return [1,2,3,4].includes(fttxDraft.step)?fttxDraft.step:1;
+}
+
+function fttxOverview(result){
+  const {items,missing,subtotal}=fttxCostRows(result.groups);
+  const meters=value=>fttxQuantityFormat.format(value)+' m';
+  return `<dl class="fttx-overview">
+    <div><dt>Trajeto</dt><dd>${meters(result.routeTotal)}</dd></div>
+    <div><dt>Cabo com reserva</dt><dd>${meters(result.cableTotal)}</dd></div>
+    <div><dt>Estimativa de materiais</dt><dd>${subtotal===null?'—':fttxCurrency.format(subtotal)}</dd>
+    ${items.length&&missing?`<small>${missing} de ${items.length} linhas sem preço</small>`:''}</div>
+  </dl>`;
+}
+
+function updateFttxOverview(result){
+  const overview=document.getElementById('fttx-overview');
+  if(overview)overview.innerHTML=fttxOverview(result);
+}
+
+function fttxIssues(result,step){
+  const issues=step===4?result.issues:result.issues.filter(issue=>issue.step===step);
+  if(!issues.length)return '';
+  return `<div class="fttx-alert"><strong>${step===4?'Ajuste os campos indicados para exportar':'Confira nesta etapa'}</strong>
+    <ul>${issues.map(({text,step:target})=>`<li>${text}
+    ${step===4?`<button type="button" class="btn tiny" data-fttx-step="${target}">Revisar ${FTTX_STEPS[target-1][0]}</button>`:''}
+    </li>`).join('')}</ul></div>`;
+}
+
 function updateFttxResults(){
   const result=calculateFttx(fttxDraft);
+  updateFttxOverview(result);
+  document.querySelectorAll('[data-fttx-issues]').forEach(target=>{
+    const message=fttxIssues(result,Number(target.dataset.fttxIssues));
+    if(target.innerHTML!==message)target.innerHTML=message;
+  });
+  if(currentFttxStep()!==4)return;
   const target=document.getElementById('fttx-results');
   if(!target)return;
   fttxPriceOpen=target.querySelector('.fttx-prices')?.open??fttxPriceOpen;
   target.innerHTML=fttxResults(result);
   const disabled=result.alerts.length>0||!result.groups.some(group=>group.items.length);
   document.querySelectorAll('[data-fttx-export]').forEach(button=>{button.disabled=disabled;});
+}
+
+function goFttxStep(step){
+  const [label,headingId]=FTTX_STEPS[step-1];
+  const heading=document.getElementById(headingId);
+  fttxDraft.step=step;
+  document.querySelectorAll('[data-fttx-panel]').forEach(panel=>{
+    panel.hidden=Number(panel.dataset.fttxPanel)!==step;
+  });
+  document.querySelectorAll('.fttx-navigation [data-fttx-step]').forEach(button=>{
+    if(Number(button.dataset.fttxStep)===step)button.setAttribute('aria-current','step');
+    else button.removeAttribute('aria-current');
+  });
+  document.getElementById('fttx-step-status').textContent=`Etapa ${step} de ${FTTX_STEPS.length} · ${label}`;
+  if((step===2||step===3)&&FTTX_FIBERS.some(fibers=>fibers!==12&&fttxQuantity(fttxDraft.cables?.[fibers]?.meters,true)>0)){
+    heading.closest('[data-fttx-panel]').querySelector('[data-fttx-other-cables]').open=true;
+  }
+  persistFttx();
+  updateFttxResults();
+  heading.focus({preventScroll:true});
+  document.getElementById('fttx-overview').scrollIntoView({block:'start'});
+}
+
+function fttxStepActions(step){
+  const next=['','Continuar para CTO','Continuar para CEO / CEP','Revisar lista'];
+  return `<div class="fttx-step-actions">
+    ${step>1?`<button type="button" class="btn" data-fttx-step="${step-1}">Voltar</button>`:''}
+    ${step<4?`<button type="button" class="btn primary" data-fttx-step="${step+1}">${next[step]} →</button>`:''}
+  </div>`;
 }
 
 function fttxInput(field,label,help,decimal=false){
@@ -241,8 +313,8 @@ function fttxCableInputs(fields){
     }).join('')}</div></fieldset>`;
   };
   const otherFibers=FTTX_FIBERS.filter(fibers=>fibers!==12);
-  const expanded=otherFibers.some(fibers=>fields.some(field=>fttxQuantity(fttxDraft.cables?.[fibers]?.[field],true)>0));
-  return `${inputGroup(12)}<details class="fttx-options" ${expanded?'open':''}><summary>Outras bitolas · 06, 24 e 36 FO</summary>
+  const expanded=otherFibers.some(fibers=>[...fields,'meters'].some(field=>fttxQuantity(fttxDraft.cables?.[fibers]?.[field],true)>0));
+  return `${inputGroup(12)}<details class="fttx-options" data-fttx-other-cables ${expanded?'open':''}><summary>Outras bitolas · 06, 24 e 36 FO</summary>
     <div class="fttx-other-cables">${otherFibers.map(inputGroup).join('')}</div></details>`;
 }
 
@@ -261,18 +333,12 @@ function fttxCatalogOptions(query=''){
   return `<option value="">${options?'Selecione um material':'Nenhum material encontrado'}</option>${options}`;
 }
 
-function fttxResults({cables,groups,cableTotal,reserveTotal,routeTotal,alerts}){
+function fttxResults({cables,groups}){
   const f=value=>fttxQuantityFormat.format(value);
   const shown=cables.filter(c=>c.total>0);
   const {items}=fttxCostRows(groups);
   const money=value=>value===null?'—':fttxCurrency.format(value);
-  return `<div class="grid3 fttx-totals">
-    <div class="stat"><strong>${f(routeTotal)} m</strong><span>Cabo lançado</span></div>
-    <div class="stat"><strong>${f(reserveTotal)} m</strong><span>Reserva técnica</span></div>
-    <div class="stat"><strong>${f(cableTotal)} m</strong><span>Total de cabo</span></div>
-  </div>
-  <div id="fttx-cost-summary" class="fttx-cost-summary">${fttxCostSummary(groups)}</div>
-  ${alerts.length?`<ul class="fttx-alert" role="status">${alerts.map(alert=>`<li>${alert}</li>`).join('')}</ul>`:''}
+  return `<div id="fttx-cost-summary" class="fttx-cost-summary">${fttxCostSummary(groups)}</div>
   ${shown.length?`<h3>Reserva por bitola</h3><div class="table-scroll"><table class="data-table">
     <thead><tr><th>Bitola</th><th>CTOs</th><th>CEOs</th><th>A cada 500 m</th><th>Reserva</th><th>Cabo total</th></tr></thead>
     <tbody>${shown.map(c=>`<tr><th scope="row">${String(c.fibers).padStart(2,'0')} FO</th>
@@ -294,18 +360,24 @@ function fttxResults({cables,groups,cableTotal,reserveTotal,routeTotal,alerts}){
 }
 
 function renderFttx(){
-  const result=calculateFttx(fttxDraft);
+  const result=calculateFttx(fttxDraft),step=currentFttxStep();
+  const panel=number=>`class="card fttx-panel" data-fttx-panel="${number}" ${step!==number?'hidden':''}`;
+  const issues=number=>`<div data-fttx-issues="${number}" role="status">${fttxIssues(result,number)}</div>`;
   return `<main class="shell fttx-shell">
     <div class="home-hero"><div><h1>Levantamento FTTx</h1>
       <p>Monte uma estimativa de materiais para o orçamento preliminar do projeto.</p></div>${isGoogleMode()?'':button('home','Voltar à Gestão','primary')}</div>
+    <div id="fttx-overview">${fttxOverview(result)}</div>
+    <div class="fttx-wizard-head">
+      <p id="fttx-step-status">Etapa ${step} de ${FTTX_STEPS.length} · ${FTTX_STEPS[step-1][0]}</p>
+      <p class="small muted" id="fttx-save" role="status">${fttxSaveError?'Armazenamento local indisponível.':'Rascunho neste dispositivo'}</p>
+    </div>
     <nav class="fttx-navigation" aria-label="Etapas do levantamento">
-      <button type="button" class="btn tiny" data-fttx-jump="fttx-project-heading">1. Lançamento</button>
-      <button type="button" class="btn tiny" data-fttx-jump="fttx-cto-heading">2. CTO</button>
-      <button type="button" class="btn tiny" data-fttx-jump="fttx-box-heading">3. CEO / CEP</button>
-      <button type="button" class="btn tiny" data-fttx-jump="fttx-list-heading">4. Lista e estimativa</button>
+      ${FTTX_STEPS.map(([label],index)=>`<button type="button" class="btn tiny" data-fttx-step="${index+1}"
+        ${index+1===step?'aria-current="step"':''}><span aria-hidden="true">${index+1}</span>${label}</button>`).join('')}
     </nav>
-    <section class="card">
-      <div class="card-head">${fttxStep(1,'fttx-project-heading','Lançamento de cabo e postes')}<p class="small muted" id="fttx-save" role="status">${fttxSaveError?'Armazenamento local indisponível.':'Rascunho neste dispositivo'}</p></div>
+    <section ${panel(1)} aria-labelledby="fttx-project-heading">
+      ${fttxStep(1,'fttx-project-heading','Lançamento de cabo e postes')}
+      ${issues(1)}
       <p>Comece pelo cabo e pelos postes do trajeto. Use as quantidades previstas no mapa ou no projeto. Você pode deixar em branco as quantidades que ainda precisa confirmar.</p>
       <label class="fttx-field fttx-project"><span>Nome do projeto</span><input maxlength="100" data-fttx-field="name" placeholder="Ex.: Expansão Curralinho" value="${esc(fttxDraft.name??'')}"></label>
       <h3>Cabo por número de fibras (FO)</h3>
@@ -320,47 +392,53 @@ function renderFttx(){
         <p class="small muted">Preencha os itens que já consegue estimar pelo traçado. Deixe os demais para a conferência de campo.</p>
         <div class="fttx-fields">${FTTX_ROUTE_DETAILS.map(([field,label,help])=>fttxInput(field,label,help)).join('')}</div>
       </details>
+      ${fttxStepActions(1)}
     </section>
-    <section class="card">
+    <section ${panel(2)} aria-labelledby="fttx-cto-heading">
       ${fttxStep(2,'fttx-cto-heading','Montagem de CTO')}
-      <p>CTO é a caixa de atendimento aos clientes. Conte as caixas no trecho e separe as de ponta, que ficam no final do ramal. Lance cada caixa uma vez na bitola do cabo em que a sobra será reservada.</p>
+      ${issues(2)}
+      <p>Conte as caixas de atendimento (CTOs). Separe as comuns das de ponta, que ficam no fim do ramal. Informe cada caixa na bitola do cabo que terá a reserva.</p>
       ${fttxCableInputs(['cto','endCto'])}
       <div class="fttx-fields">${fttxInput('ctoPoles','Postes com CTO','Conte os postes distintos. Se duas caixas estiverem no mesmo poste, conte apenas um poste.')}</div>
       <button type="button" class="btn tiny fttx-suggestion" data-fttx-suggestion="ctoPoles">Estimar uma CTO por poste</button>
       <p class="small muted">Por caixa, o sistema inclui 1 plaqueta, 3 m de fita de aço, 2 fechos e 6 anéis guia. Também inclui 1 olhal básico por poste com CTO. A reserva é de 22 m por CTO comum e 12,5 m por CTO de ponta.</p>
+      ${fttxStepActions(2)}
     </section>
-    <section class="card">
+    <section ${panel(3)} aria-labelledby="fttx-box-heading">
       ${fttxStep(3,'fttx-box-heading','Montagem de CEO / CEP')}
-      <p>Conte as caixas de emenda previstas. Informe cada CEO na bitola em que será guardada a reserva. Para CEO, o sistema soma 20 m de cabo e 2 alças de cordoalha por caixa. Para cada CEO ou CEP, inclui 1 conjunto de reserva técnica e 1 plaqueta.</p>
+      <p>Informe as caixas de emenda previstas. Cada CEO soma 20 m de cabo na bitola indicada e 2 alças de cordoalha. Cada CEO ou CEP inclui 1 conjunto de reserva e 1 plaqueta.</p>
       ${fttxCableInputs(['ceo'])}
       <div class="fttx-fields">${fttxInput(...FTTX_BOX_FIELDS[0])}</div>
       <details class="fttx-options" ${FTTX_BOX_FIELDS.slice(1).some(([key])=>fttxQuantity(fttxDraft[key],true)>0)?'open':''}>
         <summary>Detalhar componentes das caixas de emenda</summary>
         <div class="fttx-fields">${FTTX_BOX_FIELDS.slice(1).map(([field,label,help])=>fttxInput(field,label,help,field==='strand')).join('')}</div>
       </details>
+      ${fttxStepActions(3)}
     </section>
-    <details class="card fttx-options fttx-catalog" ${Object.keys(fttxDraft.extras||{}).length?'open':''}>
-      <summary>Adicionar outros materiais do catálogo</summary>
-      <form id="fttx-catalog-form" class="fttx-fields">
-        <label class="fttx-field"><span>Buscar no catálogo</span><input type="search" id="fttx-search" placeholder="Ex.: DIO, OLT ou microduto"></label>
-        <label class="fttx-field"><span id="fttx-material-label">Material</span><select id="fttx-catalog-item" aria-labelledby="fttx-material-label" required>${fttxCatalogOptions()}</select></label>
-        <label class="fttx-field"><span>Quantidade</span><input id="fttx-catalog-quantity" type="number" min="0" step="0.01" inputmode="decimal" required></label>
-        <button class="btn" type="submit">Aplicar quantidade</button>
-      </form>
-      <p class="small muted" id="fttx-catalog-status" role="status">Informe zero para retirar um material complementar da lista.</p>
-    </details>
-    <section class="card">
+    <section ${panel(4)} aria-labelledby="fttx-list-heading">
       <div class="card-head">${fttxStep(4,'fttx-list-heading','Lista para o almoxarifado')}
         <div class="btnrow" aria-label="Exportar materiais">${[['pdf','Baixar PDF','primary'],['xlsx','Baixar Excel',''],['csv','Baixar CSV','']]
           .map(([format,label,style])=>`<button type="button" class="btn ${style}" data-fttx-export="${format}"
           ${result.alerts.length||!result.groups.some(group=>group.items.length)?'disabled':''}>${label}</button>`).join('')}</div></div>
       <p id="fttx-export-status" class="small muted fttx-export-status" role="status"></p>
-      <p class="small muted">Revise a lista por etapa. A reserva já inclui 50 m a cada 500 m completos do trajeto por bitola. Complete os preços em “Estimativa de materiais” e confira o traçado e as quantidades antes de enviar ao almoxarifado.</p>
+      <p class="small muted">Revise as quantidades por etapa e ajuste os preços antes de baixar o levantamento preliminar.</p>
+      ${issues(4)}
+      <details class="fttx-options fttx-catalog" ${Object.keys(fttxDraft.extras||{}).length?'open':''}>
+        <summary>Adicionar outros materiais do catálogo</summary>
+        <form id="fttx-catalog-form" class="fttx-fields">
+          <label class="fttx-field"><span>Buscar no catálogo</span><input type="search" id="fttx-search" placeholder="Ex.: DIO, OLT ou microduto"></label>
+          <label class="fttx-field"><span id="fttx-material-label">Material</span><select id="fttx-catalog-item" aria-labelledby="fttx-material-label" required>${fttxCatalogOptions()}</select></label>
+          <label class="fttx-field"><span>Quantidade</span><input id="fttx-catalog-quantity" type="number" min="0" step="0.01" inputmode="decimal" required></label>
+          <button class="btn" type="submit">Aplicar quantidade</button>
+        </form>
+        <p class="small muted" id="fttx-catalog-status" role="status">Informe zero para retirar um material complementar da lista.</p>
+      </details>
       <details class="fttx-options">
         <summary>Ver um exemplo de cálculo da reserva</summary>
         <p class="small muted">Para 1.000 m de cabo de 12 FO, 2 CTOs comuns, 1 CTO de ponta e 1 CEO na mesma bitola, a reserva é de 176,5 m. São 100 m pelo trajeto, 44 m pelas CTOs comuns, 12,5 m pela CTO de ponta e 20 m pela CEO. O cabo previsto fica em 1.176,5 m.</p>
       </details>
-      <div id="fttx-results">${fttxResults(result)}</div>
+      <div id="fttx-results">${step===4?fttxResults(result):''}</div>
+      ${fttxStepActions(4)}
     </section>
   </main>`;
 }
@@ -458,6 +536,8 @@ document.addEventListener('click',event=>{
 
 document.addEventListener('input',saveFttx);
 document.addEventListener('click',event=>{
+  const step=event.target.closest('[data-fttx-step]');
+  if(step&&fttxActive())return goFttxStep(Number(step.dataset.fttxStep));
   const suggestion=event.target.closest('[data-fttx-suggestion]');
   if(suggestion&&fttxActive()){
     const field=suggestion.dataset.fttxSuggestion;

@@ -37,6 +37,14 @@ function commonBattery_(units,key){
   const values=units.map(unit=>String(unit[key]??'').trim()).filter(Boolean);
   return new Set(values.map(normalizeAsset_)).size===1?values[0]:undefined;
 }
+function classifiedTransceivers_(record){
+  const oltIds=new Set((record.inventory||[]).filter(item=>/^OLT\b/.test(normalizeAsset_(item.tipo))).map(item=>item.id));
+  return (record.invTransceivers||[]).map(item=>{
+    const gponPort=/^GPON\s+\d+\/\d+\/\d+$/.test(normalizeAsset_(item.porta));
+    return normalizeAsset_(item.tipo)==='OUTRO'&&gponPort&&oltIds.has(item.equipamentoId)
+      ? {...item,tipo:'GPON'} : item;
+  });
+}
 function assetCandidates_(r){
   const candidates=[],warnings=[];
   const push=(tab,item,values,kind)=>candidates.push({tab,item,values,kind,serial:item.serie||item.serial||'',patr:item.patrimonio||'',ref:item.centralId||'',label:item.modelo||item.identificacao||kind});
@@ -58,7 +66,7 @@ function assetCandidates_(r){
     push('Retificadores',item,{'Estação':r.nome,'Modelo':item.modelo,'Fabricante':item.fabricante,'Módulos':item.urInstaladas,'Corrente (A) (TOTAL)':item.capacidadeCC,'Tensão (V)':item.tensao,'UR 01':item.ur01,'UR 02':item.ur02,'UR 03':item.ur03,'UR 04':item.ur04,'Data de Verficação':assetDate_(r.data),'Proxima Verificação':assetDate_(r.scheduleDueDate),'Observações':item.observacao},'Retificadora');
   }
   for(const item of r.equipamentos?.dios||[]){if(reviewed_(r,'dios'))generic(item,'Transmissão','DIO');else warnings.push('DIO não conferido: '+(item.identificacao||item.id));}
-  for(const item of r.invTransceivers||[]){if(reviewed_(r,'transceivers'))generic(item,'Transmissão','Transceiver '+(item.tipo||''));else warnings.push('Transceiver não conferido: '+(item.serie||item.id));}
+  for(const item of classifiedTransceivers_(r)){if(reviewed_(r,'transceivers'))generic(item,'Transmissão','Transceiver '+(item.tipo||''));else warnings.push('Transceiver não conferido: '+(item.serie||item.id));}
   for(const bank of r.invBatteryBanks||[]){
     const units=bank.baterias||[];
     const label=bank.identificacao||bank.id;
@@ -271,7 +279,7 @@ function inspectionAssets_(input,user){
   const banks=record.invBatteryBanks?.length?record.invBatteryBanks:(record.equipamentos?.bancos||[]);
   const groups=[
     ['Equipamentos de rede',record.inventory],
-    ['Transceivers',record.invTransceivers],
+    ['Transceivers',classifiedTransceivers_(record)],
     ['Climatização',record.equipamentos?.climatizadores],
     ['Retificadores',record.equipamentos?.retificadoras],
     ['DIOs',record.equipamentos?.dios],
@@ -279,7 +287,8 @@ function inspectionAssets_(input,user){
     ['Baterias',banks.flatMap(bank=>bank.baterias||[])]
   ].filter(([,items])=>Array.isArray(items)&&items.length).map(([label,items])=>({
     label,items:items.map(item=>({
-      name:String(item.modelo||item.identificacao||item.tipo||'Sem identificação').slice(0,130),
+      name:String(label==='Transceivers'&&item.tipo==='GPON'&&item.modelo
+        ? item.modelo+' · GPON' : item.modelo||item.identificacao||item.tipo||'Sem identificação').slice(0,130),
       serial:String(item.serie||item.serial||'').slice(0,80),
       asset:String(item.patrimonio||'').slice(0,80),
       status:String(item.estado||item.confirmacao||'').slice(0,90)

@@ -210,3 +210,26 @@ test('banco com série repetida para patrimônios diferentes não grava ativos d
  assert.equal(value(h,'Controle_Baterias',1,'Descrição'),'Referência das etiquetas');
  assert.equal(value(h,'Controle_Baterias',1,'Nº Série'),'S1, S2');
 });
+
+test('corrige Outro em porta GPON de OLT sem alterar os outros tipos ou o envio original',()=>{
+ const h=harness(),r=h.record();
+ r.inventory=[{id:'OLT-1',tipo:'OLT DA1',modelo:'DM4615',serial:'OLT-S1',confirmacao:'Confirmado na etiqueta'}];
+ r.inventoryReview={transceivers:'alterado'};
+ r.invTransceivers=[
+  {id:'TX1',tipo:'Outro',modelo:'M1',serie:'S1',equipamentoId:'OLT-1',porta:'GPON 1/1/1'},
+  {id:'TX2',tipo:'Outro',modelo:'M2',serie:'S2',equipamentoId:'OLT-1',porta:'Ten-Gigabit-ethernet 1/1/1'},
+  {id:'TX3',tipo:'SFP+',modelo:'M3',serie:'S3',equipamentoId:'OLT-1',porta:'GPON 1/1/3'}
+ ];
+ assert.equal(h.send(r).ok,true);
+ const inventory=JSON.parse(h.rows[1][h.rows[0].indexOf('inventario_json')]);
+ assert.deepEqual(inventory.transceivers.map(item=>item.tipo),['GPON','Outro','SFP+']);
+ const detail=h.request({action:'inspectionAssets',inspectionId:r.id},'manager');
+ assert.equal(detail.groups.find(g=>g.label==='Transceivers').items[0].name,'M1 · GPON');
+ assert.equal(h.request({action:'reprocessAssets',inspectionId:r.id},'manager').pending,true);
+ assert.equal(h.request({action:'process',inspectionId:r.id},'manager').ok,true);
+ const assets=h.assets.Ativos;
+ const gear=row=>row[assets[0].indexOf('Equipamento')];
+ assert.deepEqual(assets.slice(1).map(gear).filter(g=>g.startsWith('Transceiver')).sort(),
+  ['Transceiver GPON','Transceiver Outro','Transceiver SFP+']);
+ assert.equal(r.invTransceivers[0].tipo,'Outro');
+});

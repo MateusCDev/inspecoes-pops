@@ -58,7 +58,7 @@ function row_(r, result, operator, hash) {
     ...readings.map(([k])=>r.readings?.[k]),
     ...groups.flatMap(g=>g.items.flatMap(([id])=>[r.checks?.[id]?.status||'NV',r.checks?.[id]?.note||''])),
     r.interligacoes?.status||'NV',r.interligacoes?.observacoes,
-    JSON.stringify(r.issues||[]),JSON.stringify({inventory:r.inventory,equipamentos:r.equipamentos,transceivers:r.invTransceivers,bancos:r.invBatteryBanks}),
+    JSON.stringify(r.issues||[]),JSON.stringify({inventory:r.inventory,equipamentos:r.equipamentos,transceivers:classifiedTransceivers_(r),bancos:r.invBatteryBanks}),
     result.pdfUrl,result.backupUrl,result.receivedAt,operator,hash];
   return values.map(text_);
 }

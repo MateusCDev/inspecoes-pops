@@ -775,7 +775,10 @@ function assetDate_(value){
   catch(_){return {_invalidDate:original};}
 }
 function dateKey_(value){if(!value)return '';return value instanceof Date?Utilities.formatDate(value,'America/Sao_Paulo','yyyy-MM-dd'):typeof value==='number'?new Date((value-25569)*86400000).toISOString().slice(0,10):String(value).slice(0,10);}
-function commonBattery_(units,key){const values=[...new Set(units.map(u=>u[key]).filter(v=>v!==undefined&&v!==''))];return values.length===1?values[0]:undefined;}
+function commonBattery_(units,key){
+  const values=units.map(unit=>String(unit[key]??'').trim()).filter(Boolean);
+  return new Set(values.map(normalizeAsset_)).size===1?values[0]:undefined;
+}
 function assetCandidates_(r){
   const candidates=[],warnings=[];
   const push=(tab,item,values,kind)=>candidates.push({tab,item,values,kind,serial:item.serie||item.serial||'',patr:item.patrimonio||'',ref:item.centralId||'',label:item.modelo||item.identificacao||kind});
@@ -800,8 +803,17 @@ function assetCandidates_(r){
   for(const item of r.invTransceivers||[]){if(reviewed_(r,'transceivers'))generic(item,'Transmissão','Transceiver '+(item.tipo||''));else warnings.push('Transceiver não conferido: '+(item.serie||item.id));}
   for(const bank of r.invBatteryBanks||[]){
     const units=bank.baterias||[];
+    const label=bank.identificacao||bank.id;
+    const incomplete=bank.cadastroCompleto!==true||!units.length||
+      units.some(u=>!['mantida','substituida'].includes(r.batteryReview?.[u.id])||u.estado==='Retirada');
+    if(incomplete)warnings.push('Banco incompleto, não conferido ou com retirada: '+label);
+    const identifiers=units.flatMap(unit=>[...identityTokens_(unit.serie,'S:'),...identityTokens_(unit.patrimonio,'P:')]);
+    if(new Set(identifiers).size!==identifiers.length){
+      warnings.push('Série ou patrimônio repetido no banco de baterias: '+label);
+      continue;
+    }
     for(const unit of units){if(['mantida','substituida'].includes(r.batteryReview?.[unit.id]))generic(unit,'Bateria','Bateria');}
-    if(bank.cadastroCompleto!==true||!units.length||units.some(u=>!['mantida','substituida'].includes(r.batteryReview?.[u.id])||u.estado==='Retirada')){warnings.push('Banco incompleto, não conferido ou com retirada: '+(bank.identificacao||bank.id));continue;}
+    if(incomplete)continue;
     if(!commonBattery_(units,'modelo')||!commonBattery_(units,'fabricante')){warnings.push('Banco com modelo/fabricante misto ou ausente: '+(bank.identificacao||bank.id));continue;}
     const item={...bank,serie:units.map(u=>u.serie||'').filter(Boolean).sort().join(', '),patrimonio:units.map(u=>u.patrimonio||'').filter(Boolean).sort().join(', ')};
     const technology=commonBattery_(units,'tecnologia');
@@ -962,6 +974,7 @@ function syncAssets_(r,version){
       const id=found?.row[h.indexOf('ID_Ativo')]||'AS-'+hash_(candidate.tab+'|'+r.codigoPop+'|'+(candidate.serial||candidate.patr||String(found?.index))).slice(0,24);
       const row=found?.index||appendNativeAssetRow_(table),fieldWarnings=[];
       const patch={...candidate.values,ID_Ativo:id,Codigo_POP:r.codigoPop,'Nº Série':candidate.serial,'Patrimônio':candidate.patr,[ASSET_TABS[candidate.tab].date||'Data_Ultima_Inspecao']:assetDate_(r.data),ID_Ultima_Inspecao:r.id,Versao_Inspecao:r.updated};
+      if(candidate.tab==='Controle_Baterias'&&found?.row[h.indexOf('Descrição')])delete patch.Descrição;
       const written=writeAssetPatch_(table,row,patch,fieldWarnings);
       const action=!found?'CRIADO':written.changed?'ATUALIZADO':'SEM_ALTERACAO';
       if(!found)result.created++;else if(written.changed)result.updated++;else result.unchanged++;

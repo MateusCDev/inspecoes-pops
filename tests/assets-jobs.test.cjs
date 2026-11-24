@@ -189,3 +189,24 @@ test('nova linha mantém campos opcionais vazios e recupera fórmulas ausentes n
  assert.equal(value(h,tab,2,'Próxima Manutenção'),nextMaintenance);
  assert.equal(value(h,tab,2,'Patrimônio'),'PAT-01');
 });
+
+test('banco com série repetida para patrimônios diferentes não grava ativos duplicados',()=>{
+ const h=harness(),r=h.record();
+ const bank={identificacao:'Banco 01',cadastroCompleto:true,baterias:[
+  {id:'B1',serie:'S1',patrimonio:'P1',modelo:'B150',fabricante:'Moura'},
+  {id:'B2',serie:'s1 ',patrimonio:'P2',modelo:'B150',fabricante:'Moura '}
+ ]};
+ r.invBatteryBanks=[bank];r.batteryReview={B1:'mantida',B2:'mantida'};
+ h.asset('Controle_Baterias',{'Estação':r.nome,'Fabricante':'Moura','Modelo':'B150','Patrimônio':'P1, P2','Descrição':'Referência das etiquetas'});
+ const blocked=h.send(r);
+ assert.equal(blocked.ok,true);
+ assert.match(blocked.assets.warnings[0],/Série ou patrimônio repetido/);
+ assert.equal(h.assets.Ativos.length,1);
+ assert.equal(value(h,'Controle_Baterias',1,'Nº Série'),'');
+ bank.baterias[1].serie='S2';
+ r.updated='2026-11-16T11:10:00Z';
+ const repaired=h.send(r);
+ assert.equal(repaired.assets.pending,0);
+ assert.equal(value(h,'Controle_Baterias',1,'Descrição'),'Referência das etiquetas');
+ assert.equal(value(h,'Controle_Baterias',1,'Nº Série'),'S1, S2');
+});

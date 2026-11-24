@@ -97,8 +97,7 @@ function calculateFttx(draft){
   return {cables,groups,cableTotal:fttxQuantity(cableTotal,true),reserveTotal,routeTotal:fttxQuantity(routeTotal,true),alerts};
 }
 
-function openFttx(){
-  if(!managementRoles.has(effectiveHomeRole()))return;
+function loadFttxDraft(){
   const key='voanet_fttx_draft_'+encodeURIComponent(googleUser?.email||'local');
   if(key!==fttxDraftKey){
     fttxDraftKey=key;
@@ -106,8 +105,25 @@ function openFttx(){
     try{fttxDraft=JSON.parse(localStorage.getItem(key)||'{}')||{};}
     catch(_){fttxDraft={};fttxSaveError=true;}
   }
+}
+
+function openFttx(){
+  if(!managementRoles.has(effectiveHomeRole()))return;
+  loadFttxDraft();
   navigate('fttx');
   loadFttxReferences();
+}
+
+function mountFttx(pane){
+  loadFttxDraft();
+  pane.innerHTML=renderFttx();
+  loadFttxReferences();
+}
+
+function fttxActive(){
+  return isGoogleMode()
+    ? googleUser?.role==='GESTAO'&&document.getElementById('portal-fttx-pane')?.hidden===false
+    : view==='fttx';
 }
 
 async function loadFttxReferences(){
@@ -120,7 +136,7 @@ async function loadFttxReferences(){
   }catch(_){
     fttxReferenceStatus='Referências públicas indisponíveis nesta consulta. Você pode informar preços estimados.';
   }
-  if(view==='fttx')updateFttxResults();
+  if(fttxActive())updateFttxResults();
 }
 
 function fttxMaterialKey(name){
@@ -236,7 +252,7 @@ function renderFttx(){
   const result=calculateFttx(fttxDraft);
   return `<main class="shell fttx-shell">
     <div class="home-hero"><div><h1>Levantamento FTTx</h1>
-      <p>Calcule os materiais do projeto e exporte a lista para o almoxarifado.</p></div>${button('home','Voltar à Gestão','primary')}</div>
+      <p>Calcule os materiais do projeto e exporte a lista para o almoxarifado.</p></div>${isGoogleMode()?'':button('home','Voltar à Gestão','primary')}</div>
     <section class="card">
       <div class="card-head"><h2>Projeto e trechos de cabo</h2><p class="small muted" id="fttx-save" role="status">${fttxSaveError?'Armazenamento local indisponível.':'Rascunho neste dispositivo'}</p></div>
       <label class="fttx-field fttx-project"><span>Nome do projeto</span><input maxlength="100" data-fttx-field="name" value="${esc(fttxDraft.name??'')}"></label>
@@ -291,7 +307,7 @@ function persistFttx(){
 
 function saveFttx(event){
   const input=event.target,field=input.dataset.fttxField;
-  if(!field||view!=='fttx')return;
+  if(!field||!fttxActive())return;
   if(input.dataset.fttxFiber){
     fttxDraft.cables??={};
     (fttxDraft.cables[input.dataset.fttxFiber]??={})[field]=input.value;
@@ -329,7 +345,7 @@ document.addEventListener('input',event=>{
   }
 });
 document.addEventListener('change',event=>{
-  if(view!=='fttx')return;
+  if(!fttxActive())return;
   const field=event.target;
   if(field.id==='fttx-catalog-item'){
     const quantity=document.getElementById('fttx-catalog-quantity');

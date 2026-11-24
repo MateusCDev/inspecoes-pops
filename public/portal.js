@@ -4,6 +4,8 @@
   const app = document.getElementById('app');
   const fleetPane = document.getElementById('portal-fleet-pane');
   const fleetStatus = document.getElementById('portal-fleet-status');
+  const fttxPane = document.getElementById('portal-fttx-pane');
+  const fttxLink = document.querySelector('[data-module="fttx"]');
   const navigation = document.querySelector('.portal-tabs');
   const signOut = document.getElementById('portal-signout');
   const currentScript = new URL(document.currentScript.src);
@@ -12,9 +14,11 @@
   let activeModule;
   let fleetFrame;
   let inspectionsScroll = 0;
+  let fttxScroll = 0;
 
   function moduleFromLocation() {
-    return new URL(location.href).searchParams.get('modulo') === 'frota' ? 'frota' : 'inspecoes';
+    const module = new URL(location.href).searchParams.get('modulo');
+    return ['frota','fttx'].includes(module) ? module : 'inspecoes';
   }
 
   function vehicleHash() {
@@ -24,12 +28,16 @@
   function showModule(module) {
     const changed = activeModule !== module;
     if (changed && activeModule === 'inspecoes') inspectionsScroll = window.scrollY;
+    if (changed && activeModule === 'fttx') fttxScroll = window.scrollY;
     activeModule = module;
     const showFleet = module === 'frota' && Boolean(googleUser);
-    app.hidden = showFleet;
+    const showFttx = module === 'fttx' && Boolean(googleUser);
+    app.hidden = showFleet || showFttx;
     fleetPane.hidden = !showFleet;
+    fttxPane.hidden = !showFttx;
+    fttxLink.hidden = googleUser?.role !== 'GESTAO';
     signOut.hidden = !googleUser;
-    document.body.dataset.portalModule = showFleet ? 'frota' : 'inspecoes';
+    document.body.dataset.portalModule = showFleet || showFttx ? module : 'inspecoes';
     for (const link of navigation.querySelectorAll('[data-module]')) {
       if (link.dataset.module === module) link.setAttribute('aria-current','page');
       else link.removeAttribute('aria-current');
@@ -50,13 +58,18 @@
     } else if (showFleet && vehicleHash() && fleetFrame?.contentWindow?.location.hash !== vehicleHash()) {
       fleetFrame.contentWindow.location.replace(vehicleHash());
     }
-    if (changed) window.scrollTo(0,showFleet ? 0 : inspectionsScroll);
+    if (showFttx && googleUser.role !== 'GESTAO') {
+      fttxPane.innerHTML = '<p class="portal-module-status" role="status">O Levantamento FTTx está disponível para o perfil Gestão.</p>';
+    } else if (showFttx && !fttxPane.hasChildNodes()) {
+      mountFttx(fttxPane);
+    }
+    if (changed) window.scrollTo(0,showFttx ? fttxScroll : showFleet ? 0 : inspectionsScroll);
   }
 
   function openModule(module) {
     if (module === activeModule) return;
     const url = new URL(location.href);
-    if (module === 'frota') url.searchParams.set('modulo','frota');
+    if (module === 'frota' || module === 'fttx') url.searchParams.set('modulo',module);
     else url.searchParams.delete('modulo');
     url.hash = '';
     history.pushState(null,'',url);
@@ -78,7 +91,9 @@
         fleetFrame?.remove();
         fleetFrame = null;
         fleetStatus.hidden = true;
+        fttxPane.replaceChildren();
         inspectionsScroll = 0;
+        fttxScroll = 0;
       }
       showModule(moduleFromLocation());
     },

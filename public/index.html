@@ -32,6 +32,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.52 system-ui,-ap
     <nav class="portal-tabs" aria-label="Aplicações">
       <a href="./" data-module="inspecoes" aria-current="page">Inspeções POPs</a>
       <a href="./frota/" data-module="frota">Frota</a>
+      <a href="./?modulo=fttx" data-module="fttx" hidden>FTTx</a>
     </nav>
     <div class="portal-actions"><span id="save" role="status">Dados neste dispositivo</span><button class="btn tiny" type="button" id="goHome">Estações</button><button id="portal-signout" class="btn tiny" type="button" hidden>Sair do portal</button></div>
   </div>
@@ -40,6 +41,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.52 system-ui,-ap
 <section id="portal-fleet-pane" aria-label="Frota" hidden>
   <div class="portal-module-status" id="portal-fleet-status" role="status" hidden></div>
 </section>
+<section id="portal-fttx-pane" aria-label="Levantamento FTTx" hidden></section>
 <script src="./config.js?v=__BUILD_ID__"></script>
 <script src="./google-sync.js?v=__BUILD_ID__"></script>
 <script src="./google-features.js?v=__BUILD_ID__"></script>
@@ -319,7 +321,7 @@ function renderHome(){
   ['homeSchedule','▣','Cronograma','Acompanhar inspeções previstas e vencidas'],
   ['homeIssues','☑','Planos de Ação',isGoogleMode()?'Consultar ações das inspeções recebidas da equipe':'Consultar ações das inspeções deste dispositivo'],
   ['homeAssets','▥','Gestão de Ativos','Inventário, transceivers e alertas de baterias'],
-  ['homeFttx','▤','Levantamento FTTx','Quantitativos de rede e lista para o almoxarifado'],
+  ...(!isGoogleMode()?[['homeFttx','▤','Levantamento FTTx','Quantitativos de rede e lista para o almoxarifado']]:[]),
   ['new','＋','Nova Inspeção','Realizar vistoria quando necessário']
  ];
  const technicianTiles=[
@@ -445,7 +447,7 @@ async function makeReport(){const r=cur();let photoHtml='';const categories=new 
 async function report(open){if(isBusy)return;isBusy=true;let tab=null;if(open)tab=window.open('','_blank');try{const r=cur();const html=await makeReport();if(open&&tab){tab.document.open();tab.document.write(html);tab.document.close()}else download(html,`VOANET_Relatorio_${issueId(r)}_${r.data||'vistoria'}.html`,'text/html;charset=utf-8')}catch(e){console.error(e);if(tab)tab.close();alert('Não foi possível gerar o relatório.')}finally{isBusy=false}}
 function handleAction(s){
 if(s==='homeFttx')return openFttx();
-if(s==='exportFttx'&&view==='fttx')return exportFttx();
+if(s==='exportFttx'&&fttxActive())return exportFttx();
 if(s==='homeStations'){document.getElementById('estacoes')?.scrollIntoView({behavior:'smooth',block:'start'});return}
 if(s==='homeReceived'&&isGoogleMode())return openGoogleCentral('history');
 if(s==='homeSchedule'){if(isGoogleMode())return openGoogleCentral('schedule');dashboardFilter='alerta';return navigate('dashboard')}

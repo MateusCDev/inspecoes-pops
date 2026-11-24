@@ -236,8 +236,8 @@ body:has(.portal-login) .portal-actions { display: none; }
 .portal-profile-account span { color: var(--portal-muted); overflow-wrap: anywhere; font-size: .875rem; }
 .portal-profile .notice { grid-column: 1/-1; margin: 0; }
 
-#app[hidden], #portal-fleet-pane[hidden], #portal-signout[hidden] { display: none; }
-[data-portal-module="frota"] .portal-actions :is(#goHome, #save) { display: none; }
+#app[hidden], #portal-fleet-pane[hidden], #portal-fttx-pane[hidden], #portal-signout[hidden], .portal-tabs a[hidden] { display: none; }
+:is([data-portal-module="frota"],[data-portal-module="fttx"]) .portal-actions :is(#goHome, #save) { display: none; }
 .portal-fleet-frame {
   display: block;
   width: 100%;

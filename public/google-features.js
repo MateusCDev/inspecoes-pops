@@ -88,16 +88,12 @@ async function googleLoadMore(){
   finally{if(session===googleSession){googleCentralBusy=false;render();}}
 }
 function googleActionPlansView(items){
-  const supported=googleCapabilities.actionPlans;
   const rows=items.filter(item=>Number(item.issues)>0).map(item=>`<tr>
     <td>${esc(item.station)}</td><td>${esc(fmt(item.date))}</td><td>${esc(item.technician||'—')}</td>
-    <td>${Number(item.issues)}</td><td>${supported
-      ?button('googleActionPlan:'+esc(item.id),'Ver plano de ação','tiny')
-      :button('googlePdf:'+esc(item.id),'Baixar relatório arquivado','tiny')}</td></tr>`).join('');
+    <td>${Number(item.issues)}</td><td>${button('googleActionPlan:'+esc(item.id),'Ver plano de ação','tiny')}</td></tr>`).join('');
   const empty=googleCentralBusy?'Consultando as inspeções recebidas…':googleCentralError?'Consulta indisponível. Use Atualizar dados para tentar novamente.':
     googleNextCursor!==null?'Nenhum plano nesta página. Carregue mais inspeções para continuar a consulta.':'Nenhum plano registrado nas inspeções recebidas.';
   return `<section class="card"><h2>Ações das vistorias da equipe</h2>
-    ${supported?'':'<p class="small muted">O detalhamento no portal será habilitado após a atualização do Apps Script. Os relatórios arquivados estão disponíveis na lista.</p>'}
     ${rows?`<div class="table-scroll"><table class="data-table"><thead><tr><th>POP</th><th>Vistoria</th><th>Técnico</th><th>Ações</th><th>Consulta</th></tr></thead><tbody>${rows}</tbody></table></div>`
       :`<p role="status">${empty}</p>`}
     ${googleNextCursor!==null?button('googleLoadMore','Carregar mais inspeções','tiny'):''}</section>`;
@@ -143,7 +139,7 @@ function openGoogleAssetDialog(title,id,loading){
   return {dialog,content:dialog.querySelector('[data-asset-issues-content]')};
 }
 async function googleOpenActionPlan(id){
-  if(googleUser?.role!=='GESTAO'||!googleCapabilities.actionPlans)return;
+  if(googleUser?.role!=='GESTAO')return;
   const session=googleSession;
   const {dialog,content}=openGoogleAssetDialog('Plano de ação da vistoria',id,'Consultando ações da vistoria…');
   try{
@@ -158,7 +154,11 @@ async function googleOpenActionPlan(id){
       ${issue.evidencia?`<p class="small muted"><strong>Evidência</strong> ${esc(issue.evidencia)}</p>`:''}
     </section>`).join(''):'<p>Nenhuma ação registrada nessa vistoria.</p>';
   }catch(error){
-    if(session===googleSession&&dialog.open)content.innerHTML=`<p role="alert">${esc(error.message)}</p>`;
+    if(session!==googleSession||!dialog.open)return;
+    if(/Operação desconhecida/i.test(error.message)){
+      content.innerHTML=`<p role="alert">A implantação acessada pelo portal ainda não oferece a consulta de planos de ação. Confira a versão publicada para este endereço no Apps Script.</p>
+        ${button('googlePdf:'+esc(id),'Baixar relatório arquivado','tiny')}`;
+    }else content.innerHTML=`<p role="alert">${esc(error.message)}</p>`;
   }
 }
 async function googleShowInventory(id,central=false){

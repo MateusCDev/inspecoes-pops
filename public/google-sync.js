@@ -77,20 +77,66 @@ function googlePanel(r){
   const pending=records.filter(x=>x.finalizedAt&&!['sincronizado','processando'].includes(x.syncState)).length;
   return `<div class="card"><h2>Planilha e relatórios PDF</h2><p>${esc(r?syncStatusText(r):'')} · ${pending} pendente(s) neste dispositivo</p><div class="btnrow">${button('retrySync','Enviar pendentes','primary tiny')}${button('googleCentral',googleUser.role==='GESTAO'?'Painel central da equipe':'Minhas inspeções enviadas','tiny')}${r?.syncState==='sincronizado'?button('googlePdf:'+r.id,'Baixar PDF','tiny'):''}${button('googleExit','Sair','tiny')}</div>${r?`<p id="google-progress-${esc(r.id)}" role="status">${esc(r.googleProgress||'')}</p>`:''}${r?.googleAssets?`<p>${esc(googleAssetText(r.googleAssets))}</p>${r.googleAssets?.pending?button('googleIssues:'+r.id,'Ver pendências dos ativos','tiny'):''}`:''}${r?.googleError?`<p role="alert">${esc(r.googleError)}</p>`:''}<p class="small muted">Registros locais de ${esc(googleUser.email)}. Confirmação somente após gravar os dados e o PDF.</p></div>`;
 }
+function googleInspectionSnapshot(record){
+  const snapshot=JSON.parse(JSON.stringify(record));
+  for(const key of ['syncState','syncedAt','syncedOrg','googlePdfUrl','googleError','ownerEmail',
+    'googlePhotoRefs','googleProgress','googleJobHash','googleSubmittedVersion','googleAssets']) delete snapshot[key];
+  snapshot.photoFiles=[];
+  return snapshot;
+}
+
+async function googlePreparePhotoFiles(record,snapshot,session){
+  const photos=snapshot.photos||[];
+  if(photos.length>inspectionPhotoLimit)throw Error('A inspeção aceita até '+inspectionPhotoLimit+' fotos.');
+  const progress=text=>{if(typeof googleProgress==='function')googleProgress(record,text);};
+  const files=[];
+  if(photos.length)progress('Verificando tamanho das fotos…');
+  for(const photo of photos){
+    if(session!==googleSession)return null;
+    const stored=await getPhoto(photo.id);
+    if(session!==googleSession)return null;
+    if(!stored?.blob)throw Error('Foto indisponível neste dispositivo: '+(photo.name||photo.id)+'. Restaure o backup ou anexe a imagem novamente.');
+    files.push({photo,blob:stored.blob});
+  }
+  // Folga para a codificação Base64, identificadores, assinaturas e campos da requisição.
+  const metadataBytes=new Blob([JSON.stringify(snapshot)]).size;
+  const available=Math.floor((14*1024*1024-metadataBytes-256*files.length)*3/4);
+  if(available<=0)throw Error('Os dados da inspeção excedem o tamanho disponível para o envio.');
+  const limit=inspectionPhotoBudget(files.map(file=>file.blob),available);
+  for(const [index,file] of files.entries()){
+    if(session!==googleSession)return null;
+    if(inspectionPhotoTypes.has(file.blob.type)&&file.blob.size<=limit)continue;
+    progress('Otimizando foto '+(index+1)+' de '+files.length+' para o envio…');
+    try{
+      file.blob=await compressImage(file.blob,Math.min(limit,160*1024));
+    }catch(error){
+      throw Error('Não foi possível otimizar a foto '+(file.photo.name||file.photo.id)+'. '+error.message);
+    }
+  }
+  return session===googleSession?files:null;
+}
+
 async function googleSend(r){
+  if(inspectionPhotoBatches.has(r)){alert('Aguarde o término da otimização das fotos antes de enviar.');return false;}
   if(googleCapabilities.stagedPhotos&&typeof googleSendV2==='function')return googleSendV2(r);
   if(googleSending||!r?.finalizedAt)return false;
   if(!googleReady()||!googleUser||!googleAccessKey||!navigator.onLine){r.syncState='pendente';saveAll();render();return false;}
   googleSending=true;const session=googleSession;r.syncState='enviando';saveAll();render();
   try{
-    const version=r.updated,snapshot=await portableRecord(r);if(session!==googleSession)return false;
-    if((snapshot.photoFiles||[]).length!==(snapshot.photos||[]).length)throw Error('Uma foto está indisponível. Restaure o backup antes de enviar.');
-    for(const key of ['syncState','syncedAt','syncedOrg','googlePdfUrl','googleError','ownerEmail'])delete snapshot[key];
+    const version=r.updated,snapshot=googleInspectionSnapshot(r);
+    const files=await googlePreparePhotoFiles(r,snapshot,session);
+    if(!files||session!==googleSession)return false;
+    for(const {photo,blob} of files){
+      if(session!==googleSession)return false;
+      const data=await fileToDataUrl(blob);
+      if(session!==googleSession)return false;
+      snapshot.photoFiles.push({id:photo.id,data});
+    }
     const result=await googleRpc('submit',{record:snapshot});if(session!==googleSession)return false;
     if(result.inspectionId!==r.id||!/^https:\/\/drive\.google\.com\//.test(result.pdfUrl||''))throw Error('Gravação completa não confirmada.');
     if(result.schedule&&r.updated===version){r.schedulePeriod=result.schedule.days;r.scheduleBaseDate=result.schedule.baseDate;r.scheduleDueDate=result.schedule.dueDate;r.popCriticality=result.schedule.criticality;}
-    r.syncedAt=result.receivedAt;r.syncState=r.updated===version?'sincronizado':'pendente';r.googleError='';saveAll();render();return true;
-  }catch(error){if(session===googleSession){r.syncState='erro';r.googleError=error.message;saveAll();render();alert('Envio pendente: '+error.message);}return false;}
+    r.syncedAt=result.receivedAt;r.syncState=r.updated===version?'sincronizado':'pendente';r.googleError='';delete r.googleProgress;saveAll();render();return true;
+  }catch(error){if(session===googleSession){r.syncState='erro';r.googleError=error.message;delete r.googleProgress;saveAll();render();alert('Envio pendente: '+error.message);}return false;}
   finally{googleSending=false;}
 }
 async function googleSendPending(){
@@ -101,6 +147,7 @@ async function googleSendPending(){
 }
 async function googleFinalize(){
   if(googleSending||!googleUser)return;const r=cur();
+  if(inspectionPhotoBatches.has(r))return alert('Aguarde o término da otimização das fotos antes de finalizar.');
   if(r?.syncState==='processando'){
     if(typeof googlePollJobs==='function')await googlePollJobs();
     if(cur()?.id===r.id&&r.syncState==='processando')alert('A inspeção já foi recebida. Aguarde a geração do PDF.');

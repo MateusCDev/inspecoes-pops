@@ -24,8 +24,8 @@ test('status desconhecidos são separados; denominador usa apenas C e NC',()=>{
 });
 function frontend(fetch){
  const r={id:'INSP-T',finalizedAt:'yes',updated:'version1',photos:[]};
- const c=vm.createContext({cfg:{mode:'google',google:{endpoint:'https://script.google.com/macros/s/test/exec'}},window:{addEventListener(){}},document:{addEventListener(){}},records:[r],navigator:{onLine:true},saveAll:()=>true,render(){},alert(){},Blob,fetch,portableRecord:async r=>JSON.parse(JSON.stringify({...r,photoFiles:[]}))});
- vm.runInContext(fs.readFileSync(root+'/public/google-sync.js','utf8')+'\n'+fs.readFileSync(root+'/public/google-features.js','utf8')+'\ngoogleAccessKey="valid";googleUser={email:"tecnico@voanet.com.br",role:"OPERACAO"};',c);return {c,r};
+ const c=vm.createContext({cfg:{mode:'google',google:{endpoint:'https://script.google.com/macros/s/test/exec'}},window:{addEventListener(){}},document:{addEventListener(){}},records:[r],navigator:{onLine:true},saveAll:()=>true,render(){},alert(){},Blob,fetch});
+ vm.runInContext(fs.readFileSync(root+'/public/inspection-photos.js','utf8')+'\n'+fs.readFileSync(root+'/public/google-sync.js','utf8')+'\n'+fs.readFileSync(root+'/public/google-features.js','utf8')+'\ngoogleAccessKey="valid";googleUser={email:"tecnico@voanet.com.br",role:"OPERACAO"};',c);return {c,r};
 }
 test('frontend só confirma depois de retorno válido',async()=>{
  const h=frontend(async()=>({ok:true,json:async()=>({ok:false,error:'negado'})}));assert.equal(await h.c.googleSend(h.r),false);assert.equal(h.r.syncState,'erro');

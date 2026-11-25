@@ -19,11 +19,9 @@ async function googleSendV2(r){
   if(!googleUser||!navigator.onLine){r.syncState='pendente';saveAll();render();return false;}
   googleSending=true;const session=googleSession,version=r.updated,key=googleAccessKey;r.syncState='enviando';saveAll();render();
   try{
-    const snapshot=JSON.parse(JSON.stringify(r));
-    for(const key of ['syncState','syncedAt','syncedOrg','googlePdfUrl','googleError','ownerEmail','googlePhotoRefs','googleProgress','googleJobHash','googleSubmittedVersion','googleAssets'])delete snapshot[key];
-    snapshot.photoFiles=[];const files=[];let bytes=new Blob([JSON.stringify(snapshot)]).size;
-    for(const photo of r.photos||[]){if(session!==googleSession)return false;const file=await getPhoto(photo.id);if(session!==googleSession)return false;if(!file?.blob)throw Error('Foto indisponível: '+photo.name);files.push({photo,blob:file.blob});bytes+=Math.ceil(file.blob.size*4/3)+128;}
-    if(bytes>15*1024*1024)throw Error('O conjunto das fotos excede 15 MB. Reduza a quantidade ou o tamanho das fotos.');
+    const snapshot=googleInspectionSnapshot(r);
+    const files=await googlePreparePhotoFiles(r,snapshot,session);
+    if(!files||session!==googleSession)return false;
     r.googlePhotoRefs||={};
     for(let i=0;i<files.length;i++){
       if(session!==googleSession)return false;

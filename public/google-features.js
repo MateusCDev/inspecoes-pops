@@ -1,5 +1,5 @@
 // Recursos v2 negociados com o serviço; clientes continuam funcionando antes da atualização do Apps Script.
-function googleProgress(r,text){r.googleProgress=text;const el=document.getElementById('google-progress-'+r.id);if(el)el.textContent=text;}
+function googleProgress(r,text){if(r.googleProgress===text)return;r.googleProgress=text;const el=document.getElementById('google-progress-'+r.id);if(el)el.textContent=text;}
 async function googleDigest(text){if(!window.crypto?.subtle)return '';const data=await window.crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return Array.from(new Uint8Array(data),x=>x.toString(16).padStart(2,'0')).join('');}
 function googleApplyReceipt(r,result,version,session){
   if(session!==googleSession)return;
@@ -16,8 +16,12 @@ function googleApplyReceipt(r,result,version,session){
 }
 async function googleSendV2(r){
   if(googleSending||!r?.finalizedAt)return false;
-  if(!googleUser||!navigator.onLine){r.syncState='pendente';saveAll();render();return false;}
-  googleSending=true;const session=googleSession,version=r.updated,key=googleAccessKey;r.syncState='enviando';saveAll();render();
+  if(!googleUser)return false;
+  if(!navigator.onLine)return googleInspectionOffline(r);
+  googleSending=true;const session=googleSession,version=r.updated,key=googleAccessKey;
+  r.syncState='enviando';r.googleError='';r.googleProgress='Preparando o envio…';saveAll();render();
+  // O serviço reaproveita a mesma foto ou revisão quando a resposta se perde.
+  const uploadOptions=message=>({retry:true,timeout:45000,onRetry:()=>googleProgress(r,message)});
   try{
     const snapshot=googleInspectionSnapshot(r);
     const files=await googlePreparePhotoFiles(r,snapshot,session);
@@ -26,15 +30,19 @@ async function googleSendV2(r){
     for(let i=0;i<files.length;i++){
       if(session!==googleSession)return false;
       const {photo,blob}=files[i];googleProgress(r,`Enviando foto ${i+1} de ${files.length}…`);
-      const data=await fileToDataUrl(blob),digest=await googleDigest(data),cached=r.googlePhotoRefs[photo.id];
+      const data=await googlePhotoData(photo,blob),digest=await googleDigest(data),cached=r.googlePhotoRefs[photo.id];
       if(session!==googleSession)return false;
-      const reference=digest&&cached?.digest===digest?cached:(await googleRpc('photo',{inspectionId:r.id,photoId:photo.id,data},key)).photo;
+      const reference=digest&&cached?.digest===digest?cached:
+        (await googleRpc('photo',{inspectionId:r.id,photoId:photo.id,data},key,
+          uploadOptions(`Reconectando para enviar a foto ${i+1} de ${files.length}…`))).photo;
       if(session!==googleSession)return false;
       if(!reference?.fileId||!reference.signature)throw Error('Foto não confirmada.');
       r.googlePhotoRefs[photo.id]=reference;snapshot.photoFiles.push(reference);
     }
     if(session!==googleSession)return false;
-    googleProgress(r,'Registrando envio…');const result=await googleRpc('submit',{record:snapshot,queue:true},key);if(session!==googleSession)return false;
+    googleProgress(r,'Registrando envio…');
+    const result=await googleRpc('submit',{record:snapshot,queue:true},key,uploadOptions('Reconectando para confirmar o recebimento…'));
+    if(session!==googleSession)return false;
     googleApplyReceipt(r,result,version,session);
     if(result.pending){
       // A chamada adianta o processamento; o acionador do Google continua se a página for fechada.
@@ -47,26 +55,43 @@ async function googleSendV2(r){
     if(session!==googleSession)return false;
     if(error.message.includes('A versão anterior ainda está em processamento.')){
       try{
-        const previous=await googleRpc('status',{inspectionId:r.id},key);
+        const previous=await googleRpc('status',{inspectionId:r.id},key,uploadOptions('Reconectando para consultar a versão anterior…'));
         if(session!==googleSession)return false;
         const submittedVersion=previous.hash&&previous.hash===r.googleJobHash ? (r.googleSubmittedVersion??null) : null;
         googleApplyReceipt(r,previous,submittedVersion,session);
         return true;
       }catch(statusError){error=statusError;}
     }
-    if(session===googleSession){r.syncState='erro';r.googleError=error.message;saveAll();render();alert(error.message);}
+    if(session===googleSession)googleInspectionSendFailure(r,error);
     return false;
   }
   finally{googleSending=false;}
 }
-async function googlePollJobs(){
-  if(googleJobsPolling||!googleUser||!navigator.onLine)return;
+async function googlePollJobs(current){
+  if(googleJobsPolling||!googleUser)return;
+  if(!navigator.onLine){
+    if(current?.syncState==='processando')googleProgress(current,'Inspeção recebida. Reconecte-se para consultar o PDF.');
+    return;
+  }
   googleJobsPolling=true;const session=googleSession;
   try{
-    for(const r of records.filter(x=>x.syncState==='processando')){
+    const inspections=current?[current]:records.filter(record=>record.syncState==='processando');
+    for(const record of inspections){
       if(session!==googleSession)break;
-      try{const result=await googleRpc('status',{inspectionId:r.id});if(session!==googleSession)break;googleApplyReceipt(r,result,r.googleSubmittedVersion??null,session);}
-      catch(error){if(session===googleSession){r.syncState='erro';r.googleError=error.message;saveAll();render();}}
+      if(record.syncState!=='processando')continue;
+      if(current)googleProgress(record,'Consultando o processamento…');
+      try{
+        const result=await googleRpc('status',{inspectionId:record.id},googleAccessKey,{timeout:45000});
+        if(session!==googleSession)break;
+        googleApplyReceipt(record,result,record.googleSubmittedVersion??null,session);
+      }catch(error){
+        if(session!==googleSession)break;
+        if(error instanceof GoogleTransportError){
+          googleProgress(record,'Inspeção recebida. A consulta ao PDF será retomada quando o serviço estiver disponível.');
+          continue;
+        }
+        googleInspectionSendFailure(record,error);
+      }
     }
   }finally{googleJobsPolling=false;}
 }

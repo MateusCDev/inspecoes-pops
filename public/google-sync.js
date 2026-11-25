@@ -9,16 +9,49 @@ const googleReady=()=>/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.
 function googleAssetText(result){return result?`${result.updated||0} atualização(ões), ${result.created||0} novo(s) ativo(s), ${result.pending||0} pendência(s) de conferência`:'Atualização de ativos não informada por esta versão do serviço.';}
 function googleStorageKey(){return googleUser?'voanet_google_records_'+encodeURIComponent(googleUser.email):null;}
 function googlePhotoDatabase(){if(!googleUser)throw Error('Entre para acessar as fotos.');return 'voanet_google_photos_'+encodeURIComponent(googleUser.email);}
-async function googleRpc(action,data={},key=googleAccessKey){
+class GoogleTransportError extends Error {}
+
+async function googleResponse(body,timeout){
+  const controller=timeout&&typeof AbortController==='function'?new AbortController():null;
+  const timer=controller?setTimeout(()=>controller.abort(),timeout):null;
+  try{
+    let response;
+    try{
+      response=await fetch(cfg.google.endpoint,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=UTF-8'},body,signal:controller?.signal});
+    }catch(_){
+      throw new GoogleTransportError('A conexão com o serviço de inspeções foi interrompida.');
+    }
+    if([408,429].includes(response.status)||response.status>=500)throw new GoogleTransportError('O serviço de inspeções está temporariamente indisponível.');
+    if(!response.ok)throw Error('Serviço Google indisponível (HTTP '+response.status+').');
+    try{
+      return await response.json();
+    }catch(_){
+      throw new GoogleTransportError('A resposta do serviço de inspeções não foi recebida por completo.');
+    }
+  }finally{
+    if(timer!==null)clearTimeout(timer);
+  }
+}
+
+async function googleRpc(action,data={},key=googleAccessKey,{retry,onRetry,timeout}={}){
   if(!googleReady())throw Error('Aguardando a URL do serviço Google.');
   const body=JSON.stringify({version:1,action,...data,token:key});
   if(new Blob([body]).size>15*1024*1024)throw Error('O envio excede 15 MB. Reduza as fotos.');
-  const response=await fetch(cfg.google.endpoint,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=UTF-8'},body});
-  if(!response.ok)throw Error('Serviço Google indisponível.');
-  const result=await response.json();
-  if(!result.ok)throw Error(result.error||'Operação não confirmada.');
+  const session=googleSession;
+  let result;
+  try{
+    result=await googleResponse(body,timeout);
+  }catch(error){
+    if(!retry||!(error instanceof GoogleTransportError)||session!==googleSession||!navigator.onLine)throw error;
+    onRetry?.();
+    await new Promise(resolve=>setTimeout(resolve,850));
+    if(session!==googleSession||!navigator.onLine)throw error;
+    result=await googleResponse(body,timeout);
+  }
+  if(!result?.ok)throw Error(result?.error||'Operação não confirmada.');
   return result;
 }
+
 function googleLoginView(){
   const ready=googleReady();
   return `<main class="portal-login"><div class="portal-login-card"><div class="portal-login-body">
@@ -77,6 +110,39 @@ function googlePanel(r){
   const pending=records.filter(x=>x.finalizedAt&&!['sincronizado','processando'].includes(x.syncState)).length;
   return `<div class="card"><h2>Planilha e relatórios PDF</h2><p>${esc(r?syncStatusText(r):'')} · ${pending} pendente(s) neste dispositivo</p><div class="btnrow">${button('retrySync','Enviar pendentes','primary tiny')}${button('googleCentral',googleUser.role==='GESTAO'?'Painel central da equipe':'Minhas inspeções enviadas','tiny')}${r?.syncState==='sincronizado'?button('googlePdf:'+r.id,'Baixar PDF','tiny'):''}${button('googleExit','Sair','tiny')}</div>${r?`<p id="google-progress-${esc(r.id)}" role="status">${esc(r.googleProgress||'')}</p>`:''}${r?.googleAssets?`<p>${esc(googleAssetText(r.googleAssets))}</p>${r.googleAssets?.pending?button('googleIssues:'+r.id,'Ver pendências dos ativos','tiny'):''}`:''}${r?.googleError?`<p role="alert">${esc(r.googleError)}</p>`:''}<p class="small muted">Registros locais de ${esc(googleUser.email)}. Confirmação somente após gravar os dados e o PDF.</p></div>`;
 }
+function googleInspectionSyncCard(r){
+  const actions={
+    enviando:'<button type="button" class="btn primary" disabled>Enviando…</button>',
+    processando:button('googleCheckCurrent','Verificar processamento','primary'),
+    sincronizado:button('googlePdf:'+esc(r.id),'Baixar PDF do Drive','primary'),
+    pendente:button('googleRetryCurrent','Reenviar esta inspeção','primary'),
+    erro:button('googleRetryCurrent','Reenviar esta inspeção','primary')
+  };
+  return `<div class="card"><h2>Finalização e sincronização</h2>
+    <p class="muted small">O registro fica salvo neste navegador. O portal envia as fotos e confirma quando os dados e o PDF estiverem disponíveis.</p>
+    <p><b>Estado:</b> ${esc(syncStatusText(r))}</p>
+    <p id="google-progress-${esc(r.id)}" class="inspection-sync-message" role="status">${esc(r.googleProgress||'')}</p>
+    ${r.googleError?`<p class="inspection-sync-error" role="alert">${esc(r.googleError)}</p>`:''}
+    <div class="btnrow">${r.finalizedAt?(actions[r.syncState]||actions.pendente):button('finalize','✓ Finalizar e sincronizar','primary')}
+    ${r.googleAssets?.pending?button('googleIssues:'+esc(r.id),'Ver pendências dos ativos','tiny'):''}</div></div>`;
+}
+
+function googleInspectionSendFailure(record,error){
+  record.syncState=error instanceof GoogleTransportError?'pendente':'erro';
+  const unfinished=record.googleProgress?.match(/foto (\d+ de \d+)/i);
+  const detail=unfinished?' O envio parou na foto '+unfinished[1]+'.':'';
+  record.googleError=(error.message||'Falha ao enviar a inspeção.')+detail+
+    ' A inspeção está salva neste dispositivo. Use Reenviar esta inspeção.';
+  delete record.googleProgress;
+  saveAll();
+  render();
+}
+
+function googleInspectionOffline(record){
+  googleInspectionSendFailure(record,new GoogleTransportError('Sem conexão com a internet.'));
+  return false;
+}
+
 function googleInspectionSnapshot(record){
   const snapshot=JSON.parse(JSON.stringify(record));
   for(const key of ['syncState','syncedAt','syncedOrg','googlePdfUrl','googleError','ownerEmail',
@@ -93,9 +159,15 @@ async function googlePreparePhotoFiles(record,snapshot,session){
   if(photos.length)progress('Verificando tamanho das fotos…');
   for(const photo of photos){
     if(session!==googleSession)return null;
-    const stored=await getPhoto(photo.id);
+    const label=photo.name||photo.id;
+    let stored;
+    try{
+      stored=await getPhoto(photo.id);
+    }catch(_){
+      throw Error('O navegador não conseguiu ler a foto '+label+' neste dispositivo. Reabra a inspeção e confira a foto na galeria.');
+    }
     if(session!==googleSession)return null;
-    if(!stored?.blob)throw Error('Foto indisponível neste dispositivo: '+(photo.name||photo.id)+'. Restaure o backup ou anexe a imagem novamente.');
+    if(!stored?.blob)throw Error('Foto indisponível neste dispositivo: '+label+'. Restaure o backup ou anexe a imagem novamente.');
     files.push({photo,blob:stored.blob});
   }
   // Folga para a codificação Base64, identificadores, assinaturas e campos da requisição.
@@ -116,19 +188,28 @@ async function googlePreparePhotoFiles(record,snapshot,session){
   return session===googleSession?files:null;
 }
 
+async function googlePhotoData(photo,blob){
+  try{
+    return await fileToDataUrl(blob);
+  }catch(_){
+    throw Error('O navegador não conseguiu preparar a foto '+(photo.name||photo.id)+'. Abra a galeria para conferir a imagem.');
+  }
+}
+
 async function googleSend(r){
   if(inspectionPhotoBatches.has(r)){alert('Aguarde o término da otimização das fotos antes de enviar.');return false;}
   if(googleCapabilities.stagedPhotos&&typeof googleSendV2==='function')return googleSendV2(r);
   if(googleSending||!r?.finalizedAt)return false;
-  if(!googleReady()||!googleUser||!googleAccessKey||!navigator.onLine){r.syncState='pendente';saveAll();render();return false;}
-  googleSending=true;const session=googleSession;r.syncState='enviando';saveAll();render();
+  if(!googleReady()||!googleUser||!googleAccessKey)return false;
+  if(!navigator.onLine)return googleInspectionOffline(r);
+  googleSending=true;const session=googleSession;r.syncState='enviando';r.googleError='';r.googleProgress='Preparando o envio…';saveAll();render();
   try{
     const version=r.updated,snapshot=googleInspectionSnapshot(r);
     const files=await googlePreparePhotoFiles(r,snapshot,session);
     if(!files||session!==googleSession)return false;
     for(const {photo,blob} of files){
       if(session!==googleSession)return false;
-      const data=await fileToDataUrl(blob);
+      const data=await googlePhotoData(photo,blob);
       if(session!==googleSession)return false;
       snapshot.photoFiles.push({id:photo.id,data});
     }
@@ -136,7 +217,7 @@ async function googleSend(r){
     if(result.inspectionId!==r.id||!/^https:\/\/drive\.google\.com\//.test(result.pdfUrl||''))throw Error('Gravação completa não confirmada.');
     if(result.schedule&&r.updated===version){r.schedulePeriod=result.schedule.days;r.scheduleBaseDate=result.schedule.baseDate;r.scheduleDueDate=result.schedule.dueDate;r.popCriticality=result.schedule.criticality;}
     r.syncedAt=result.receivedAt;r.syncState=r.updated===version?'sincronizado':'pendente';r.googleError='';delete r.googleProgress;saveAll();render();return true;
-  }catch(error){if(session===googleSession){r.syncState='erro';r.googleError=error.message;delete r.googleProgress;saveAll();render();alert('Envio pendente: '+error.message);}return false;}
+  }catch(error){if(session===googleSession)googleInspectionSendFailure(r,error);return false;}
   finally{googleSending=false;}
 }
 async function googleSendPending(){
@@ -149,8 +230,7 @@ async function googleFinalize(){
   if(googleSending||!googleUser)return;const r=cur();
   if(inspectionPhotoBatches.has(r))return alert('Aguarde o término da otimização das fotos antes de finalizar.');
   if(r?.syncState==='processando'){
-    if(typeof googlePollJobs==='function')await googlePollJobs();
-    if(cur()?.id===r.id&&r.syncState==='processando')alert('A inspeção já foi recebida. Aguarde a geração do PDF.');
+    if(typeof googlePollJobs==='function')await googlePollJobs(r);
     return;
   }
   if(!r?.nome?.trim()||!r.inspetor?.trim()||!r.data)return alert('Informe estação, Técnico 01 e data.');
@@ -159,8 +239,8 @@ async function googleFinalize(){
   r.nome=station.name;r.popCriticality=station.criticality;r.schedulePeriod=station.days;
   if(!r.finalizedAt){r.finalizedAt=new Date().toISOString();r.updated=r.finalizedAt;}
   r.scheduleBaseDate=r.data;r.scheduleDueDate=addLocalDays(r.data,station.days);r.syncState='pendente';
-  if(!saveAll())return;render();const session=googleSession,sent=await googleSend(r);
-  if(session===googleSession)alert(sent?(r.syncState==='sincronizado'?'Dados e PDF confirmados. Próxima inspeção: '+fmt(r.scheduleDueDate)+'.':r.syncState==='processando'?'Inspeção recebida. O PDF e os ativos estão em processamento; você pode continuar usando o aplicativo.':'Versão enviada. Há alterações recentes pendentes.'):'Inspeção salva neste dispositivo. Confira o painel para reenviar.');
+  if(!saveAll())return;
+  await googleSend(r);
 }
 let googleCentralSection='dashboard';
 async function openGoogleCentral(section=googleUser?.role==='GESTAO'?'dashboard':'history'){
@@ -267,6 +347,14 @@ document.addEventListener('click',e=>{
   if(action==='googleExit')return googleLogout();if(!googleUser)return;
   if(action==='googleCentral')openGoogleCentral();
   if(action==='googleRefresh')googleRefreshCentral();
+  if(action==='googleRetryCurrent'){
+    const record=cur();
+    if(record?.finalizedAt&&['pendente','erro'].includes(record.syncState))googleSend(record);
+  }
+  if(action==='googleCheckCurrent'){
+    const record=cur();
+    if(record?.syncState==='processando')googlePollJobs(record);
+  }
   if(action?.startsWith('centralSection:'))openGoogleCentral(action.slice('centralSection:'.length));
   if(action?.startsWith('googleSummaryPdf:'))googleDownloadSummary(action.slice('googleSummaryPdf:'.length),trigger);
   if(action?.startsWith('googlePdf:'))googleDownloadPdf(action.slice(10));

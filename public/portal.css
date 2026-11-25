@@ -459,3 +459,12 @@ body:has(.portal-login) .portal-actions { display: none; }
 .fttx-cost-summary strong { font-size: 1.25rem; color: var(--portal-red-dark); }
 .fttx-cost-summary p { margin: 0; color: var(--portal-muted); font-size: .85rem; }
 .fttx-export-status:empty { margin: 0; }
+
+.inspection-sync-message:empty { display: none; }
+.inspection-sync-error {
+  padding: .7rem .85rem;
+  border: 1px solid #efd79c;
+  border-radius: .6rem;
+  background: #fff7e8;
+  color: #61420a;
+}

@@ -87,3 +87,60 @@ test('fotos antigas acima do limite são otimizadas para os dois modos de envio'
   assert.equal(record.syncState,'sincronizado');
  }
 });
+
+test('repete somente a requisição interrompida e continua consultando depois de receber',async()=>{
+ const record={id:'INSP-CLIENT-4',finalizedAt:'2026-11-25T12:00:00Z',updated:'2026-11-25T12:00:00Z',
+  photos:[{id:'PH-1',name:'etiqueta.jpg'}]};
+ const attempts={photo:0,submit:0,status:0};
+ const bodies={photo:[],submit:[]};
+ const pending={ok:true,pending:true,inspectionId:record.id,hash:'mesma-revisao'};
+ const c=vm.createContext({
+  console,Blob,cfg:{mode:'google',google:{endpoint:'https://script.google.com/macros/s/mock/exec'}},
+  window:{addEventListener(){}},document:{addEventListener(){},getElementById(){return null}},navigator:{onLine:true},
+  view:'resumo',cur:()=>record,records:[record],saveAll:()=>true,render(){},alert:message=>assert.fail(message),
+  setTimeout:callback=>queueMicrotask(callback),getPhoto:async()=>({blob:new Blob(['foto'],{type:'image/jpeg'})}),
+  fileToDataUrl:async()=> 'data:image/jpeg;base64,Zm90bw==',
+  fetch:async(_url,{body})=>{
+   const {action}=JSON.parse(body);
+   if(action==='process')return {ok:true,json:async()=>({ok:false})};
+   attempts[action]++;
+   bodies[action]?.push(body);
+   if(attempts[action]===1)throw new TypeError('Load failed');
+   const result=action==='photo'?{ok:true,photo:{id:'PH-1',fileId:'drive-foto',signature:'assinada'}}:
+    action==='submit'?pending:{ok:true,inspectionId:record.id,pdfUrl:'https://drive.google.com/file/d/teste/view'};
+   return {ok:true,json:async()=>result};
+  }
+ });
+ vm.runInContext(clientScripts+'\ngoogleUser={email:"ops@example.test"};googleAccessKey="teste";',c);
+ assert.equal(await c.googleSendV2(record),true);
+ assert.equal(record.syncState,'processando');
+ assert.deepEqual(attempts,{photo:2,submit:2,status:0});
+ assert.equal(bodies.photo[0],bodies.photo[1]);
+ assert.equal(bodies.submit[0],bodies.submit[1]);
+ await c.googlePollJobs();
+ assert.equal(record.syncState,'processando');
+ assert.match(record.googleProgress,/consulta ao PDF será retomada/);
+ await c.googlePollJobs();
+ assert.equal(record.syncState,'sincronizado');
+ assert.deepEqual(attempts,{photo:2,submit:2,status:2});
+});
+
+test('falhas repetidas deixam a inspeção e o progresso disponíveis para reenvio',async()=>{
+ const record={id:'INSP-CLIENT-5',finalizedAt:'2026-11-25T12:00:00Z',updated:'2026-11-25T12:00:00Z',
+  photos:[{id:'PH-1',name:'etiqueta.jpg'}]};
+ let attempts=0, saved;
+ const c=vm.createContext({
+  console,Blob,cfg:{mode:'google',google:{endpoint:'https://script.google.com/macros/s/mock/exec'}},
+  window:{addEventListener(){}},document:{addEventListener(){},getElementById(){return null}},navigator:{onLine:true},
+  view:'resumo',cur:()=>record,saveAll:()=>{saved=structuredClone(record);return true;},render(){},alert:message=>assert.fail(message),
+  setTimeout:callback=>queueMicrotask(callback),getPhoto:async()=>({blob:new Blob(['foto'],{type:'image/jpeg'})}),
+  fileToDataUrl:async()=> 'data:image/jpeg;base64,Zm90bw==',
+  fetch:async()=>{attempts++;throw new TypeError('Load failed');}
+ });
+ vm.runInContext(clientScripts+'\ngoogleUser={email:"ops@example.test"};googleAccessKey="teste";',c);
+ assert.equal(await c.googleSendV2(record),false);
+ assert.equal(attempts,2);
+ assert.equal(saved.syncState,'pendente');
+ assert.match(saved.googleError,/foto 1 de 1.*Reenviar esta inspeção/);
+ assert.equal(saved.photos[0].id,'PH-1');
+});

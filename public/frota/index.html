@@ -11,7 +11,7 @@
 @media(max-width:1050px){.brand{padding:3px 0 22px}.brand img{padding:4px;width:60px}.brand small{display:none}.mobile-brand{display:block;width:124px;height:auto;margin-bottom:12px}.sidebar-bottom{display:none}}
 @media(max-width:640px){.sidebar{overflow:visible}.nav{justify-content:flex-start}.nav button{flex:0 0 48px}.top{flex-wrap:wrap}.mobile-brand{width:130px}.metric{padding:13px}.btn{min-height:44px}.btn.small{min-height:40px}.top .right{width:100%}.top .right .btn{flex:1}.content{padding-bottom:90px}.modal{max-height:90vh}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
-</style><link rel="stylesheet" href="../portal.css?v=__BUILD_ID__"><link rel="icon" type="image/png" sizes="192x192" href="../icon-192.png?v=__BUILD_ID__">
+</style><link rel="stylesheet" href="../portal.css?v=__BUILD_ID__"><link rel="stylesheet" href="./fleet-layout.css?v=__BUILD_ID__"><link rel="icon" type="image/png" sizes="192x192" href="../icon-192.png?v=__BUILD_ID__">
 <script>
   if(window.parent===window){
     const portal=new URL('../',location.href);
@@ -46,22 +46,65 @@ const fileInput=(id,label,existing)=>`<label>${label}<input type="file" id="${id
 const f=(id,label,value='',type='text',extra='')=>`<label>${label}<input id="${id}" type="${type}" value="${h(value)}" ${extra}></label>`;
 const opts=(arr,chosen,placeholder='Selecione')=>`<option value="">${placeholder}</option>`+arr.map(x=>`<option value="${h(x.id)}" ${x.id===chosen?'selected':''}>${h(x.name)}</option>`).join('');
 function notify(msg){let n=document.createElement('div');n.textContent=msg;n.style='position:fixed;right:16px;bottom:78px;background:#11253e;color:white;padding:12px 18px;z-index:50;border-radius:10px;max-width:380px;box-shadow:0 8px 32px #0003';document.body.append(n);setTimeout(()=>n.remove(),3200)}
-const menu=[['dashboard','▦','Dashboard'],['vehicles','▣','Veículos'],['drivers','♙','Condutores'],['inspections','☑','Checklists'],['issues','⚠','Avarias'],['handovers','⇄','Devoluções'],['reports','▤','Relatórios'],['audit','◷','Auditoria'],['settings','⚙','Configurações']];
+const menu=[
+  ['dashboard','▦','Dashboard'],['vehicles','▣','Veículos'],['drivers','♙','Condutores'],
+  ['inspections','✓','Checklists'],['issues','!','Avarias'],['handovers','⇄','Devoluções'],
+  ['reports','▤','Relatórios'],['audit','◷','Auditoria'],['settings','⚙︎','Configurações']
+];
+const fleetPages={
+  dashboard:['Painel da Infraestrutura','Acompanhe a disponibilidade dos veículos e as pendências da frota.',
+    '+ Novo checklist',"go('inspections');inspectionModal()"],
+  vehicles:['Veículos cadastrados','Consulte a situação de cada veículo e acesse sua ficha.',
+    '+ Veículo','vehicleModal()'],
+  drivers:['Condutores e CNH','Consulte o cadastro e a validade dos documentos.',
+    '+ Condutor','driverModal()'],
+  inspections:['Checklists veiculares','Revise as condições dos veículos e o histórico de vistorias.',
+    '+ Checklist','inspectionModal()'],
+  issues:['Avarias e pendências','Acompanhe os registros de avaria e as soluções aplicadas.'],
+  handovers:['Entrega e devolução','Registre e confirme a transferência de responsabilidade pelos veículos.',
+    '+ Devolução / Entrega','handoverModal()'],
+  reports:['Histórico e relatórios','Consulte os checklists e exporte seus registros.'],
+  audit:['Histórico de gravações','Veja as revisões registradas no cadastro da Frota.'],
+  settings:['Configurações e dados','Gerencie os dados da Frota e o endereço usado nos códigos QR.']
+};
 function go(p){
-  const fromNavigation=document.activeElement?.matches('.nav button');
+  const fromNavigation=document.activeElement?.matches('.nav button, #fleet-section');
   page=p;editId=null;draft={};checkStatuses={};pendingPhotos={};
   render();
-  if(fromNavigation)document.querySelector('.nav [aria-current="page"]')?.focus({preventScroll:true});
+  if(fromNavigation){
+    const section=$('fleet-section');
+    (section.getClientRects().length?section:document.querySelector('.nav [aria-current="page"]'))?.focus({preventScroll:true});
+  }
   scrollTo(0,0);
 }
-function render(){const tit={dashboard:'Painel da Infraestrutura',vehicles:'Veículos cadastrados',drivers:'Condutores e CNH',inspections:'Checklists veiculares',issues:'Avarias e pendências',handovers:'Entrega e devolução',reports:'Histórico e relatórios',audit:'Histórico de gravações',settings:'Configurações e dados'};
-$('root').innerHTML=`<div class="app"><aside class="sidebar"><div class="nav" role="navigation" aria-label="Seções da Frota">${menu.map(([id,ic,name])=>`<button class="${page===id?'active':''}" ${page===id?'aria-current="page"':''} onclick="go('${id}')" title="${name}"><span class="ic" aria-hidden="true">${ic}</span><span class="nav-text">${name}</span></button>`).join('')}</div></aside><main class="content"><header class="top"><div class="top-heading"><h1>${tit[page]}</h1><div class="sub">${new Date().toLocaleDateString('pt-BR')}</div></div><div class="right">${page==='vehicles'?'<button class="btn" onclick="vehicleModal()">+ Veículo</button>':''}${page==='drivers'?'<button class="btn" onclick="driverModal()">+ Condutor</button>':''}${page==='inspections'?'<button class="btn" onclick="inspectionModal()">+ Checklist</button>':''}${page==='handovers'?'<button class="btn" onclick="handoverModal()">+ Devolução / Entrega</button>':''}</div></header><section id="main"></section></main></div><div id="overlay"></div>`;
-const screens={dashboard:dashboardScreen,vehicles:vehiclesScreen,drivers:driversScreen,inspections:inspectionsScreen,issues:issuesScreen,handovers:handoversScreen,reports:reportsScreen,audit:auditScreen,settings:settingsScreen};screens[page]();
-  const navigation=document.querySelector('.nav'), current=navigation.querySelector('[aria-current="page"]');
-  if(current&&navigation.scrollWidth>navigation.clientWidth){
-    const item=current.getBoundingClientRect(), bar=navigation.getBoundingClientRect();
-    navigation.scrollLeft+=item.left-bar.left+(item.width-bar.width)/2;
-  }
+function render(){
+  const [title,description,action,handler]=fleetPages[page];
+  const navButton=([id,ic,name])=>`<button class="${page===id?'active':''}" ${page===id?'aria-current="page"':''}
+    onclick="go('${id}')" title="${name}"><span class="ic" aria-hidden="true">${ic}</span><span class="nav-text">${name}</span></button>`;
+  $('root').innerHTML=`<div class="app">
+    <aside class="sidebar">
+      <nav class="nav" aria-label="Seções da Frota">
+        <div class="fleet-nav-group">${navButton(menu[0])}</div>
+        <div class="fleet-nav-group"><p>Operação</p>${menu.slice(1,6).map(navButton).join('')}</div>
+        <div class="fleet-nav-group"><p>Gestão</p>${menu.slice(6).map(navButton).join('')}</div>
+      </nav>
+      <label class="fleet-section-select" for="fleet-section">Seção da Frota
+        <select id="fleet-section" onchange="go(this.value)">
+          ${menu.map(([id,,name])=>`<option value="${id}" ${page===id?'selected':''}>${name}</option>`).join('')}
+        </select>
+      </label>
+    </aside>
+    <main class="content">
+      <header class="top ${page==='dashboard'?'fleet-hero':''}">
+        <div class="top-heading"><h1>${title}</h1><p class="sub">${description}</p></div>
+        ${action?`<div class="right"><button class="btn" onclick="${handler}">${action}</button></div>`:''}
+      </header>
+      <section id="main"></section>
+    </main>
+  </div><div id="overlay"></div>`;
+  const screens={dashboard:dashboardScreen,vehicles:vehiclesScreen,drivers:driversScreen,inspections:inspectionsScreen,
+    issues:issuesScreen,handovers:handoversScreen,reports:reportsScreen,audit:auditScreen,settings:settingsScreen};
+  screens[page]();
 }
 function lastPeriodic(id){
   let latest;
@@ -73,8 +116,71 @@ function lastPeriodic(id){
 }
 function inspectionStatus(v){let last=lastPeriodic(v.id);if(!last)return ['Sem inspeção','red'];let elapsed=daysBetween(last.date,today());if(elapsed>15)return ['Atrasado','red'];if(elapsed>7)return last.extended?['Prazo excepcional','yellow']:['Atrasado','red'];return ['Em dia','green']}
 function licenseStatus(d){if(!d.expiry)return ['Sem validade','red'];let n=daysBetween(today(),d.expiry);return n<0?['Vencida*','red']:n<=30?['Até 30 dias','yellow']:n<=60?['Até 60 dias','yellow']:['Cadastrada','green']}
-function dashboardScreen(){let active=state.vehicles.filter(v=>v.status==='Em utilização').length,free=state.vehicles.filter(v=>v.status==='Disponível').length,unavailable=state.vehicles.filter(v=>v.status==='Indisponível').length,late=state.vehicles.filter(v=>inspectionStatus(v)[1]==='red').length,issues=state.issues.filter(i=>i.status!=='Resolvida').length,expiring=state.drivers.filter(d=>licenseStatus(d)[1]!=='green').length;
-$('main').innerHTML=`<div class="metrics">${[['Veículos cadastrados',state.vehicles.length],['Em utilização',active],['Disponíveis',free],['Indisponíveis',unavailable]].map(x=>`<div class="metric"><span>${x[0]}</span><strong>${x[1]}</strong></div>`).join('')}</div><div class="layout2"><div><div class="panel"><div class="flex between"><h2>Agenda de inspeções</h2><button class="btn small" onclick="go('inspections');inspectionModal()">+ Novo checklist</button></div>${state.vehicles.length?state.vehicles.map(v=>{let st=inspectionStatus(v);return `<div class="card-row"><div><b>${h(v.plate)} · ${h(v.model)}</b><div class="help">Última periódica: ${displayDate(lastPeriodic(v.id)?.date)}</div></div>${pill(...st)}</div>`}).join(''):'<div class="empty"><b>Nenhum veículo cadastrado</b>Cadastre um veículo para começar as inspeções.</div>'}</div><div class="panel"><h2>Movimentações recentes</h2>${state.handovers.length?state.handovers.slice().reverse().slice(0,5).map(x=>`<div class="card-row"><div><b>${h(vehicle(x.vehicleId)?.plate||'Veículo removido')}</b><div class="help">${h(x.reason)} · ${displayDate(x.date)}</div></div>${pill(x.confirmed?'Recebido':'Aguardando',x.confirmed?'green':'yellow')}</div>`).join(''):'<div class="help">Nenhuma entrega ou devolução registrada.</div>'}</div></div><div><div class="panel"><h2>Pendências internas</h2><div class="card-row"><span>Checklists sem situação regular</span>${pill(String(late),'red')}</div><div class="card-row"><span>Avarias abertas</span>${pill(String(issues),'yellow')}</div><div class="card-row"><span>CNHs com alerta cadastral</span>${pill(String(expiring),'yellow')}</div><div class="card-row"><span>Devoluções aguardando confirmação</span>${pill(String(state.handovers.filter(x=>!x.confirmed).length),'blue')}</div><p class="help">* CNH vencida sinaliza conferência necessária, não uma decisão jurídica automática sobre autorização para dirigir.</p></div><div class="panel"><h2>Acesso rápido</h2><div class="flex"><button class="btn" onclick="go('inspections');inspectionModal()">☑ Inspecionar</button><button class="btn secondary" onclick="go('vehicles')">▣ Veículos</button><button class="btn secondary" onclick="go('handovers')">⇄ Devolver</button></div></div></div></div>`}
+function fleetDashboardLinks(items){
+  return `<ul class="fleet-dashboard-list fleet-dashboard-links">
+    ${items.map(([label,count,tone,screen])=>`<li><button type="button" onclick="go('${screen}')">
+      <span>${label}</span>${pill(count,count?tone:'')}<span class="fleet-row-arrow" aria-hidden="true">›</span>
+    </button></li>`).join('')}
+  </ul>`;
+}
+function dashboardScreen(){
+  const countStatus=status=>state.vehicles.filter(v=>v.status===status).length;
+  const metrics=[
+    ['Veículos cadastrados',state.vehicles.length,'total'],
+    ['Em utilização',countStatus('Em utilização'),'active'],
+    ['Disponíveis',countStatus('Disponível'),'available'],
+    ['Indisponíveis',countStatus('Indisponível'),'unavailable']
+  ];
+  const checks=state.vehicles.map(vehicle=>({vehicle,status:inspectionStatus(vehicle)}));
+  const pending=[
+    ['Checklists sem situação regular',checks.filter(x=>x.status[1]==='red').length,'red','inspections'],
+    ['Avarias abertas',state.issues.filter(i=>i.status!=='Resolvida').length,'yellow','issues'],
+    ['CNHs com alerta cadastral',state.drivers.filter(d=>licenseStatus(d)[1]!=='green').length,'yellow','drivers'],
+    ['Devoluções aguardando confirmação',state.handovers.filter(x=>!x.confirmed).length,'blue','handovers']
+  ];
+  const preventive=[
+    ['Revisões próximas ou vencidas',state.vehicles.filter(reviewAlert).length,'yellow','vehicles'],
+    ['Licenciamento próximo / pendente',state.vehicles.filter(v=>!v.licenseDate||daysBetween(today(),v.licenseDate)<=30).length,'yellow','vehicles'],
+    ['Plano de ação vencido',state.issues.filter(x=>x.status!=='Resolvida'&&x.due&&x.due<today()).length,'yellow','issues'],
+    ['Veículos sem condutor',state.vehicles.filter(v=>!v.driverId).length,'yellow','vehicles']
+  ];
+  $('main').innerHTML=`<dl class="metrics fleet-metrics">
+    ${metrics.map(([label,value,tone])=>`<div class="metric fleet-metric-${tone}"><dt>${label}</dt><dd>${value}</dd></div>`).join('')}
+  </dl>
+  <div class="fleet-dashboard-grid">
+    <section class="panel fleet-pending">
+      <h2>Pendências internas</h2>
+      ${fleetDashboardLinks(pending)}
+      <p class="help">* CNH vencida sinaliza a necessidade de conferência cadastral.</p>
+    </section>
+    <section class="panel fleet-agenda">
+      <h2>Agenda de inspeções</h2>
+      ${checks.length?`<ul class="fleet-dashboard-list">${checks.map(({vehicle:v,status})=>`<li class="card-row"><div>
+        <b>${h(v.plate)} <span class="fleet-row-model">${h(v.model)}</span></b>
+        <div class="help">Último checklist periódico · ${displayDate(lastPeriodic(v.id)?.date)}</div>
+      </div>${pill(...status)}</li>`).join('')}</ul>`
+        :`<div class="empty">
+          <b>Nenhum veículo cadastrado</b>
+          <button type="button" class="btn secondary small" onclick="go('vehicles');vehicleModal()">Cadastrar veículo</button>
+        </div>`}
+    </section>
+    <section class="panel fleet-preventive">
+      <h2>Controle preventivo e documental</h2>
+      ${fleetDashboardLinks(preventive)}
+    </section>
+    <section class="panel fleet-movements">
+      <div class="fleet-panel-heading">
+        <h2>Movimentações recentes</h2>
+        <button class="btn secondary small" onclick="go('handovers')">Ver devoluções</button>
+      </div>
+      ${state.handovers.length?`<ul class="fleet-dashboard-list">${state.handovers.slice().reverse().slice(0,5).map(item=>`
+        <li class="card-row"><div><b>${h(vehicle(item.vehicleId)?.plate||'Veículo removido')}</b>
+          <div class="help">${h(item.reason)} · ${displayDate(item.date)}</div>
+        </div>${pill(item.confirmed?'Recebido':'Aguardando',item.confirmed?'green':'yellow')}</li>`).join('')}</ul>`
+        :'<p class="help">Nenhuma entrega ou devolução registrada.</p>'}
+    </section>
+  </div>`;
+}
 const fleetSearchText=value=>String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 function vehiclesScreen(){
   const statuses=[...new Set(state.vehicles.map(v=>v.status).filter(Boolean))];
@@ -85,8 +191,7 @@ function vehiclesScreen(){
         ${statuses.map(status=>`<option>${h(status)}</option>`).join('')}</select></label>
       <p id="vehicle-filter-count" class="help" role="status"></p>
     </div>
-    <div class="table-wrap"><table><thead><tr><th>Placa</th><th>Modelo</th><th>Equipe / Responsável</th><th>Situação</th><th>Checklist</th><th>Ações</th></tr></thead>
-    <tbody id="vehicle-rows"></tbody></table></div></div>`;
+  </div><div id="vehicle-rows" class="fleet-vehicle-grid"></div>`;
   const search=$('vehicle-search'),status=$('vehicle-status-filter');
   const vehicles=state.vehicles.map(v=>{
     const name=driver(v.driverId)?.name;
@@ -96,12 +201,23 @@ function vehiclesScreen(){
     const query=fleetSearchText(search.value.trim());
     const matches=vehicles.filter(({v,text})=>(!status.value||v.status===status.value)&&text.includes(query));
     $('vehicle-filter-count').textContent=`${matches.length} de ${vehicles.length} veículos`;
-    $('vehicle-rows').innerHTML=matches.map(({v,name})=>`<tr>
-      <td><b>${h(v.plate)}</b></td><td>${h(v.model)}</td><td>${h(v.team||'—')}<div class="help">${h(name||'Sem condutor')}</div></td>
-      <td>${pill(v.status,v.status==='Disponível'?'green':v.status==='Indisponível'?'red':'blue')}</td>
-      <td>${pill(...inspectionStatus(v))}</td>
-      <td><button class="btn secondary small" onclick="vehicleModal('${v.id}')">Editar</button> <button class="btn secondary small" onclick="vehicleDetail('${v.id}')">Ficha</button></td></tr>`).join('')||
-      `<tr><td colspan="6" class="empty">${vehicles.length?'Nenhum veículo corresponde aos filtros.':'Sem veículos. Clique em + Veículo para cadastrar.'}</td></tr>`;
+    $('vehicle-rows').innerHTML=matches.map(({v,name})=>`<article class="panel fleet-vehicle">
+      <header>
+        <div><h3>${h(v.plate)}</h3><p class="fleet-vehicle-model">${h(v.model)}</p></div>
+        ${pill(v.status,v.status==='Disponível'?'green':v.status==='Indisponível'?'red':'blue')}
+      </header>
+      <dl class="fleet-vehicle-facts">
+        <div><dt>Equipe / responsável</dt><dd>${h(v.team||'—')}</dd><dd class="help">${h(name||'Sem condutor')}</dd></div>
+        <div><dt>Checklist</dt><dd>${pill(...inspectionStatus(v))}</dd></div>
+      </dl>
+      <div class="flex">
+        <button class="btn secondary small" onclick="vehicleDetail('${v.id}')">Ficha</button>
+        <button class="btn secondary small" onclick="vehicleModal('${v.id}')">Editar</button>
+      </div>
+    </article>`).join('')||`<div class="panel fleet-vehicle-empty">
+      <div class="empty"><b>${vehicles.length?'Nenhum veículo corresponde aos filtros.':'Nenhum veículo cadastrado.'}</b>
+      ${vehicles.length?'':'<button class="btn secondary small" onclick="vehicleModal()">Cadastrar veículo</button>'}</div>
+      </div>`;
   }
   search.addEventListener('input',showVehicles);
   status.addEventListener('change',showVehicles);
@@ -150,7 +266,6 @@ function clearDraft(){clearTimeout(draftTimer);delete state.inspectionDraft;draf
 async function cancelInspection(){if(!confirm('Cancelar e descartar o rascunho deste checklist?'))return;clearDraft();closeModal()}
 function exportCSV(){let rows=[['Placa','Data','Tipo','Condutor','KM','Não conformidades'],...state.inspections.map(i=>[i.plate,i.date,i.type,i.driverName,i.km,i.failures])];let cell=x=>'"'+String(x??'').replace(/^[=+@-]/,"'$&").replaceAll('"','""')+'"';download('frota-checklists.csv','\uFEFF'+rows.map(r=>r.map(cell).join(';')).join('\r\n'),'text/csv;charset=utf-8')}
 function reviewAlert(v){return (v.reviewDate&&daysBetween(today(),v.reviewDate)<=30)||(v.reviewKm&&Number(v.reviewKm)-Number(v.km||0)<=500)}
-const dashboardBase=dashboardScreen;dashboardScreen=function(){dashboardBase();let items=[['Revisões próximas ou vencidas',state.vehicles.filter(reviewAlert).length],['Licenciamento próximo / pendente',state.vehicles.filter(v=>!v.licenseDate||daysBetween(today(),v.licenseDate)<=30).length],['Plano de ação vencido',state.issues.filter(x=>x.status!=='Resolvida'&&x.due&&x.due<today()).length],['Veículos sem condutor',state.vehicles.filter(v=>!v.driverId).length]];$('main').insertAdjacentHTML('beforeend',`<div class="panel"><h2>Controle preventivo e documental</h2>${items.map(([l,n])=>`<div class="card-row">${h(l)} ${pill(n,n?'yellow':'green')}</div>`).join('')}</div>`)};
 const qrLibrary=(()=>{const modules={"./QR8bitByte":function(module,exports,require){
 var QRMode = require('./QRMode');
 

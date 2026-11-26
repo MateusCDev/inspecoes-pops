@@ -1,6 +1,15 @@
-# Inspeções POPs — aplicação, painel central e PDFs
+# VOANET — Central de Infraestrutura
 
-O GitHub Pages hospeda `public/`. O Apps Script recebe os pedidos, valida as credenciais e consulta/grava as inspeções no Sheets. O Drive guarda PDFs e cópias JSON. O Looker Studio é opcional: o próprio aplicativo tem um painel central.
+A **Visão geral** é a entrada do portal. Ela reúne **Inspeções POPs**, **Frota** e **Levantamento FTTx**, com módulos visíveis de acordo com o perfil. Os indicadores da entrada são de inspeções. A página identifica os rascunhos e envios pendentes que pertencem ao navegador atual.
+
+O GitHub Pages hospeda `public/`. O Apps Script autentica as requisições e integra o portal ao Google Sheets e ao Drive. O FTTx mantém rascunhos no navegador e exporta lista de materiais em PDF, Excel e CSV.
+
+## Continuar o desenvolvimento
+
+- Clone `MateusCDev/inspecoes-pops` e abra a pasta em uma branch de trabalho. Com Google AI Pro, é possível usar o [Google Antigravity](https://antigravity.google/docs/getting-started) para editar e executar os testes no repositório local. A [importação de código no Gemini web](https://support.google.com/gemini/answer/16176929?hl=pt-BR) serve para consultar e discutir uma cópia da branch importada.
+- A navegação do portal está em `public/portal.js`, os estilos comuns em `public/portal.css` e as URLs de integração em `public/config.js`. Para visualizar localmente, execute `python -m http.server 8000 --directory public` e abra `http://localhost:8000/`. Trabalhe com dados fictícios ou um ambiente de teste.
+- Execute `node --test tests/*.test.cjs` antes de mesclar. Quando houver alterações nos fontes do Apps Script, atualize o arquivo consolidado com `node tools/build-bd.cjs`.
+- A branch `main` publica o frontend no GitHub Pages. Alterações no Apps Script exigem uma implantação separada, mantendo a URL `/exec` usada pelo portal. As chaves individuais pertencem a cada usuário. Use a configuração e a documentação versionadas como contexto de desenvolvimento.
 
 ## Estado da integração
 
@@ -8,7 +17,7 @@ O site está conectado ao serviço Google. A versão v2 acrescenta processamento
 
 ## Frota Infra
 
-O portal oferece as abas **Inspeções POPs** e **Frota**. Cada módulo usa sua URL de implantação do Apps Script, configurada em `public/config.js`. A Frota usa as chaves individuais de Gestão já emitidas quando as duas implantações pertencem ao mesmo projeto Apps Script. Nesta versão, só o perfil **Gestão** pode consultar ou gravar o acervo de Frota. A chave é informada uma vez por sessão no portal. As duas abas preservam as telas abertas enquanto o portal estiver aberto. A opção **Sair do portal** encerra os dois acessos. Ao recarregar ou fechar a página, a chave em memória é descartada.
+As abas **Inspeções POPs** e **Frota** usam URLs de implantação do Apps Script configuradas em `public/config.js`. A Frota usa as chaves individuais de Gestão já emitidas quando as duas implantações pertencem ao mesmo projeto Apps Script. Nesta versão, só o perfil **Gestão** pode consultar ou gravar o acervo de Frota. A chave é informada uma vez por sessão no portal. As duas abas preservam as telas abertas enquanto o portal estiver aberto. A opção **Sair do portal** encerra a sessão em todos os módulos. Ao recarregar ou fechar a página, a chave em memória é descartada.
 
 A aba **Frota** do arquivo **DADOS CENTRALIZADOS (INFRA)** recebe a lista operacional de veículos, checklists, avarias e devoluções. A descrição nessa lista é padronizada. O acervo completo, inclusive os cadastros de condutores, fotos, documentos e histórico de gravações, é guardado no Drive restrito. A aba é atualizada pelo aplicativo. Edições manuais nos registros da Frota podem ser substituídas na próxima gravação. O compartilhamento já configurado da planilha permite acesso direto à lista operacional.
 

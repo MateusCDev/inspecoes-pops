@@ -271,7 +271,8 @@ function assetAdjustmentForm(adjustment){
 async function googleShowAssetIssues(id){
   const session=googleSession;
   const {dialog,content}=openGoogleAssetDialog('Pendências de conferência',id,'Carregando pendências…');
-  dialog.classList.add('asset-review-dialog');
+  dialog.classList.add('asset-review-dialog','inspection-review-panel');
+  content.removeAttribute('aria-live');
   const active=()=>session===googleSession&&dialog.open;
   async function refresh(saved=false){
     const result=await googleRpc('assetIssues',{inspectionId:id});
@@ -288,16 +289,19 @@ async function googleShowAssetIssues(id){
       ? button('googleCompare:'+id,'Conferir com a base central','primary tiny'):'';
     const update=tabs.size&&googleUser?.role==='GESTAO'&&!googleCapabilities.assetAdjustments
       ? '<p class="small muted">O ajuste nesta tela fica disponível após atualizar a implantação do Apps Script.</p>':'';
-    const sections=[...tabs].map(([title,items])=>`<section class="asset-review-group"><div class="asset-review-group-title"><h3>${esc(title)}</h3><span>${items.length}</span></div>
+    const sections=[...tabs].map(([title,items])=>`<section class="asset-review-group"><div class="asset-review-group-title"><h3>${esc(title)}</h3><span aria-hidden="true">${items.length}</span></div>
       <ul>${items.map(({detail,adjustment})=>{
         const guidance=assetIssueGuidance(detail);
         return `<li><p class="asset-review-detail">${esc(detail)}</p>${assetAdjustmentForm(adjustment)||
           (guidance?`<p class="asset-issue-guidance">${esc(guidance)}</p>`:'')}</li>`;
       }).join('')}</ul></section>`).join('');
     const count=result.issues.length;
+    const actionable=googleUser?.role==='GESTAO'&&googleCapabilities.assetAdjustments?
+      result.issues.filter(entry=>entry.adjustment).length:0;
     const outcome=saved?'Ajuste salvo. ':'';
-    content.innerHTML=`<div class="asset-review-summary"><p tabindex="-1" id="asset-remaining">${outcome}${count
-      ? count+(count===1?' pendência para revisar.':' pendências para revisar.'):'Sem pendências nesta versão.'}</p>${actions}</div>
+    content.innerHTML=`<div class="asset-review-summary"><div><p tabindex="-1" id="asset-remaining" role="status">${outcome}${count
+      ? count+(count===1?' pendência para revisar.':' pendências para revisar.'):'Sem pendências nesta versão.'}</p>
+      ${actionable>0?`<p class="inspection-review-actionable">${actionable===1?'1 pendência com ajuste disponível':actionable+' pendências com ajuste disponível'}</p>`:''}</div>${actions}</div>
       ${update}${sections}`;
     if(saved)content.querySelector('#asset-remaining').focus();
   }

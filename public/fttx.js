@@ -187,19 +187,20 @@ function fttxPriceTable(groups){
     const source=reference&&/^https:\/\//.test(reference.url)
       ? `<a href="${esc(reference.url)}" target="_blank" rel="noopener noreferrer">${esc(reference.store)}</a>
         <div class="small muted">${esc(reference.details||'')} · ${esc(fmt(reference.checkedOn))}</div>`
-      : esc(quote.source);
-    return `<tr><th scope="row">${name}</th><td>${fttxQuantityFormat.format(qty)} ${unit}</td>
-      <td><input type="number" min="0" step="0.0001" inputmode="decimal" class="fttx-price-input"
+      : `<span>${esc(quote.source)}</span>`;
+    return `<tr role="row"><th role="rowheader" scope="row">${esc(name)}</th><td role="cell">${fttxCellLabel('Quantidade')}${fttxQuantityFormat.format(qty)} ${unit}</td>
+      <td role="cell">${fttxCellLabel('Preço unitário')}<input type="number" min="0" step="0.0001" inputmode="decimal" class="fttx-price-input"
         aria-label="Preço unitário de ${esc(name)}" data-fttx-price="${esc(name)}"
         value="${esc(fttxDraft.prices?.[name]??'')}" placeholder="${quote.unit===null?'—':fttxUnitPrice.format(quote.unit)}"></td>
-      <td data-fttx-price-result><strong>${quote.cents===null?'—':fttxCurrency.format(quote.cents/100)}</strong></td><td data-fttx-price-result>${source}</td></tr>`;
+      <td role="cell" data-fttx-price-result>${fttxCellLabel('Subtotal')}<strong>${quote.cents===null?'—':fttxCurrency.format(quote.cents/100)}</strong></td>
+      <td role="cell" data-fttx-price-result>${fttxCellLabel('Origem')}${source}</td></tr>`;
   }).join('');
   return `<details class="fttx-prices" ${fttxPriceOpen?'open':''}><summary id="fttx-prices-editor">Estimativa de materiais · ${cents||missing<materials.size?fttxCurrency.format(cents/100):'sem valores'}</summary>
     <p class="small muted">${fttxReferenceStatus} O valor digitado substitui a referência pública.</p>
     <div data-fttx-price-result>${missing?`<p class="fttx-alert">${missing} de ${materials.size} materiais sem preço. O subtotal cobre os itens com valor informado.</p>`:''}</div>
-    <div class="table-scroll"><table class="data-table fttx-price-table">
-      <thead><tr><th>Material</th><th>Quantidade</th><th>Preço unitário</th><th>Subtotal</th><th>Origem</th></tr></thead>
-      <tbody>${rows}</tbody></table></div></details>`;
+    <div class="table-scroll fttx-review-table"><table class="data-table fttx-price-table" role="table" aria-label="Preços de materiais">
+      <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Material</th><th role="columnheader" scope="col">Quantidade</th><th role="columnheader" scope="col">Preço unitário</th><th role="columnheader" scope="col">Subtotal</th><th role="columnheader" scope="col">Origem</th></tr></thead>
+      <tbody role="rowgroup">${rows}</tbody></table></div></details>`;
 }
 
 let fttxPriceOpen=true;
@@ -333,27 +334,34 @@ function fttxCatalogOptions(query=''){
   return `<option value="">${options?'Selecione um material':'Nenhum material encontrado'}</option>${options}`;
 }
 
+function fttxCellLabel(label){
+  return `<span class="fttx-cell-label" aria-hidden="true">${label}</span>`;
+}
+
 function fttxResults({cables,groups}){
   const f=value=>fttxQuantityFormat.format(value);
   const shown=cables.filter(c=>c.total>0);
   const {items}=fttxCostRows(groups);
   const money=value=>value===null?'—':fttxCurrency.format(value);
   return `<div id="fttx-cost-summary" class="fttx-cost-summary">${fttxCostSummary(groups)}</div>
-  ${shown.length?`<h3>Reserva por bitola</h3><div class="table-scroll"><table class="data-table">
-    <thead><tr><th>Bitola</th><th>CTOs</th><th>CEOs</th><th>A cada 500 m</th><th>Reserva</th><th>Cabo total</th></tr></thead>
-    <tbody>${shown.map(c=>`<tr><th scope="row">${String(c.fibers).padStart(2,'0')} FO</th>
-      ${[c.ctoReserve,c.ceoReserve,c.routeReserve,c.reserve,c.total].map(v=>`<td>${f(v)} m</td>`).join('')}</tr>`).join('')}</tbody>
-    </table></div>`:''}
+  ${shown.length?`<section class="fttx-reservation"><h3>Reserva por bitola</h3><div class="table-scroll fttx-review-table"><table class="data-table fttx-reserve-table" role="table" aria-label="Reserva por bitola">
+    <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Bitola</th><th role="columnheader" scope="col">CTOs</th><th role="columnheader" scope="col">CEOs</th><th role="columnheader" scope="col">A cada 500 m</th><th role="columnheader" scope="col">Reserva</th><th role="columnheader" scope="col">Cabo total</th></tr></thead>
+    <tbody role="rowgroup">${shown.map(c=>`<tr role="row"><th role="rowheader" scope="row">${String(c.fibers).padStart(2,'0')} FO</th>
+      ${[['CTOs',c.ctoReserve],['CEOs',c.ceoReserve],['A cada 500 m',c.routeReserve],['Reserva',c.reserve],['Cabo total',c.total]]
+        .map(([label,value])=>`<td role="cell">${fttxCellLabel(label)}${f(value)} m</td>`).join('')}</tr>`).join('')}</tbody>
+    </table></div></section>`:''}
   ${items.length?groups.filter(group=>group.items.length).map(group=>{
     const rows=items.filter(item=>item.group===group.title);
     const priced=rows.filter(item=>item.subtotal!==null);
     const subtotal=priced.length?priced.reduce((sum,item)=>sum+Math.round(item.subtotal*100),0)/100:null;
     return `<section class="fttx-materials"><div class="fttx-stage-total"><h3>${group.title}</h3>
       <span>Subtotal estimado <strong>${money(subtotal)}</strong></span></div>
-      <div class="table-scroll"><table class="data-table fttx-budget-table">
-      <thead><tr><th>Material</th><th>Un.</th><th>Quantidade</th><th>Preço unitário</th><th>Subtotal</th></tr></thead>
-      <tbody>${rows.map(({name,unit,quantity,price,subtotal})=>`<tr><th scope="row">${name}</th><td>${unit}</td>
-        <td><strong>${f(quantity)}</strong></td><td>${price===null?'—':fttxUnitPrice.format(price)}</td><td>${money(subtotal)}</td></tr>`).join('')}</tbody>
+      <div class="table-scroll fttx-review-table"><table class="data-table fttx-budget-table" role="table" aria-label="${esc(group.title)}">
+      <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Material</th><th role="columnheader" scope="col">Quantidade</th><th role="columnheader" scope="col">Preço unitário</th><th role="columnheader" scope="col">Subtotal</th></tr></thead>
+      <tbody role="rowgroup">${rows.map(({name,unit,quantity,price,subtotal})=>`<tr role="row"><th role="rowheader" scope="row">${esc(name)}</th>
+        <td role="cell">${fttxCellLabel('Quantidade')}<strong>${f(quantity)} ${unit}</strong></td>
+        <td role="cell">${fttxCellLabel('Preço unitário')}${price===null?'—':fttxUnitPrice.format(price)}</td>
+        <td role="cell">${fttxCellLabel('Subtotal')}${money(subtotal)}</td></tr>`).join('')}</tbody>
       </table></div></section>`;
   }).join(''):'<p class="muted">Preencha os dados do projeto para gerar a lista de materiais.</p>'}
   ${fttxPriceTable(groups)}`;
@@ -364,82 +372,91 @@ function renderFttx(){
   const panel=number=>`class="card fttx-panel" data-fttx-panel="${number}" ${step!==number?'hidden':''}`;
   const issues=number=>`<div data-fttx-issues="${number}" role="status">${fttxIssues(result,number)}</div>`;
   return `<main class="shell fttx-shell">
-    <div class="home-hero"><div><h1>Levantamento FTTx</h1>
-      <p>Monte uma estimativa de materiais para o orçamento preliminar do projeto.</p></div>${isGoogleMode()?'':button('home','Voltar à Gestão','primary')}</div>
+    <header class="fttx-page-heading"><div><h1>Levantamento FTTx</h1>
+      <p>Calcule a metragem, confira os materiais e prepare o levantamento para o almoxarifado.</p></div>${isGoogleMode()?'':button('home','Voltar à Gestão','tiny')}</header>
     <div id="fttx-overview">${fttxOverview(result)}</div>
-    <div class="fttx-wizard-head">
-      <p id="fttx-step-status">Etapa ${step} de ${FTTX_STEPS.length} · ${FTTX_STEPS[step-1][0]}</p>
-      <p class="small muted" id="fttx-save" role="status">${fttxSaveError?'Armazenamento local indisponível.':'Rascunho neste dispositivo'}</p>
+    <div class="fttx-workspace">
+      <aside class="fttx-wizard" aria-label="Progresso do levantamento">
+        <div class="fttx-wizard-head">
+          <p id="fttx-step-status">Etapa ${step} de ${FTTX_STEPS.length} · ${FTTX_STEPS[step-1][0]}</p>
+          <p class="small muted" id="fttx-save" role="status">${fttxSaveError?'Armazenamento local indisponível.':'Rascunho neste dispositivo'}</p>
+        </div>
+        <nav class="fttx-navigation" aria-label="Etapas do levantamento">
+          ${FTTX_STEPS.map(([label],index)=>`<button type="button" class="btn tiny" data-fttx-step="${index+1}" aria-label="${label}"
+            ${index+1===step?'aria-current="step"':''}><span aria-hidden="true">${index+1}</span>
+            <b>${label}</b>${index===3?'<b class="fttx-short-name" aria-hidden="true">Revisão</b>':''}</button>`).join('')}
+        </nav>
+      </aside>
+      <div class="fttx-step-content">
+        <section ${panel(1)} aria-labelledby="fttx-project-heading">
+          ${fttxStep(1,'fttx-project-heading','Lançamento de cabo e postes')}
+          ${issues(1)}
+          <p class="fttx-panel-description">Use as quantidades previstas no mapa ou no projeto. Deixe em branco as que ainda precisa confirmar.</p>
+          <label class="fttx-field fttx-project"><span>Nome do projeto</span><input maxlength="100" data-fttx-field="name" placeholder="Ex.: Expansão Curralinho" value="${esc(fttxDraft.name??'')}"></label>
+          <h3>Cabo por número de fibras (FO)</h3>
+          <p class="small muted">Informe a metragem por bitola. O sistema calcula a reserva.</p>
+          ${fttxCableInputs(['meters'])}
+          <h3>Postes e abraçadeiras</h3>
+          <div class="fttx-fields">${FTTX_ROUTE_FIELDS.map(([field,label,help])=>fttxInput(field,label,help)).join('')}</div>
+          <button type="button" class="btn tiny fttx-suggestion" data-fttx-suggestion="asPoles">Usar todos os postes para cabo AS</button>
+          <p class="small muted">Use esse atalho se o cabo AS passar em todos os postes do trecho. Você pode ajustar a quantidade depois.</p>
+          <details class="fttx-options" ${FTTX_ROUTE_DETAILS.some(([key])=>fttxQuantity(fttxDraft[key])>0)?'open':''}>
+            <summary>Detalhar ferragens e ancoragem</summary>
+            <p class="small muted">Preencha os itens que já consegue estimar pelo traçado. Deixe os demais para a conferência de campo.</p>
+            <div class="fttx-fields">${FTTX_ROUTE_DETAILS.map(([field,label,help])=>fttxInput(field,label,help)).join('')}</div>
+          </details>
+          ${fttxStepActions(1)}
+        </section>
+        <section ${panel(2)} aria-labelledby="fttx-cto-heading">
+          ${fttxStep(2,'fttx-cto-heading','Montagem de CTO')}
+          ${issues(2)}
+          <p class="fttx-panel-description">Separe as caixas de atendimento comuns das de ponta. Informe cada caixa na bitola do cabo que terá a reserva.</p>
+          ${fttxCableInputs(['cto','endCto'])}
+          <div class="fttx-fields">${fttxInput('ctoPoles','Postes com CTO','Conte os postes distintos. Se duas caixas estiverem no mesmo poste, conte apenas um poste.')}</div>
+          <button type="button" class="btn tiny fttx-suggestion" data-fttx-suggestion="ctoPoles">Estimar uma CTO por poste</button>
+          <p class="small muted">Por caixa, o sistema inclui 1 plaqueta, 3 m de fita de aço, 2 fechos e 6 anéis guia. Também inclui 1 olhal básico por poste com CTO. A reserva é de 22 m por CTO comum e 12,5 m por CTO de ponta.</p>
+          ${fttxStepActions(2)}
+        </section>
+        <section ${panel(3)} aria-labelledby="fttx-box-heading">
+          ${fttxStep(3,'fttx-box-heading','Montagem de CEO / CEP')}
+          <p class="fttx-panel-description">Cada CEO soma 20 m de cabo na bitola indicada e 2 alças de cordoalha. Cada CEO ou CEP inclui 1 conjunto de reserva e 1 plaqueta.</p>
+          ${fttxCableInputs(['ceo'])}
+          <div class="fttx-fields">${fttxInput(...FTTX_BOX_FIELDS[0])}</div>
+          <details class="fttx-options" ${FTTX_BOX_FIELDS.slice(1).some(([key])=>fttxQuantity(fttxDraft[key],true)>0)?'open':''}>
+            <summary>Detalhar componentes das caixas de emenda</summary>
+            <div class="fttx-fields">${FTTX_BOX_FIELDS.slice(1).map(([field,label,help])=>fttxInput(field,label,help,field==='strand')).join('')}</div>
+          </details>
+          ${fttxStepActions(3)}
+        </section>
+        <section ${panel(4)} aria-labelledby="fttx-list-heading">
+          ${fttxStep(4,'fttx-list-heading','Lista para o almoxarifado')}
+          <p class="fttx-panel-description">Revise as quantidades por etapa e ajuste os preços para baixar o levantamento preliminar.</p>
+          <div class="fttx-export-bar">
+            <div class="btnrow" aria-label="Exportar materiais">${[['pdf','Baixar PDF','primary'],['xlsx','Baixar Excel',''],['csv','Baixar CSV','']]
+              .map(([format,label,style])=>`<button type="button" class="btn ${style}" data-fttx-export="${format}"
+              ${result.alerts.length||!result.groups.some(group=>group.items.length)?'disabled':''}>${label}</button>`).join('')}</div>
+            <p id="fttx-export-status" class="small muted fttx-export-status" role="status"></p>
+          </div>
+          ${issues(4)}
+          <details class="fttx-options fttx-catalog" ${Object.keys(fttxDraft.extras||{}).length?'open':''}>
+            <summary>Adicionar outros materiais do catálogo</summary>
+            <form id="fttx-catalog-form" class="fttx-fields">
+              <label class="fttx-field"><span>Buscar no catálogo</span><input type="search" id="fttx-search" placeholder="Ex.: DIO, OLT ou microduto"></label>
+              <label class="fttx-field"><span id="fttx-material-label">Material</span><select id="fttx-catalog-item" aria-labelledby="fttx-material-label" required>${fttxCatalogOptions()}</select></label>
+              <label class="fttx-field"><span>Quantidade</span><input id="fttx-catalog-quantity" type="number" min="0" step="0.01" inputmode="decimal" required></label>
+              <button class="btn" type="submit">Aplicar quantidade</button>
+            </form>
+            <p class="small muted" id="fttx-catalog-status" role="status">Informe zero para retirar um material complementar da lista.</p>
+          </details>
+          <details class="fttx-options">
+            <summary>Ver um exemplo de cálculo da reserva</summary>
+            <p class="small muted">Para 1.000 m de cabo de 12 FO, 2 CTOs comuns, 1 CTO de ponta e 1 CEO na mesma bitola, a reserva é de 176,5 m. São 100 m pelo trajeto, 44 m pelas CTOs comuns, 12,5 m pela CTO de ponta e 20 m pela CEO. O cabo previsto fica em 1.176,5 m.</p>
+          </details>
+          <div id="fttx-results">${step===4?fttxResults(result):''}</div>
+          ${fttxStepActions(4)}
+        </section>
+      </div>
     </div>
-    <nav class="fttx-navigation" aria-label="Etapas do levantamento">
-      ${FTTX_STEPS.map(([label],index)=>`<button type="button" class="btn tiny" data-fttx-step="${index+1}"
-        ${index+1===step?'aria-current="step"':''}><span aria-hidden="true">${index+1}</span>${label}</button>`).join('')}
-    </nav>
-    <section ${panel(1)} aria-labelledby="fttx-project-heading">
-      ${fttxStep(1,'fttx-project-heading','Lançamento de cabo e postes')}
-      ${issues(1)}
-      <p>Comece pelo cabo e pelos postes do trajeto. Use as quantidades previstas no mapa ou no projeto. Você pode deixar em branco as quantidades que ainda precisa confirmar.</p>
-      <label class="fttx-field fttx-project"><span>Nome do projeto</span><input maxlength="100" data-fttx-field="name" placeholder="Ex.: Expansão Curralinho" value="${esc(fttxDraft.name??'')}"></label>
-      <h3>Cabo por número de fibras (FO)</h3>
-      <p class="small muted">Informe apenas a distância do trajeto que usa cada cabo, em metros. A reserva é somada depois. Por exemplo, 1.000 m de trajeto em cabo de 12 fibras entram no campo 12 FO.</p>
-      ${fttxCableInputs(['meters'])}
-      <h3>Postes e abraçadeiras</h3>
-      <div class="fttx-fields">${FTTX_ROUTE_FIELDS.map(([field,label,help])=>fttxInput(field,label,help)).join('')}</div>
-      <button type="button" class="btn tiny fttx-suggestion" data-fttx-suggestion="asPoles">Usar todos os postes para cabo AS</button>
-      <p class="small muted">Use esse atalho se o cabo AS passar em todos os postes do trecho. Você pode ajustar a quantidade depois.</p>
-      <details class="fttx-options" ${FTTX_ROUTE_DETAILS.some(([key])=>fttxQuantity(fttxDraft[key])>0)?'open':''}>
-        <summary>Detalhar ferragens e ancoragem</summary>
-        <p class="small muted">Preencha os itens que já consegue estimar pelo traçado. Deixe os demais para a conferência de campo.</p>
-        <div class="fttx-fields">${FTTX_ROUTE_DETAILS.map(([field,label,help])=>fttxInput(field,label,help)).join('')}</div>
-      </details>
-      ${fttxStepActions(1)}
-    </section>
-    <section ${panel(2)} aria-labelledby="fttx-cto-heading">
-      ${fttxStep(2,'fttx-cto-heading','Montagem de CTO')}
-      ${issues(2)}
-      <p>Conte as caixas de atendimento (CTOs). Separe as comuns das de ponta, que ficam no fim do ramal. Informe cada caixa na bitola do cabo que terá a reserva.</p>
-      ${fttxCableInputs(['cto','endCto'])}
-      <div class="fttx-fields">${fttxInput('ctoPoles','Postes com CTO','Conte os postes distintos. Se duas caixas estiverem no mesmo poste, conte apenas um poste.')}</div>
-      <button type="button" class="btn tiny fttx-suggestion" data-fttx-suggestion="ctoPoles">Estimar uma CTO por poste</button>
-      <p class="small muted">Por caixa, o sistema inclui 1 plaqueta, 3 m de fita de aço, 2 fechos e 6 anéis guia. Também inclui 1 olhal básico por poste com CTO. A reserva é de 22 m por CTO comum e 12,5 m por CTO de ponta.</p>
-      ${fttxStepActions(2)}
-    </section>
-    <section ${panel(3)} aria-labelledby="fttx-box-heading">
-      ${fttxStep(3,'fttx-box-heading','Montagem de CEO / CEP')}
-      <p>Informe as caixas de emenda previstas. Cada CEO soma 20 m de cabo na bitola indicada e 2 alças de cordoalha. Cada CEO ou CEP inclui 1 conjunto de reserva e 1 plaqueta.</p>
-      ${fttxCableInputs(['ceo'])}
-      <div class="fttx-fields">${fttxInput(...FTTX_BOX_FIELDS[0])}</div>
-      <details class="fttx-options" ${FTTX_BOX_FIELDS.slice(1).some(([key])=>fttxQuantity(fttxDraft[key],true)>0)?'open':''}>
-        <summary>Detalhar componentes das caixas de emenda</summary>
-        <div class="fttx-fields">${FTTX_BOX_FIELDS.slice(1).map(([field,label,help])=>fttxInput(field,label,help,field==='strand')).join('')}</div>
-      </details>
-      ${fttxStepActions(3)}
-    </section>
-    <section ${panel(4)} aria-labelledby="fttx-list-heading">
-      <div class="card-head">${fttxStep(4,'fttx-list-heading','Lista para o almoxarifado')}
-        <div class="btnrow" aria-label="Exportar materiais">${[['pdf','Baixar PDF','primary'],['xlsx','Baixar Excel',''],['csv','Baixar CSV','']]
-          .map(([format,label,style])=>`<button type="button" class="btn ${style}" data-fttx-export="${format}"
-          ${result.alerts.length||!result.groups.some(group=>group.items.length)?'disabled':''}>${label}</button>`).join('')}</div></div>
-      <p id="fttx-export-status" class="small muted fttx-export-status" role="status"></p>
-      <p class="small muted">Revise as quantidades por etapa e ajuste os preços antes de baixar o levantamento preliminar.</p>
-      ${issues(4)}
-      <details class="fttx-options fttx-catalog" ${Object.keys(fttxDraft.extras||{}).length?'open':''}>
-        <summary>Adicionar outros materiais do catálogo</summary>
-        <form id="fttx-catalog-form" class="fttx-fields">
-          <label class="fttx-field"><span>Buscar no catálogo</span><input type="search" id="fttx-search" placeholder="Ex.: DIO, OLT ou microduto"></label>
-          <label class="fttx-field"><span id="fttx-material-label">Material</span><select id="fttx-catalog-item" aria-labelledby="fttx-material-label" required>${fttxCatalogOptions()}</select></label>
-          <label class="fttx-field"><span>Quantidade</span><input id="fttx-catalog-quantity" type="number" min="0" step="0.01" inputmode="decimal" required></label>
-          <button class="btn" type="submit">Aplicar quantidade</button>
-        </form>
-        <p class="small muted" id="fttx-catalog-status" role="status">Informe zero para retirar um material complementar da lista.</p>
-      </details>
-      <details class="fttx-options">
-        <summary>Ver um exemplo de cálculo da reserva</summary>
-        <p class="small muted">Para 1.000 m de cabo de 12 FO, 2 CTOs comuns, 1 CTO de ponta e 1 CEO na mesma bitola, a reserva é de 176,5 m. São 100 m pelo trajeto, 44 m pelas CTOs comuns, 12,5 m pela CTO de ponta e 20 m pela CEO. O cabo previsto fica em 1.176,5 m.</p>
-      </details>
-      <div id="fttx-results">${step===4?fttxResults(result):''}</div>
-      ${fttxStepActions(4)}
-    </section>
   </main>`;
 }
 

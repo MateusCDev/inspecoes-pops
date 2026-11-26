@@ -252,6 +252,7 @@ async function openGoogleCentral(section=googleUser?.role==='GESTAO'?'dashboard'
   if(!googleCentralUpdated)await googleRefreshCentral();
 }
 function googleRenderCentralData(){
+  window.VOANET_PORTAL?.updateOverview?.();
   if(!['home','assets','googleCentral'].includes(view))return;
   const focused=document.activeElement;
   const selector=focused?.id?'#'+CSS.escape(focused.id):focused?.dataset?.action
@@ -339,7 +340,7 @@ function googleHistoryResults(items,manager){
 
 function googleHistoryView(items,manager){
   return `<section class="card history-section">
-    <h2>Histórico de inspeções</h2>
+    <header class="inspection-section-head"><h2>Histórico de inspeções</h2></header>
     <div class="history-filters">
       <label for="google-history-query">Buscar no histórico<input id="google-history-query" type="search" maxlength="100"
         placeholder="Estação, técnico ou data" value="${esc(googleHistoryQuery)}"></label>
@@ -357,13 +358,101 @@ function updateGoogleHistoryFilters(event){
 }
 document.addEventListener('input',updateGoogleHistoryFilters);
 
+function googleUpcomingInspections(items){
+  const latest=new Map();
+  for(const item of googleSummary?.latest||items){
+    const key=String(item.stationCode||'')+'|'+item.station;
+    const previous=latest.get(key);
+    if(!previous||String(item.date)+String(item.updated)>String(previous.date)+String(previous.updated))latest.set(key,item);
+  }
+  return [...latest.values()]
+    .filter(item=>!googleStations.some(station=>station.inactive&&station.code===String(item.stationCode)&&station.name===item.station))
+    .sort((a,b)=>String(a.due||'9999').localeCompare(String(b.due||'9999')));
+}
+
+function googleScheduleLabel(due){
+  const days=daysUntil(due);
+  if(days===null)return {className:'neutral',label:'Sem programação'};
+  if(days<0){
+    const elapsed=Math.abs(days);
+    return {className:'overdue',label:`Vencida há ${elapsed} ${elapsed===1?'dia':'dias'}`};
+  }
+  if(days===0)return {className:'soon',label:'Vence hoje'};
+  return {className:days<=7?'soon':'current',label:days===1?'Vence amanhã':`Faltam ${days} dias`};
+}
+
+function googleScheduleBadge(due){
+  const {className,label}=googleScheduleLabel(due);
+  return `<span class="inspection-due inspection-due-${className}">${esc(label)}</span>`;
+}
+
+function googleCentralSchedule(items){
+  const upcoming=googleUpcomingInspections(items);
+  return `<section class="card inspection-schedule">
+    <header class="inspection-section-head"><h2 id="google-schedule-heading" tabindex="-1">Próximas inspeções por POP</h2>
+      <p class="muted">Prazos calculados a partir da última vistoria de cada estação.</p>
+    </header>
+    ${upcoming.length?`<ol class="inspection-schedule-list">${upcoming.map(item=>`<li class="inspection-schedule-row">
+      <div class="inspection-schedule-station"><h3>${esc(item.station||'Estação sem nome')}</h3>
+        ${item.stationCode?`<span>${esc(item.stationCode)}</span>`:''}</div>
+      <dl>
+        <div><dt>Última vistoria</dt><dd>${esc(fmt(item.date))}</dd></div>
+        <div><dt>Próxima inspeção</dt><dd>${esc(fmt(item.due))}</dd></div>
+        <div><dt>Periodicidade</dt><dd>${Number(item.period)>0?Number(item.period)+' dias':'—'}</dd></div>
+      </dl>
+      ${googleScheduleBadge(item.due)}
+    </li>`).join('')}</ol>`:'<p class="inspection-empty">Sem inspeções recebidas.</p>'}
+  </section>`;
+}
+
+function googleCentralDashboard(items){
+  const number=new Intl.NumberFormat('pt-BR');
+  const sum=key=>items.reduce((total,item)=>total+(Number(item[key])||0),0);
+  const conform=Number(googleSummary?.conform??sum('conform'))||0;
+  const nonconform=Number(googleSummary?.nc??sum('nc'))||0;
+  const loaded=Boolean(googleSummary||googleCentralUpdated||items.length);
+  const total=Number(googleSummary?.total??items.length)||0;
+  const percent=conform+nonconform?100*conform/(conform+nonconform):null;
+  const percentText=percent===null?'—':percent.toLocaleString('pt-BR',{maximumFractionDigits:1})+'%';
+  const byPOP=new Map();
+  for(const item of items){
+    const station=item.station||'Estação sem nome';
+    byPOP.set(station,(byPOP.get(station)||0)+(Number(item.nc)||0));
+  }
+  const ranking=(googleSummary?.ranking||[...byPOP].sort((a,b)=>b[1]-a[1]))
+    .filter(([,count])=>Number(count)>0).slice(0,8);
+  const ceiling=Math.max(1,...ranking.map(([,count])=>Number(count)));
+  const scheduled=googleUpcomingInspections(items).filter(item=>item.due).slice(0,4);
+  return `<div class="inspection-kpis">
+    <article class="inspection-kpi"><h2>Inspeções recebidas</h2>
+      <strong>${loaded?number.format(total):'—'}</strong>
+      ${button('centralSection:history','Consultar histórico','tiny')}</article>
+    <article class="inspection-kpi inspection-kpi-attention"><h2>Não conformidades</h2>
+      <strong>${loaded?number.format(nonconform):'—'}</strong>
+      ${button('centralSection:plans','Ver planos de ação','tiny')}</article>
+    <article class="inspection-kpi inspection-kpi-rate"><h2>Taxa de conformidade</h2><strong>${percentText}</strong>
+      ${percent===null?'':`<meter min="0" max="100" value="${percent}" aria-label="Taxa de conformidade"></meter>`}
+      <p>Itens conformes entre os itens avaliados.</p></article>
+    </div>
+    <div class="inspection-overview-grid">
+      <section class="card inspection-overview-panel"><header class="inspection-section-head"><h2>Não conformidades por POP</h2></header>
+      ${ranking.length?`<ul class="inspection-ranking">${ranking.map(([station,count])=>`<li>
+        <div><span>${esc(station)}</span><strong>${number.format(count)}</strong></div>
+        <progress aria-label="${esc(station)}" max="${ceiling}" value="${Number(count)}"></progress>
+      </li>`).join('')}</ul>`:`<p class="inspection-empty">${loaded?'Sem não conformidades no ranking.':'Aguardando os registros da base central.'}</p>`}
+      </section>
+      <section class="card inspection-overview-panel"><header class="inspection-section-head"><h2>Agenda de vistorias</h2>
+        ${button('centralSection:schedule','Abrir cronograma','tiny')}</header>
+        ${scheduled.length?`<ul class="inspection-agenda">${scheduled.map(item=>`<li>
+          <div><strong>${esc(item.station||'Estação sem nome')}</strong><span>${esc(fmt(item.due))}</span></div>
+          ${googleScheduleBadge(item.due)}
+        </li>`).join('')}</ul>`:`<p class="inspection-empty">${loaded?'Sem vistorias programadas.':'Aguardando os registros da base central.'}</p>`}
+      </section>
+    </div>`;
+}
+
 function googleCentralView(){
-  const manager=googleUser.role==='GESTAO',items=googleCentralItems,sum=k=>items.reduce((n,r)=>n+(Number(r[k])||0),0),c=googleSummary?.conform??sum('conform'),nc=googleSummary?.nc??sum('nc');
-  const byPOP=Object.create(null);items.forEach(r=>{byPOP[r.station]=(byPOP[r.station]||0)+(Number(r.nc)||0);});
-  const ranking=googleSummary?.ranking||Object.entries(byPOP).filter(([,n])=>n>0).sort((a,b)=>b[1]-a[1]).slice(0,8),max=Math.max(1,...ranking.map(([,n])=>n));
-  const latest=new Map();for(const item of googleSummary?.latest||items){const key=String(item.stationCode||'')+'|'+item.station,old=latest.get(key);if(!old||String(item.date)+String(item.updated)>String(old.date)+String(old.updated))latest.set(key,item);}
-  const upcoming=[...latest.values()].filter(r=>!googleStations.some(s=>s.inactive&&s.code===String(r.stationCode)&&s.name===r.station)).sort((a,b)=>String(a.due||'9999').localeCompare(String(b.due||'9999')));
-  const scheduleHTML=()=>`<div class="card"><h2 id="google-schedule-heading" tabindex="-1">Próximas inspeções — última vistoria de cada POP</h2><div class="table-scroll"><table class="data-table"><thead><tr><th>POP</th><th>Última vistoria</th><th>Prazo</th><th>Próxima inspeção</th><th>Situação</th></tr></thead><tbody>${upcoming.map(r=>{const days=daysUntil(r.due),status=days===null?'Sem programação':days<0?'Vencida há '+Math.abs(days)+' dia(s)':days===0?'Vence hoje':'Faltam '+days+' dia(s)';return `<tr><td>${esc(r.station)}</td><td>${esc(fmt(r.date))}</td><td>${Number(r.period)||'—'} dias</td><td>${esc(fmt(r.due))}</td><td>${esc(status)}</td></tr>`;}).join('')||'<tr><td colspan="5">Sem inspeções recebidas.</td></tr>'}</tbody></table></div></div>`;
+  const manager=googleUser.role==='GESTAO',items=googleCentralItems;
   const section=googleCentralSection;
   const title={dashboard:manager?'Dashboard Gerencial':'Minhas inspeções enviadas',
     history:manager?'Inspeções Recebidas':'Minhas inspeções enviadas',schedule:'Cronograma de inspeções',plans:'Planos de Ação'}[section];
@@ -372,14 +461,16 @@ function googleCentralView(){
   const sections=manager?[['dashboard','Dashboard'],['history','Inspeções recebidas'],['schedule','Cronograma'],['plans','Planos de Ação']]:
     [['history','Inspeções enviadas'],['schedule','Cronograma']];
   const nav=sections.map(([id,label])=>`<button type="button" class="btn tiny" data-action="centralSection:${id}" ${id===section?'aria-current="page"':''}>${label}</button>`).join('');
-  const dashboardHTML=()=>`<div class="grid3"><div class="stat"><strong>${googleSummary?.total??items.length}</strong><span>Inspeções recebidas</span></div><div class="stat"><strong>${nc}</strong><span>Não conformidades registradas</span></div><div class="stat"><strong>${c+nc?(100*c/(c+nc)).toFixed(1)+'%':'—'}</strong><span>Conformidade: C ÷ (C + NC)</span></div></div>${ranking.length?`<div class="card"><h2>Não conformidades acumuladas por POP</h2>${ranking.map(([station,n])=>`<p>${esc(station)} · ${n}</p><div style="height:10px;background:#e5e7eb;margin-bottom:12px"><div style="height:10px;background:#c90018;width:${100*n/max}%"></div></div>`).join('')}</div>`:''}`;
-  return `<main class="shell central-shell">${googleProfilePanel()}
-    <section class="card central-heading"><div class="card-head"><div><h1 id="google-central-title" tabindex="-1">${title}</h1>
+  const body={dashboard:()=>googleCentralDashboard(items),history:()=>googleHistoryView(items,manager),
+    schedule:()=>googleCentralSchedule(items),plans:()=>googleActionPlansView(items)};
+  return `<main class="shell central-shell inspection-central-shell">
+    <section class="card central-heading inspection-central-heading">${googleProfilePanel()}
+    <div class="card-head"><div><h1 id="google-central-title" tabindex="-1">${title}</h1>
       <p>${description}</p><p class="central-status small muted" role="status">${esc(googleCentralStatus())}</p>
       </div><div class="btnrow">${button('googleRefresh',googleCentralBusy?'Atualizando…':'Atualizar dados','primary tiny')}${button('home','Voltar','tiny')}</div></div>
       <nav class="central-navigation" aria-label="Visões da base central">${nav}</nav>
     </section>
-    ${section==='plans'?googleActionPlansView(items):{dashboard:dashboardHTML,history:()=>googleHistoryView(items,manager),schedule:scheduleHTML}[section]()}
+    ${body[section]()}
   </main>`;
 }
 let googleReportRequest=null;

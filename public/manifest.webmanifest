@@ -1,6 +1,6 @@
 {
-  "name": "VOANET | Inspeção Infraestrutura v2.2",
-  "short_name": "VOANET Inspeções",
+  "name": "VOANET | Central de Infraestrutura",
+  "short_name": "VOANET Infra",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",

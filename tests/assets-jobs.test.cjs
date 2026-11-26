@@ -365,3 +365,20 @@ test('ajuste de identificação exige unidade existente e rejeita série e patri
  assert.equal(h.request(list,'manager').issues.length,0);
  assert.equal(h.assets.Ativos.length,3);
 });
+
+test('ajuste retroativo preserva a leitura de uma vistoria mais recente',()=>{
+ const h=harness(),r=climateRecord(h);
+ r.equipamentos.climatizadores[0].temperatura='?';
+ assert.equal(h.send(r).assets.pending,1);
+ const header=h.assets['Climatização_Voanet'][0],row=h.assets['Climatização_Voanet'][1];
+ row[header.indexOf('Data_Ultima_Inspecao')]='2027-01-02';
+ row[header.indexOf('Última Medição Temperatura')]=25;
+ const [issue]=h.request({action:'assetIssues',inspectionId:r.id},'manager').issues;
+ const request={action:'applyAssetAdjustment',inspectionId:r.id,adjustmentToken:issue.adjustment.token,
+  reason:'Revisão da inspeção anterior'};
+ const stale=h.request({...request,value:'22'},'manager');
+ assert.equal(stale.ok,false);
+ assert.match(stale.error,/vistoria mais recente/);
+ assert.equal(h.request({...request,notMeasured:true},'manager').pending,0);
+ assert.equal(value(h,'Climatização_Voanet',1,'Última Medição Temperatura'),25);
+});

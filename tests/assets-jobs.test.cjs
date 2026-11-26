@@ -237,3 +237,57 @@ test('corrige Outro em porta GPON de OLT sem alterar os outros tipos ou o envio 
   ['Transceiver GPON','Transceiver Outro','Transceiver SFP+']);
  assert.equal(r.invTransceivers[0].tipo,'Outro');
 });
+
+test('climatização fora do escopo e medições omitidas preservam as últimas leituras',()=>{
+ const h=harness();
+ h.asset('Climatização_Voanet',{'Estação':'POP fictício','Modelo':'AC100','Fabricante':'Gree','Nº Série':'SER-AC-1',
+   'Última Medição Temperatura':24,'Última Medição Corrente':3.4});
+ const r=climateRecord(h),unit=r.equipamentos.climatizadores[0];
+ Object.assign(unit,{temperatura:'Não medido',corrente:' N/A '});
+ const sent=h.send(r);
+ assert.equal(sent.ok,true);
+ assert.equal(sent.assets.pending,0);
+ assert.equal(value(h,'Climatização_Voanet',1,'Última Medição Temperatura'),24);
+ assert.equal(value(h,'Climatização_Voanet',1,'Última Medição Corrente'),3.4);
+ const skipped=climateRecord(h);
+ skipped.id='INSP-CLIMA-FORA';
+ skipped.inventoryReview.climatizadores='fora_escopo';
+ skipped.inventory=[{id:'AC-GERAL',tipo:'Ar-condicionado',confirmacao:'Confirmado na etiqueta',estado:'Crítico',serial:'SER-AC-1'}];
+ Object.assign(skipped.equipamentos.climatizadores[0],{temperatura:'23 ºC',corrente:'4,2'});
+ assert.equal(h.send(skipped).assets.pending,0);
+ assert.equal(value(h,'Ativos',1,'Status'),'Operacional');
+ assert.equal(value(h,'Climatização_Voanet',1,'Última Medição Temperatura'),24);
+ assert.equal(value(h,'Climatização_Voanet',1,'Última Medição Corrente'),3.4);
+ assert.equal(h.c.validatedAssetValue_(null,'23,5 ºC','Última Medição Temperatura'),23.5);
+ assert.throws(()=>h.c.validatedAssetValue_(null,'gelado','Última Medição Temperatura'),/numérico/);
+});
+
+test('Gestão vê modelo parecido sem vincular e pode confirmar identidade exata mantendo fabricante',()=>{
+ const h=harness();
+ const r=h.record();
+ r.inventoryReview={equipamentos:'alterado'};
+ r.inventory=[
+  {id:'A1',tipo:'Outro',marca:'Outro fabricante',modelo:'Kit fans OLT UR1',patrimonio:'32444'},
+  {id:'A2',tipo:'Outro',marca:'Outro fabricante',modelo:'DIO 48F.O',serial:'ID-DIO'},
+  {id:'A3',tipo:'Switch',marca:'Datacom',modelo:'Sem identificação',serial:'Sem número de série'}
+ ];
+ h.asset('Ativos',{'Local':'POP fictício','Categoria':'Outro','Equipamento':'Refrigeração','Fabricante':'Datacom','Modelo':'Kit Fans Olt UR','Patrimônio':'32444'});
+ h.asset('Ativos',{'Local':'POP fictício','Categoria':'Outro','Equipamento':'DIO','Fabricante':'XPS','Modelo':'Dio 48 F.O','Nº Série':'ID-DIO'});
+ const result=h.send(r);
+ assert.equal(result.ok,true);
+ assert.equal(result.assets.pending,3);
+ assert.equal(h.assets.Ativos.length,3);
+ const compare={action:'compareInspectionAssets',inspectionId:r.id};
+ const items=h.request(compare,'manager').items;
+ const fan=items.find(item=>item.model==='Kit fans OLT UR1').matches[0];
+ assert.ok(fan.basis.includes('Modelo parecido'));
+ assert.equal(fan.rowNumber,2);
+ assert.equal(fan.operation,undefined);
+ const dio=items.find(item=>item.model==='DIO 48F.O').matches[0];
+ assert.equal(dio.makerDiff,true);
+ assert.equal(dio.operation,'keepMaker');
+ const decision={action:'applyAssetDecision',inspectionId:r.id,decisionToken:dio.token,reason:'Identidade conferida na etiqueta'};
+ assert.equal(h.request(decision,'manager').action,'VINCULADO');
+ assert.equal(value(h,'Ativos',2,'Fabricante'),'XPS');
+ assert.equal(h.request({action:'assetIssues',inspectionId:r.id},'manager').issues.length,2);
+});

@@ -229,6 +229,15 @@ function assetIssueGuidance(detail){
   if(/banco incompleto|banco com modelo/i.test(message)){
     return 'Na inspeção original, confira as baterias do banco uma a uma. Marque o cadastro como completo depois da conferência e reenvie a inspeção.';
   }
+  if(/última medição (corrente|temperatura)/i.test(message)){
+    return 'Se a medição não aconteceu, deixe o campo em branco. Se houve medição, informe o número. Na inspeção arquivada, use Reprocessar ativos após atualizar o Apps Script.';
+  }
+  if(/fabricante divergente/i.test(message)){
+    return 'Abra a comparação. Confira modelo, série ou patrimônio com a etiqueta. Se a identidade for única, a Gestão pode manter o fabricante cadastrado ao confirmar o vínculo.';
+  }
+  if(/mais de um equipamento|informe número de série ou patrimônio/i.test(message)){
+    return 'Compare as linhas do POP pela série ou pelo patrimônio. O mesmo modelo pode constar em vários equipamentos.';
+  }
   if(/carga gás|carga de gás/i.test(message)){
     return 'Confira a carga na etiqueta do aparelho e a unidade. Se a implantação já foi atualizada e o valor informado está correto, use Reprocessar ativos.';
   }
@@ -307,7 +316,7 @@ function renderCentralBatteries(){
 }
 
 function assetComparisonCells(item){
-  const values=[item.station,[item.maker,item.model||item.name].filter(Boolean).join(' '),item.serial,item.patr,
+  const values=[item.station,item.equipment||item.name,item.maker,item.model,item.serial,item.patr,
     item.quantity,item.gas,item.installed&&fmt(item.installed)];
   return values.map(value=>`<td>${esc(value===''||value==null?'—':value)}</td>`).join('');
 }
@@ -323,18 +332,22 @@ async function googleCompareAssets(id){
     content.innerHTML=items.length?items.map(item=>`<section>
       <h3>${esc(item.label)}</h3><p class="small muted">${esc(item.tab)}</p>
       <ul>${item.issues.map(detail=>`<li>${esc(detail)}</li>`).join('')}</ul>
-      <div class="table-scroll"><table class="data-table"><thead><tr><th>Origem</th><th>Estação</th><th>Equipamento</th><th>Série</th><th>Patrimônio</th><th>Qtd.</th><th>Carga de gás</th><th>Instalação</th></tr></thead>
+      <div class="table-scroll"><table class="data-table"><thead><tr><th>Origem</th><th>Estação</th><th>Equipamento</th><th>Fabricante</th><th>Modelo</th><th>Série</th><th>Patrimônio</th><th>Qtd.</th><th>Carga de gás</th><th>Instalação</th></tr></thead>
       <tbody><tr><th scope="row">Vistoria</th>${assetComparisonCells(item)}</tr>
-      ${item.matches.map((match,index)=>`<tr><th scope="row">Cadastro ${index+1}</th>${assetComparisonCells(match)}</tr>`).join('')
-        ||'<tr><td colspan="8">Nenhum cadastro semelhante encontrado.</td></tr>'}</tbody></table></div>
-      ${item.matches.map((match,index)=>`<p><strong>Cadastro ${index+1}</strong> ·
-        ${esc([...match.basis,match.serialDiff&&'Série divergente',match.patrDiff&&'Patrimônio divergente',match.otherStation&&'Outra estação'].filter(Boolean).join(' · '))}</p>
-        ${match.operation?`<details class="archived-pdf"><summary>${match.operation==='replace'?'Confirmar substituição':'Vincular ao mesmo equipamento'}</summary>
+      ${item.matches.map((match,index)=>`<tr><th scope="row">${match.rowNumber?'Linha '+esc(match.rowNumber):'Cadastro '+(index+1)}</th>${assetComparisonCells(match)}</tr>`).join('')
+        ||'<tr><td colspan="10">Nenhum cadastro semelhante encontrado.</td></tr>'}</tbody></table></div>
+      ${item.matchCount>item.matches.length?`<p class="small muted">Exibindo ${item.matches.length} de ${item.matchCount} cadastros, priorizados pela identificação.</p>`:''}
+      ${item.matches.map((match,index)=>`<p><strong>${match.rowNumber?'Linha '+esc(match.rowNumber):'Cadastro '+(index+1)}</strong> ·
+        ${esc([...match.basis,match.makerDiff&&'Fabricante divergente',match.categoryDiff&&'Categoria divergente',match.serialDiff&&'Série divergente',match.patrDiff&&'Patrimônio divergente',match.otherStation&&'Outra estação'].filter(Boolean).join(' · '))}</p>
+        ${match.operation?`<details class="archived-pdf"><summary>${match.operation==='replace'?'Confirmar substituição':match.operation==='keepMaker'?'Vincular e manter fabricante da base':'Vincular ao mesmo equipamento'}</summary>
         <form data-asset-decision="${esc(match.token)}">
-          <p class="small muted">${match.operation==='replace'?'Confirme pela etiqueta ou ordem de serviço antes de atualizar a série. A identificação anterior fica no histórico.':'Confirme os dados de identificação antes de atualizar a linha indicada.'}</p>
+          <p class="small muted">${match.operation==='replace'?'Confirme pela etiqueta ou ordem de serviço antes de atualizar a série. A identificação anterior fica no histórico.':match.operation==='keepMaker'?'Confira a identidade pela etiqueta. A decisão preserva o fabricante cadastrado e fica no histórico.':'Confirme os dados de identificação antes de atualizar a linha indicada.'}</p>
           <label>Motivo da decisão <input name="reason" required minlength="5" maxlength="300"></label>
           <button class="btn primary tiny" type="submit">Salvar decisão</button><p role="status"></p>
         </form></details>`:''}`).join('')}</section>`).join(''):'<p>Nenhuma pendência com equipamento identificável para comparar nesta vistoria.</p>';
+    if(!googleCapabilities.assetComparisonV2){
+      content.insertAdjacentHTML('afterbegin','<p class="notice">A comparação por modelos semelhantes e fabricante divergente fica disponível após atualizar o Apps Script.</p>');
+    }
   }catch(error){
     if(active())content.innerHTML=`<p role="alert">${esc(error.message)}</p>`;
   }

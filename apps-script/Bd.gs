@@ -120,7 +120,7 @@ function doPost(e) {
     if(!user)return reply_({ok:false,code:'AUTH',error:'Chave inválida, revogada ou ainda não vinculada a uma pessoa ativa.'});
     requirePrivateData_();
     if(input.version!==1)throw Error('Versão incompatível.');
-    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,accessAdmin:true,reportRefresh:true,assetInventory:true,assetReconciliation:true,actionPlans:true}});
+    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,accessAdmin:true,reportRefresh:true,assetInventory:true,assetReconciliation:true,assetComparisonV2:true,climateOptional:true,actionPlans:true}});
     if(input.action==='fleetLoad'||input.action==='fleetSave')return reply_(fleetRequest_(input,user));
     if(input.action==='users')return reply_(listAccess_(user));
     if(input.action==='manageOperator')return reply_(manageOperator_(input,user));
@@ -758,7 +758,7 @@ function assertAssetHeaders_(headers,name){
 }
 function normalizeAsset_(value){return String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase().replace(/\s+/g,' ');}
 function stationAssetKey_(value){return normalizeAsset_(value).replace(/^\w+[.-]\d+\s*[: -]\s*/,'').replace(/\bVOANET\b/g,'').replace(/[^A-Z0-9]/g,'');}
-function identityTokens_(value,prefix){return String(value||'').split(/[,;\n]+/).map(x=>normalizeAsset_(x)).filter(x=>x&&!x.startsWith('#')&&!['N/A','NA','NAO IDENTIFICADO','SEM SERIE','SEM PATRIMONIO','-'].includes(x)).map(x=>prefix+x);}
+function identityTokens_(value,prefix){return String(value||'').split(/[,;\n]+/).map(x=>normalizeAsset_(x)).filter(x=>x&&!x.startsWith('#')&&!/^(?:N[/.]?A[.]?|NAO (?:IDENTIFICAD[OA]|VERIFICAD[OA]|INFORMAD[OA]|SE APLICA)|SEM (?:NUMERO (?:DE )?|N[º°.] (?:DE )?)?(?:SERIE|PATRIMONIO)|[-–—]+)$/.test(x)).map(x=>prefix+x);}
 function overlappingAssetIds_(a,b){return a.some(value=>b.includes(value));}
 function paddedSerialMatch_(a,b){
   return a.length===1&&b.length===1&&/^S:\d+$/.test(a[0])&&/^S:\d+$/.test(b[0])
@@ -789,15 +789,18 @@ function classifiedTransceivers_(record){
 }
 function assetCandidates_(r){
   const candidates=[],warnings=[];
+  const climateSkipped=r.inventoryReview?.climatizadores==='fora_escopo';
   const push=(tab,item,values,kind)=>candidates.push({tab,item,values,kind,serial:item.serie||item.serial||'',patr:item.patrimonio||'',ref:item.centralId||'',label:item.modelo||item.identificacao||kind});
   const generic=(item,kind,equipment,values={})=>push('Ativos',item,{'Local':r.nome,'Categoria':kind,'Equipamento':equipment,'Fabricante':item.fabricante||item.marca,'Modelo':item.modelo,'Status':assetState_(item.estado),'Observações':item.observacao||item.observacoes,...values},kind);
   for(const item of r.inventory||[]){
+    if(climateSkipped&&/^AR[- ]CONDICIONADO$/.test(normalizeAsset_(item.tipo)))continue;
     if(!reviewed_(r,'equipamentos')&&item.confirmacao!=='Confirmado na etiqueta'){warnings.push('Equipamento não conferido: '+(item.modelo||item.id));continue;}
     if(Number(item.quantidade||1)!==1){warnings.push('Equipamento agregado deve ser identificado por unidade: '+(item.modelo||item.id));continue;}
     const types={RETIFICADORA:'Retificadora',BATERIA:'Bateria','AR-CONDICIONADO':'Ar-condicionado',GERADOR:'Gerador',NOBREAK:'Nobreak',INVERSOR:'Inversor',TRANSMISSAO:'Transmissão',OLT:'OLT',ROTEADOR:'Roteador',SWITCH:'Switch',SEGURANCA:'Segurança'};
     generic(item,types[normalizeAsset_(item.tipo)]||'Outro',item.tipo||'Equipamento');
   }
   for(const item of r.equipamentos?.climatizadores||[]){
+    if(climateSkipped)continue;
     if(!reviewed_(r,'climatizadores')){warnings.push('Climatizador não conferido: '+(item.modelo||item.id));continue;}
     generic(item,'Ar-condicionado','Ar-condicionado');
     push('Climatização_Voanet',item,{'Estação':r.nome,'Tipo Local':'POP','Fabricante':item.marca,'Modelo':item.modelo,'BTUs':item.capacidade,'Tipo':item.tipo,'Nº Série':item.serie,'Tipo de Gás':item.gas,'Carga Gás':item.cargaGas,'Data Instalação':assetDate_(item.instalacao),'Última Medição Corrente':item.corrente,'Última Medição Temperatura':item.temperatura,'Protocolo referencia':r.os},'Ar-condicionado');
@@ -894,14 +897,17 @@ function findAssetRow_(table,candidate,r){
   return matches[0]||null;
 }
 function validatedAssetValue_(rule,value,header){
-  if(value===undefined||value===null||value==='')return undefined;
+  if(value===undefined||value===null||(typeof value==='string'&&!value.trim()))return undefined;
   if(value?._invalidDate)throw Error('Data inválida: '+value._invalidDate);
   if(typeof value==='string'&&['NAO VERIFICADO','NAO IDENTIFICADO'].includes(normalizeAsset_(value)))return undefined;
   if(['Nº Série','Patrimônio'].includes(header)&&!identityTokens_(value,'').length)return undefined;
   if(['BTUs','Carga Gás','Última Medição Corrente','Última Medição Temperatura','Módulos','Corrente (A) (TOTAL)','Tensão (V)','Quantidade','Autonomia (h)','Tensão Nominal (V)','Capacidade (Ah)'].includes(header)){
     const raw=String(value).trim();
+    const climateMeasurement=['Última Medição Corrente','Última Medição Temperatura'].includes(header);
+    if(climateMeasurement&&/^(?:[-–—]+|N[/.]?A[.]?|S[/.]?M[.]?|NAO (?:SE APLICA|MEDID[OA]|AFERID[OA]|REALIZAD[OA]|INFORMAD[OA])|(?:SEM|NAO HOUVE) MEDICAO|MEDICAO NAO REALIZADA)$/.test(normalizeAsset_(raw)))return undefined;
     const gasUnit=header==='Carga Gás'?raw.match(/\s*(kg|g)$/i):null;
-    const normalized=(gasUnit?raw.slice(0,gasUnit.index):raw.replace(/\s*(BTU\/h|BTUs?|Ah|A|V|h|°C)$/i,'')).replace(',','.');
+    const unit=header==='Última Medição Temperatura'?/\s*[°º]?\s*C$/i:/\s*(BTU\/h|BTUs?|Ah|A|V|h)$/i;
+    const normalized=(gasUnit?raw.slice(0,gasUnit.index):raw.replace(unit,'')).trim().replace(',','.');
     if(!/^-?\d+(\.\d+)?$/.test(normalized))throw Error(header==='Carga Gás'?'Informe a carga em g ou kg.':'Informe um valor numérico.');
     value=Number(normalized)*(gasUnit?.[1].toLowerCase()==='kg'?1000:1);
   }
@@ -998,8 +1004,11 @@ function syncAssets_(r,version){
       const action=!found?'CRIADO':written.changed?'ATUALIZADO':'SEM_ALTERACAO';
       if(!found)result.created++;else if(written.changed)result.updated++;else result.unchanged++;
       if(action!=='SEM_ALTERACAO')log(candidate.tab,id,action,candidate.label,written.before,written.after);
-      for(const warning of fieldWarnings){result.pending++;result.warnings.push(candidate.tab+' · '+candidate.label+': '+warning);log(candidate.tab,id,'PENDENCIA',warning);}
-    }catch(error){const detail=candidate.tab+' · '+candidate.label+': '+error.message;result.pending++;result.warnings.push(detail);log(candidate.tab,candidate.ref,'PENDENCIA',detail);}
+      for(const warning of fieldWarnings){
+        const detail=candidate.tab+' · '+candidate.label+': '+warning;
+        result.pending++;result.warnings.push(detail);log(candidate.tab,id,'PENDENCIA',detail,{candidate:assetCandidateKey_(candidate)});
+      }
+    }catch(error){const detail=candidate.tab+' · '+candidate.label+': '+error.message;result.pending++;result.warnings.push(detail);log(candidate.tab,candidate.ref,'PENDENCIA',detail,{candidate:assetCandidateKey_(candidate)});}
   }
   appendAssetEvents_(events);
   // O resumo nas propriedades tem tamanho limitado; os detalhes integrais ficam no histórico privado.
@@ -1084,6 +1093,24 @@ function centralAssetsForInspection_(input,user){
   return {ok:true,groups};
 }
 
+function assetCandidateKey_(candidate){
+  return JSON.stringify([candidate.tab,candidate.label,candidate.item?.id,candidate.serial,candidate.patr]);
+}
+function similarAssetModel_(left,right){
+  if(Math.min(left.length,right.length)<6||Math.abs(left.length-right.length)>1||left===right)return false;
+  if(left.length>right.length)[left,right]=[right,left];
+  let i=0,j=0,edited=false;
+  while(i<left.length&&j<right.length){
+    if(left[i]!==right[j]){
+      if(edited)return false;
+      edited=true;
+      if(left.length<right.length){j++;continue;}
+    }
+    i++;j++;
+  }
+  return true;
+}
+
 function comparisonAsset_(candidate,table,entry,record){
   const {row}=entry,h=table.headers,get=name=>row[h.indexOf(name)];
   const serial=identityTokens_(candidate.serial,'S:'),patr=identityTokens_(candidate.patr,'P:');
@@ -1101,15 +1128,20 @@ function comparisonAsset_(candidate,table,entry,record){
   const maker=normalizeAsset_(candidate.values.Fabricante),oldMaker=normalizeAsset_(get('Fabricante'));
   const model=normalizeAsset_(candidate.values.Modelo).replace(/[^A-Z0-9]/g,'');
   const oldModel=normalizeAsset_(get('Modelo')).replace(/[^A-Z0-9]/g,'');
-  const sameModel=Boolean(model&&model===oldModel&&(!maker||!oldMaker||maker===oldMaker));
+  const sameModel=Boolean(model&&model===oldModel);
+  const makerDiff=Boolean(maker&&oldMaker&&maker!==oldMaker);
+  const sameCategory=candidate.tab!=='Ativos'||normalizeAsset_(candidate.values.Categoria)===normalizeAsset_(get('Categoria'));
+  const similarModel=sameStation&&sameCategory&&!sameModel&&similarAssetModel_(model,oldModel);
   const bankLabel=candidate.tab==='Controle_Baterias'&&candidate.label&&normalizeAsset_(candidate.label)===normalizeAsset_(get('Descrição'));
-  const score=(sameRef?16:0)+(sameSerial?8:0)+(samePatr?6:0)+(sameStation&&(sameModel||bankLabel)?2:0);
+  const score=(sameRef?32:0)+(sameSerial?16:0)+(samePatr?8:0)+(sameStation&&(sameModel||bankLabel)?4:0)+(similarModel?2:0);
   if(!score)return null;
-  const basis=[sameRef&&'Vínculo anterior',sameRawSerial&&'Série igual',(sameSerial&&!sameRawSerial)&&'Série equivalente com zeros à esquerda',samePatr&&'Patrimônio igual',sameModel&&'Modelo igual',bankLabel&&'Banco com a mesma identificação'].filter(Boolean);
+  const basis=[sameRef&&'Vínculo anterior',sameRawSerial&&'Série igual',(sameSerial&&!sameRawSerial)&&'Série equivalente com zeros à esquerda',
+    samePatr&&'Patrimônio igual',sameModel&&'Modelo igual',similarModel&&'Modelo parecido',bankLabel&&'Banco com a mesma identificação'].filter(Boolean);
   const date=dateKey_(get(config.date||'Data_Ultima_Inspecao'));
-  return {entry,score,sameStation,sameModel,sameRef,sameSerial,samePatr,serialDiff,patrDiff,
+  return {entry,score,sameStation,sameModel,sameRef,sameSerial,samePatr,serialDiff,patrDiff,makerDiff,sameCategory,
     newer:date>record.data||(date===record.data&&String(get('Versao_Inspecao')||'')>record.updated),paddedSerial,
     display:{station,model:get('Modelo'),maker:get('Fabricante'),serial:get('Nº Série'),patr:get('Patrimônio'),
+      rowNumber:entry.index,equipment:get('Equipamento'),makerDiff,categoryDiff:!sameCategory,
       name:get('Descrição'),quantity:get('Quantidade'),gas:get('Carga Gás'),installed:dateKey_(get('Data Instalação')),basis,serialDiff,patrDiff,
       otherStation:!sameStation}};
 }
@@ -1132,41 +1164,57 @@ function assetComparisonData_(id,user){
   const tables={},comparisons=[];
   for(const candidate of candidates){
     const prefix=candidate.tab+' · '+candidate.label+': ';
-    const related=issues.filter(issue=>issue[4]===candidate.tab
+    const identity=assetCandidateKey_(candidate);
+    const sameLabelCount=candidates.filter(item=>item.tab===candidate.tab&&item.label===candidate.label).length;
+    const related=issues.filter(issue=>{
+      // Nos envios recentes a pendência identifica a unidade, mesmo quando o modelo se repete.
+      let savedIdentity;
+      try{savedIdentity=JSON.parse(issue[8]).candidate;}catch(_){}
+      if(savedIdentity)return issue[4]===candidate.tab&&savedIdentity===identity;
+      if(sameLabelCount>1&&issue[4]===candidate.tab&&issue[7].startsWith(prefix)){
+        const table=tables[candidate.tab]||(tables[candidate.tab]=assetTable_(candidate.tab));
+        try{findAssetRow_(table,candidate,record);}
+        catch(error){return issue[7]===prefix+error.message;}
+        return false;
+      }
+      return issue[4]===candidate.tab
       ? issue[7].startsWith(prefix)||(!issue[7].startsWith(candidate.tab+' · ')&&candidate.tab!=='Ativos')
-      : candidate.tab==='Controle_Baterias'&&!issue[4]&&issue[7].endsWith(': '+candidate.label));
+      : candidate.tab==='Controle_Baterias'&&!issue[4]&&issue[7].endsWith(': '+candidate.label);
+    });
     if(!related.length)continue;
     const table=tables[candidate.tab]||(tables[candidate.tab]=assetTable_(candidate.tab));
     const matches=table.values.slice(1).map((row,i)=>comparisonAsset_(candidate,table,{row,index:i+2},record))
       .filter(Boolean).sort((a,b)=>b.score-a.score);
     const identityIssues=related.filter(issue=>issue[7].startsWith(prefix)&&/série diverge|mais de um equipamento|fabricante divergente/i.test(issue[7]));
     const hasSerial=identityTokens_(candidate.serial,'S:').length===1;
-    const identity=JSON.stringify([candidate.tab,candidate.label,candidate.item?.id,candidate.serial,candidate.patr]);
-    for(const match of matches.slice(0,6)){
+    const shown=matches.slice(0,8);
+    for(const match of shown){
       const stableIdentity=match.sameRef||match.sameSerial||match.samePatr;
       const elsewhere=matches.some(other=>other!==match&&(other.sameSerial||other.samePatr));
-      const uniqueCandidate=candidates.filter(item=>item.tab===candidate.tab&&item.label===candidate.label).length===1;
+      const uniqueCandidate=sameLabelCount===1;
       const permitted=candidate.tab==='Ativos'&&uniqueCandidate&&identityIssues.length===1&&match.sameStation&&!match.newer&&!elsewhere;
-      if(permitted&&stableIdentity&&!match.serialDiff&&!match.patrDiff&&match.sameModel)match.operation='link';
-      if(permitted&&hasSerial&&match.serialDiff&&!match.paddedSerial&&!match.patrDiff&&(match.samePatr||match.sameModel))match.operation='replace';
+      if(permitted&&stableIdentity&&!match.serialDiff&&!match.patrDiff&&match.sameModel&&match.sameCategory){
+        match.operation=match.makerDiff?'keepMaker':'link';
+      }
+      if(permitted&&!match.makerDiff&&match.sameCategory&&hasSerial&&match.serialDiff&&!match.paddedSerial&&!match.patrDiff&&(match.samePatr||match.sameModel))match.operation='replace';
       if(match.operation){
         match.issue=identityIssues[0];
         match.token=hash_(JSON.stringify([id,revision.hash,match.issue[0],identity,match.entry.row,match.operation]));
       }
     }
-    comparisons.push({candidate,table,matches:matches.slice(0,6),related});
+    comparisons.push({candidate,table,matches:shown,matchCount:matches.length,related});
   }
   return {record,revision,issues,comparisons};
 }
 
 function compareInspectionAssets_(input,user){
   const data=assetComparisonData_(input.inspectionId,user);
-  return {ok:true,items:data.comparisons.map(({candidate,matches,related})=>({
-    tab:candidate.tab,label:candidate.label,station:data.record.nome,model:candidate.values.Modelo,maker:candidate.values.Fabricante,
+  return {ok:true,items:data.comparisons.map(({candidate,matches,matchCount,related})=>({
+    tab:candidate.tab,label:candidate.label,station:data.record.nome,equipment:candidate.values.Equipamento,model:candidate.values.Modelo,maker:candidate.values.Fabricante,
     serial:candidate.serial,patr:candidate.patr,quantity:candidate.values.Quantidade,
     gas:candidate.values['Carga Gás'],installed:candidate.values['Data Instalação'] instanceof Date
       ? dateKey_(candidate.values['Data Instalação']) : candidate.values['Data Instalação']?._invalidDate,
-    issues:related.map(issue=>issue[7]),
+    issues:related.map(issue=>issue[7]),matchCount,
     matches:matches.map(match=>({...match.display,operation:match.operation,token:match.token}))
   }))};
 }
@@ -1187,6 +1235,7 @@ function applyAssetDecision_(input,user){
     const patch={...candidate.values,ID_Ativo:assetId,Codigo_POP:record.codigoPop,
       'Nº Série':candidate.serial,'Patrimônio':candidate.patr,Data_Ultima_Inspecao:assetDate_(record.data),
       ID_Ultima_Inspecao:id,Versao_Inspecao:record.updated};
+    if(match.operation==='keepMaker')delete patch.Fabricante;
     const version=revision.assetAuditVersion||revision.hash;
     const detail=match.issue[0]+'|'+user.email+'|'+reason;
     const pendingEvent=[hash_(input.decisionToken+'|DECISAO'),new Date(),id,record.codigoPop,'Ativos',assetId,

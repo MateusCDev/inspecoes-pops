@@ -315,7 +315,7 @@ function googleHistoryCard(item,manager){
       <div class="btnrow">
         ${pending>0?button('googleIssues:'+id,'Ver pendências','primary tiny'):''}
         ${manager?button('googleSummaryPdf:'+id,'Baixar PDF gerencial (1 página)',pending>0?'tiny':'primary tiny'):''}
-        ${manager&&pending>0?button('googleAssets:'+id,'Reprocessar ativos','tiny'):''}
+        ${pending>0?button('googleAssets:'+id,'Reprocessar ativos','tiny'):''}
       </div>
       <details class="archived-pdf"><summary>Relatório arquivado</summary><div class="btnrow">
         ${button('googlePdf:'+id,'Baixar arquivo do Drive','tiny')}

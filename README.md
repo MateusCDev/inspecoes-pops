@@ -10,6 +10,16 @@ A [Central do Setor](https://mateuscdev.github.io/inspecoes-pops/central-setor/)
 
 O módulo **Fibra Import** abre a aplicação existente dentro da Central de Infraestrutura, sem duplicar seu código. Ele continua mantido no repositório `MateusCDev/fibra-import` e acessível no endereço original. O módulo é visível após entrar no portal para Gestão e Operação; a aplicação original é pública, portanto a sessão do portal não protege o endereço direto do importador. Arquivos KML/KMZ são processados no navegador pelo aplicativo original. A navegação entre módulos preserva a tela aberta; sair do portal fecha o módulo. O fundo do mapa segue sujeito às condições de privacidade dos provedores descritas na documentação do Fibra Import.
 
+## Controle pessoal e links privados da Gestão
+
+Na Central do Setor, **Meu controle de atividades** não tem uma planilha pessoal fixa. Cada pessoa usa **Configurar meu controle**, informa o endereço da sua planilha e salva. O destino fica no `localStorage` daquele perfil de navegador. O botão **Alterar meu controle** permite substituí-lo. Em computadores compartilhados, use perfis de navegador individuais.
+
+**Gestão de links** usa a mesma chave individual do Portal de Infraestrutura. Somente o perfil `GESTAO` pode consultar, adicionar, editar, arquivar ou restaurar os links desse catálogo. Os novos links não são publicados nos arquivos estáticos nem enviados ao perfil Operação. A sessão e a chave ficam somente na memória da página; ao recarregar é necessário entrar novamente. Os atalhos públicos existentes continuam separados desse catálogo privado.
+
+O serviço guarda o catálogo em um arquivo JSON privado do Drive do proprietário, criado na primeira gravação. A referência fica na propriedade privada `LINK_CATALOG_FILE_ID`. Não compartilhe o arquivo diretamente: o serviço recusa consultas se houver convites diretos ou acesso geral ampliado. As gravações usam controle de revisão para impedir que uma edição antiga substitua a de outro gestor. Arquivar preserva o registro para restauração. São aceitos até 200 registros e 3 MB, com imagens raster reduzidas pelo navegador.
+
+O frontend está em `public/central-setor/app.js`; o serviço está em `apps-script/link-catalog.gs` e integra o `Bd.gs` gerado. Após alterar o serviço, é necessário implantar nova versão no mesmo endereço `/exec`. Os testes de catálogo usam Drive e autenticação simulados; a interface foi conferida com um serviço fictício em ambiente local.
+
 ## Continuar o desenvolvimento
 
 - Clone `MateusCDev/inspecoes-pops` e abra a pasta em uma branch de trabalho. Com Google AI Pro, é possível usar o [Google Antigravity](https://antigravity.google/docs/getting-started) para editar e executar os testes no repositório local. A [importação de código no Gemini web](https://support.google.com/gemini/answer/16176929?hl=pt-BR) serve para consultar e discutir uma cópia da branch importada.

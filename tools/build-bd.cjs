@@ -23,6 +23,7 @@ ${read('dashboard.gs')}
 ${read('assets.gs')}
 ${read('access-admin.gs')}
 ${read('fleet.gs')}
+${read('link-catalog.gs')}
 return { setup, setupFleet, createOperatorKey, doPost, processQueue };
 })();
 

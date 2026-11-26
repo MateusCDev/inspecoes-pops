@@ -41,7 +41,7 @@ function harness(){
  CacheService:{getScriptCache:()=>({get:k=>cache.get(k),put:(k,v)=>cache.set(k,v)})},
  LockService:{getScriptLock:()=>({tryLock:()=>{if(lock)return false;lock=true;return true},hasLock:()=>lock,releaseLock:()=>{lock=false}})},
  DriveApp:{Access:{PRIVATE:1},getFileById:key=>byId.get(key)||({getSharingAccess:()=>1}),getFolderById:()=>({getSharingAccess:()=>1,getFilesByName:name=>({hasNext:()=>files.has(name),next:()=>files.get(name)}),createFile(name,data){if(name?._data)return makeFile(name.getName(),name);return makeFile(name,data)}})},MimeType:{PLAIN_TEXT:1}});
- vm.runInContext(['schema.gs','Code.gs','report.gs','access.gs','scheduling.gs','runtime.gs','staging.gs','jobs.gs','dashboard.gs','assets.gs','access-admin.gs','fleet.gs'].map(f=>fs.readFileSync(root+'/apps-script/'+f,'utf8')).join('\n'),c);
+ vm.runInContext(['schema.gs','Code.gs','report.gs','access.gs','scheduling.gs','runtime.gs','staging.gs','jobs.gs','dashboard.gs','assets.gs','access-admin.gs','fleet.gs','link-catalog.gs'].map(f=>fs.readFileSync(root+'/apps-script/'+f,'utf8')).join('\n'),c);
  c.createPdf_=(_r,_folder,name)=>{locksDuringPdf.push(lock);if(failPdf)throw Error('falha PDF');return makeFile(name+'.pdf')};
  const request=(data,token='valid')=>JSON.parse(c.doPost({postData:{contents:JSON.stringify({version:1,...data,token})}}).text);
  const send=(record,token='valid')=>request({record},token);

@@ -81,7 +81,8 @@ function doPost(e) {
     if(!user)return reply_({ok:false,code:'AUTH',error:'Chave inválida, revogada ou ainda não vinculada a uma pessoa ativa.'});
     requirePrivateData_();
     if(input.version!==1)throw Error('Versão incompatível.');
-    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,accessAdmin:true,reportRefresh:true,assetInventory:true,assetReconciliation:true,assetComparisonV2:true,assetAdjustments:true,climateOptional:true,actionPlans:true}});
+    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,accessAdmin:true,reportRefresh:true,assetInventory:true,assetReconciliation:true,assetComparisonV2:true,assetAdjustments:true,climateOptional:true,actionPlans:true,linkCatalog:true}});
+    if(input.action==='linkCatalogLoad'||input.action==='linkCatalogSave')return reply_(linkCatalogRequest_(input,user));
     if(input.action==='fleetLoad'||input.action==='fleetSave')return reply_(fleetRequest_(input,user));
     if(input.action==='users')return reply_(listAccess_(user));
     if(input.action==='manageOperator')return reply_(manageOperator_(input,user));

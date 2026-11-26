@@ -1,114 +1,18 @@
 <!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f4f6fa"><title>VOANET | Central do Setor</title><link rel="icon" href="../icon-192.png"><style>
 :root{--ink:#192332;--muted:#566478;--red:#b9142a;--line:#dfe5ec;--bg:#f4f6fa;--surface:#fff;--shadow:0 1px 2px #182a4510,0 10px 26px #182a4507;font-family:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--ink);background:var(--bg)}*{box-sizing:border-box}body{margin:0}button,input{font:inherit}button{cursor:pointer}a{color:inherit}.header{position:sticky;z-index:2;top:0;background:white;border-bottom:1px solid var(--line);box-shadow:0 3px 16px #182a4507}.bar{max-width:1500px;min-height:72px;margin:auto;padding:0 clamp(1rem,4vw,2.5rem);display:flex;align-items:center;gap:1rem}.brand{display:flex;align-items:center;gap:.9rem;text-decoration:none;font-weight:700;font-size:.875rem}.brand img{display:block;width:clamp(6rem,10vw,8rem);height:auto}.brand span{border-left:1px solid var(--line);padding-left:.9rem}.bar-note{margin-left:auto;color:var(--muted);font-size:.875rem}.shell{width:min(100%,1220px);margin:auto;padding:clamp(1rem,4vw,2.5rem) clamp(.85rem,4vw,2rem) 4rem}.hero{position:relative;isolation:isolate;overflow:hidden;padding:clamp(1.25rem,4vw,2.8rem);border:1px solid #263247;border-radius:1.15rem;background:radial-gradient(ellipse at 94% 0%,#4a3046,transparent 57%),#1e2a3e;color:#fff}.hero::after{content:"";position:absolute;z-index:-1;inset:0 0 0 46%;background:repeating-linear-gradient(124deg,transparent 0 24px,#fff2 25px 26px,transparent 27px 48px);mask-image:linear-gradient(90deg,transparent,#0009)}.eyebrow{font-size:.75rem;font-weight:750;letter-spacing:.1em;text-transform:uppercase;color:#ffc4cc}.hero h1{margin:.5rem 0;font-size:clamp(1.9rem,5vw,3rem);line-height:1.05;letter-spacing:-.04em}.hero p{margin:0;max-width:42rem;line-height:1.6;color:#e4e8ef}.searchwrap{position:relative;margin-top:1.5rem}.searchwrap svg{position:absolute;top:18px;left:17px;color:#64748b}.search{display:block;width:100%;height:56px;background:white;border:1px solid #cfd8e3;border-radius:.85rem;padding:0 1rem 0 3rem;outline:none;box-shadow:var(--shadow);color:var(--ink)}.search:focus{border-color:var(--red);box-shadow:0 0 0 3px #b9142a22}.section{margin-top:2rem}.section-heading{display:flex;justify-content:space-between;align-items:end;gap:1rem}.section h2{margin:0;font-size:1.25rem;letter-spacing:-.02em}.section p{margin:.4rem 0 0;color:var(--muted);font-size:.9rem;line-height:1.5}.counter{font-size:.85rem;color:var(--muted);white-space:nowrap}.filters{display:flex;gap:.55rem;flex-wrap:wrap;margin:1rem 0}.filters button{border:1px solid var(--line);border-radius:100px;padding:.55rem .9rem;background:white;color:var(--muted);font-size:.875rem}.filters button.active{background:#fff0f1;color:#9d1124;border-color:#f2c9cf;font-weight:700}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,18rem),1fr));gap:.75rem}.card{display:grid;grid-template-columns:auto 1fr;gap:.75rem;align-items:start;min-height:135px;padding:1rem;border:1px solid var(--line);border-radius:.9rem;box-shadow:var(--shadow);text-decoration:none;background:white}.card:hover{border-color:#c4909b;background:#fffafa}.icon{width:2.45rem;height:2.45rem;display:grid;place-items:center;border-radius:.6rem;background:#fff0f1;color:#9d1124;font-size:.75rem;font-weight:800}.icon{background:#f7f9fc;border:1px solid #e6ebf0}.icon img{display:block;width:32px;height:32px;object-fit:contain}.icon.icon-dark{background:#1e2a3e;border-color:#1e2a3e}.card strong{display:block;line-height:1.3}.card .desc{display:block;margin-top:.35rem;color:var(--muted);font-size:.875rem;line-height:1.45}.card .kind{display:inline-block;margin-top:.8rem;color:#9d1124;font-weight:700;font-size:.75rem}.empty{grid-column:1/-1;color:var(--muted);padding:2rem;text-align:center;border:1px dashed #cbd5e1;border-radius:.9rem}.footer{padding:1.4rem 0 0;color:var(--muted);font-size:.82rem;line-height:1.55}a:focus-visible,button:focus-visible{outline:3px solid var(--red);outline-offset:3px}@media(max-width:560px){.bar{min-height:64px}.bar-note{display:none}.section-heading{display:block}.counter{display:block;margin-top:.5rem}}
-</style></head><body><header class="header"><div class="bar"><a class="brand" href="./"><img src="../voanet.png" width="1116" height="229" alt="VOANET"><span>Central do Setor</span></a><span class="bar-note">Projetos e infraestrutura</span></div></header><main class="shell"><section class="hero"><div class="eyebrow">Projetos e infraestrutura</div><h1>Central do Setor</h1><p>Encontre os sistemas, planilhas e ferramentas que fazem parte da rotina da equipe.</p></section><div class="searchwrap"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="m16 16 4 4"></path></svg><input class="search" id="search" type="search" placeholder="Buscar uma ferramenta ou assunto" aria-label="Buscar acessos"></div><section class="section"><div class="section-heading"><div><h2>Acessos da equipe</h2><p>Escolha uma categoria ou pesquise pelo nome.</p></div><span id="count" class="counter" role="status"></span></div><div class="filters" id="filters" aria-label="Filtrar por categoria"></div><div class="grid" id="grid"></div></section><div class="footer">Cada ferramenta usa a sessão do próprio navegador e mantém suas permissões. Em computadores compartilhados, use um perfil de navegador individual.</div></main><script>
-'use strict';
-const accesses=[
-  {
-    "name": "Central de Infraestrutura",
-    "category": "Portais",
-    "description": "Inspeções POPs, Frota, FTTx e Fibra Import.",
-    "icon": "../icon-192.png",
-    "url": "../"
-  },
-  {
-    "name": "ERP · Operações",
-    "category": "Sistemas",
-    "description": "Acesso à página de operações no ERP Elleven.",
-    "icon": "assets/erp.png",
-    "url": "https://erp.voanet.com.br/ui/legacy/operations/539969eb-ff8c-b6cd-0c09-38e853f2b4fd"
-  },
-  {
-    "name": "INT6 · AutoISP",
-    "category": "Sistemas",
-    "description": "Consulta do serviço no AutoISP com o acesso de cada usuário.",
-    "icon": "assets/int6.png",
-    "url": "https://autoisp.voanet.com.br/contracted_services/1003230"
-  },
-  {
-    "name": "NetBox",
-    "category": "Sistemas",
-    "description": "Consulta e documentação da infraestrutura de rede.",
-    "icon": "assets/netbox.png",
-    "url": "https://netbox.voanet.com.br/"
-  },
-  {
-    "name": "OZmap",
-    "category": "Sistemas",
-    "description": "Documentação e consulta da rede óptica.",
-    "icon": "assets/ozmap.png",
-    "url": "https://voanet.ozmap.com.br:9994/"
-  },
-  {
-    "name": "SIGA+ · Monitoramento FSM",
-    "category": "Sistemas",
-    "description": "Monitoramento das atividades de campo.",
-    "icon": "assets/siga.png",
-    "url": "https://sigaplus.voanet.com.br/private/fsm/monitoring"
-  },
-  {
-    "name": "SYDLE ONE",
-    "category": "Sistemas",
-    "description": "Acesso à plataforma SYDLE ONE da Voanet.",
-    "icon": "assets/sydle.png",
-    "url": "https://voanet.sydle.one/"
-  },
-  {
-    "name": "Ocupação Rede FTTH",
-    "category": "Dashboards",
-    "description": "Dashboard do Setor de Projetos no Looker Studio.",
-    "icon": "assets/looker.png",
-    "url": "https://datastudio.google.com/reporting/81114519-4466-4a93-8918-0ade78f9ce43/page/0HPCE"
-  },
-  {
-    "name": "Dashboard do setor",
-    "category": "Dashboards",
-    "description": "Indicadores no Looker Studio. Use sua própria conta Google.",
-    "icon": "assets/looker.png",
-    "url": "https://datastudio.google.com/reporting/2e96f462-af5e-47cd-a8fe-bfa78dad287d/page/SaG7F"
-  },
-  {
-    "name": "Dados centralizados · Projetos",
-    "category": "Planilhas",
-    "description": "Dados centralizados da equipe de projetos.",
-    "icon": "assets/sheets.ico",
-    "url": "https://docs.google.com/spreadsheets/d/1ECl74D0TwYXkjTl3kWGT50cjSTlOddXGiox9h-FAd8M/edit"
-  },
-  {
-    "name": "Dados centralizados · Infra",
-    "category": "Planilhas",
-    "description": "Dados centralizados da infraestrutura.",
-    "icon": "assets/sheets.ico",
-    "url": "https://docs.google.com/spreadsheets/d/1WArVbYwKaiWkhgNxeNXdbPx4OK5tNqyJcDRbFp91Gf8/edit"
-  },
-  {
-    "name": "Controle de atividades · Documentação técnica",
-    "category": "Planilhas",
-    "description": "Acompanhamento das atividades de documentação técnica.",
-    "icon": "assets/sheets.ico",
-    "url": "https://docs.google.com/spreadsheets/d/1YWX0hpDYTgNSbVkcr_9m5UCJpsYYQljgGhE45S3tCpc/edit"
-  },
-  {
-    "name": "Documentação · Planilhas no Drive",
-    "category": "Documentos",
-    "description": "Pasta Documentação_Planilhas do setor.",
-    "icon": "assets/drive.png",
-    "url": "https://drive.google.com/drive/folders/12vB5YpXR1pUM0pibLJvL827UU5moO1bM"
-  },
-  {
-    "name": "Controle de Estações · SharePoint",
-    "category": "Documentos",
-    "description": "Documentos de infraestrutura e controle de estações.",
-    "icon": "assets/sharepoint.png",
-    "url": "https://voanetcom.sharepoint.com/sites/InfraVoanet/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FInfraVoanet%2FShared%20Documents%2FInfraestrutura%2FControle%20de%20Esta%C3%A7%C3%B5es&viewid=5ec0301a%2Dca67%2D482d%2D93b6%2D89663180c469"
-  },
-  {
-    "name": "Acessos · Inspeções POPs",
-    "category": "Administração",
-    "description": "Planilha privada de administração de acessos. Requer permissão de gestão.",
-    "icon": "assets/sheets.ico",
-    "url": "https://docs.google.com/spreadsheets/d/1IRXgtRt8_oS1I5MuKD29MUrWv9xUNRibbuT_szs34j4/edit?gid=888598780#gid=888598780"
-  }
-];
-const categories=['Todos','Portais','Sistemas','Planilhas','Dashboards','Documentos','Administração'];let active='Todos';const search=document.querySelector('#search'),grid=document.querySelector('#grid'),filters=document.querySelector('#filters');function element(tag,className,text){const e=document.createElement(tag);if(className)e.className=className;if(text)e.textContent=text;return e}function render(){const query=search.value.trim().toLocaleLowerCase('pt-BR');const visible=accesses.filter(item=>(active==='Todos'||item.category===active)&&`${item.name} ${item.description} ${item.category}`.toLocaleLowerCase('pt-BR').includes(query));document.querySelector('#count').textContent=`${visible.length} ${visible.length===1?'acesso encontrado':'acessos encontrados'}`;filters.replaceChildren(...categories.map(category=>{const button=element('button',category===active?'active':'',category);button.type='button';button.setAttribute('aria-pressed',String(category===active));button.addEventListener('click',()=>{active=category;render()});return button}));grid.replaceChildren();if(!visible.length){grid.append(element('div','empty',active==='Dashboards'&&!query?'Nenhum dashboard foi adicionado ainda.':'Nenhum acesso encontrado.'));return}visible.forEach(item=>{const link=element('a','card');link.href=item.url;link.target='_blank';link.rel='noopener noreferrer';const icon=element('span','icon'),image=element('img');image.src=item.icon;image.alt='';image.width=32;image.height=32;image.loading='lazy';icon.append(image);if(item.icon.endsWith('/siga.png'))icon.classList.add('icon-dark');const body=element('span'),title=element('strong','',item.name),desc=element('span','desc',item.description),kind=element('span','kind',item.category);body.append(title,desc,kind);link.append(icon,body);grid.append(link)})}search.addEventListener('input',render);render();
-</script></body></html>
+</style><link rel="stylesheet" href="central-ui.css?v=1"></head><body><header class="header"><div class="bar"><a class="brand" href="./"><img src="../voanet.png" width="1116" height="229" alt="VOANET"><span>Central do Setor</span></a><span class="bar-note">Projetos e infraestrutura</span><button class="ui-button" id="manage-open" type="button">Gestão de links</button><button class="ui-button" id="manage-exit" type="button" hidden>Sair da gestão</button></div></header><main class="shell"><section class="hero"><div class="eyebrow">Projetos e infraestrutura</div><h1>Central do Setor</h1><p>Encontre os sistemas, planilhas e ferramentas que fazem parte da rotina da equipe.</p></section><div class="searchwrap"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="m16 16 4 4"></path></svg><input class="search" id="search" type="search" placeholder="Buscar uma ferramenta ou assunto" aria-label="Buscar acessos"></div><section class="section"><div class="section-heading"><div><h2>Acessos da equipe</h2><p>Escolha uma categoria ou pesquise pelo nome.</p></div><div class="section-actions"><span id="count" class="counter" role="status"></span><button class="ui-button" id="control-settings" type="button">Configurar meu controle</button></div></div><div class="filters" id="filters" aria-label="Filtrar por categoria"></div><div class="grid" id="grid"></div></section><div class="footer">Cada ferramenta usa a sessão do próprio navegador e mantém suas permissões. Em computadores compartilhados, use um perfil de navegador individual.</div></main>
+<dialog id="control-dialog" class="ui-dialog" aria-labelledby="control-title"><form id="control-form">
+<div class="dialog-heading"><h2 id="control-title">Meu controle de atividades</h2><button class="close-button" type="button" data-close="control-dialog" aria-label="Fechar">×</button></div>
+<p>Cole o link do seu controle no Google Planilhas. Ele fica salvo somente neste perfil de navegador.</p>
+<label class="ui-field">Link da minha planilha<input id="control-url" type="url" placeholder="https://docs.google.com/spreadsheets/d/..." required></label>
+<p id="control-error" class="ui-error" role="alert" hidden></p><div class="dialog-actions"><button class="ui-button" type="button" data-close="control-dialog">Cancelar</button><button class="ui-button primary" type="submit">Salvar e abrir meu controle</button></div>
+</form></dialog>
+<dialog id="manage-dialog" class="ui-dialog manager-dialog" aria-labelledby="manage-title">
+<div class="dialog-heading"><div><h2 id="manage-title">Links da gestão</h2><p>Os links deste catálogo ficam visíveis somente à Gestão conectada.</p></div><button class="close-button" type="button" data-close="manage-dialog" aria-label="Fechar">×</button></div>
+<form id="manager-login"><label class="ui-field">Chave individual de gestão<input id="manager-key" type="password" autocomplete="off" required></label><p>Use a mesma chave individual do Portal de Infraestrutura.</p><button class="ui-button primary" type="submit">Entrar na gestão</button></form>
+<div id="manager-panel" hidden><div class="manager-account"><span id="manager-user"></span><button class="ui-button" id="manager-refresh" type="button">Atualizar lista</button></div>
+<form id="link-form"><h3 id="link-form-title">Adicionar link</h3><div class="form-grid"><label class="ui-field">Nome<input id="link-name" maxlength="100" required></label><label class="ui-field">Categoria<select id="link-category"></select></label></div><label class="ui-field">Endereço<input id="link-url" type="url" placeholder="https://..." required></label><label class="ui-field">Descrição<input id="link-description" maxlength="240"></label><div class="icon-upload"><img id="icon-preview" alt="Prévia do ícone" hidden width="48" height="48"><div><label class="ui-field">Ícone (opcional)<input id="link-icon-file" type="file" accept="image/png,image/jpeg,image/webp"></label><p>PNG, JPG ou WebP, até 2 MB. Sem imagem, será usado o ícone do site.</p><button class="ui-button" id="icon-clear" type="button">Usar ícone do site</button></div></div><label class="check-field"><input id="link-icon-dark" type="checkbox">Usar fundo escuro no ícone</label><div class="dialog-actions"><button class="ui-button" id="link-cancel" type="button">Limpar formulário</button><button class="ui-button primary" id="link-save" type="submit">Adicionar link</button></div></form>
+<div class="managed-heading"><h3>Catálogo da gestão</h3><label class="check-field"><input id="show-archived" type="checkbox">Mostrar arquivados</label></div><div id="managed-list"></div>
+</div><p id="manager-message" class="manager-message" role="status"></p></dialog>
+<script src="../config.js?v=links-1"></script><script src="app.js?v=1"></script></body></html>

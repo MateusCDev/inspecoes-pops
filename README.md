@@ -1,8 +1,14 @@
 # VOANET — Central de Infraestrutura
 
-A **Visão geral** é a entrada do portal. Ela reúne **Inspeções POPs**, **Frota** e **Levantamento FTTx**, com módulos visíveis de acordo com o perfil. Os indicadores da entrada são de inspeções. A página identifica os rascunhos e envios pendentes que pertencem ao navegador atual.
+A **Visão geral** é a entrada do portal. Ela reúne **Inspeções POPs**, **Frota**, **Levantamento FTTx** e **Fibra Import**, com módulos visíveis de acordo com o perfil. Os indicadores da entrada são de inspeções. A página identifica os rascunhos e envios pendentes que pertencem ao navegador atual.
 
 O GitHub Pages hospeda `public/`. O Apps Script autentica as requisições e integra o portal ao Google Sheets e ao Drive. O FTTx mantém rascunhos no navegador e exporta lista de materiais em PDF, Excel e CSV.
+
+## Central do Setor e Fibra Import
+
+A [Central do Setor](https://mateuscdev.github.io/inspecoes-pops/central-setor/) reúne atalhos para sistemas e planilhas. Ela é uma página pública do GitHub Pages; cada destino continua sujeito às próprias permissões. Os atalhos são mantidos em `public/central-setor/index.html`. Não coloque senhas, chaves ou dados de rede na página.
+
+O módulo **Fibra Import** abre a aplicação existente dentro da Central de Infraestrutura, sem duplicar seu código. Ele continua mantido no repositório `MateusCDev/fibra-import` e acessível no endereço original. O módulo é visível após entrar no portal para Gestão e Operação; a aplicação original é pública, portanto a sessão do portal não protege o endereço direto do importador. Arquivos KML/KMZ são processados no navegador pelo aplicativo original. A navegação entre módulos preserva a tela aberta; sair do portal fecha o módulo. O fundo do mapa segue sujeito às condições de privacidade dos provedores descritas na documentação do Fibra Import.
 
 ## Continuar o desenvolvimento
 

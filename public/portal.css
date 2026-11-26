@@ -803,3 +803,8 @@ body:has(.portal-login) .portal-actions { display: none; }
 
 #sync-section { scroll-margin-top: calc(var(--portal-header-height) + 1rem); }
 .overview-stats a { margin-top: .2rem; width: fit-content; }
+
+/* Importador aberto como módulo, mantendo a aplicação em seu endereço original. */
+.portal-fibra-frame { display:block; width:100%; height:calc(100dvh - var(--portal-header-height)); min-height:32rem; border:0; background:var(--portal-bg); }
+.overview-icon-fibra::before { width:15px; height:15px; border-radius:50%; }
+.overview-icon-fibra::after { width:4px; height:4px; border-radius:50%; background:currentColor; }

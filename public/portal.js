@@ -6,6 +6,7 @@
   const fleetPane = document.getElementById('portal-fleet-pane');
   const fleetStatus = document.getElementById('portal-fleet-status');
   const fttxPane = document.getElementById('portal-fttx-pane');
+  const fibraPane = document.getElementById('portal-fibra-pane');
   const navigation = document.querySelector('.portal-tabs');
   const brand = document.querySelector('.portal-brand');
   const signOut = document.getElementById('portal-signout');
@@ -15,11 +16,13 @@
   const modules = {
     inspecoes: ['Inspeções POPs', 'Registre vistorias, consulte relatórios e trate pendências por estação.'],
     frota: ['Frota', 'Acompanhe veículos, checklists e movimentações.'],
-    fttx: ['Levantamento FTTx', 'Estime materiais e custos de rede e exporte a lista para o almoxarifado.']
+    fttx: ['Levantamento FTTx', 'Estime materiais e custos de rede e exporte a lista para o almoxarifado.'],
+    fibra: ['Fibra Import', 'Prepare arquivos KML e KMZ para importação no OZmap.']
   };
   const scrollPositions = {};
   let activeModule;
   let fleetFrame;
+  let fibraFrame;
 
   function moduleFromLocation() {
     const module = new URL(location.href).searchParams.get('modulo');
@@ -50,7 +53,7 @@
       </header>
       <section class="overview-section" aria-labelledby="overview-modules-title">
         <h2 id="overview-modules-title">Módulos</h2>
-        <div class="overview-modules">${(manager ? Object.keys(modules) : ['inspecoes']).map(overviewModule).join('')}</div>
+        <div class="overview-modules">${(manager ? Object.keys(modules) : ['inspecoes','fibra']).map(overviewModule).join('')}</div>
       </section>
       <section class="overview-section overview-activity" aria-labelledby="overview-activity-title">
         <div class="overview-section-heading">
@@ -107,11 +110,13 @@
     const showOverview = module === 'central' && signedIn;
     const showFleet = module === 'frota' && signedIn;
     const showFttx = module === 'fttx' && signedIn;
+    const showFibra = module === 'fibra' && signedIn;
     const manager = googleUser?.role === 'GESTAO';
-    app.hidden = showOverview || showFleet || showFttx;
+    app.hidden = showOverview || showFleet || showFttx || showFibra;
     overview.hidden = !showOverview;
     fleetPane.hidden = !showFleet;
     fttxPane.hidden = !showFttx;
+    fibraPane.hidden = !showFibra;
     signOut.hidden = !signedIn;
     navigation.hidden = isGoogleMode() && !signedIn;
     brand.dataset.module = isGoogleMode() ? 'central' : 'inspecoes';
@@ -146,6 +151,13 @@
       fttxPane.innerHTML = '<p class="portal-module-status" role="status">O Levantamento FTTx está disponível para o perfil Gestão.</p>';
     } else if (showFttx && !fttxPane.hasChildNodes()) {
       mountFttx(fttxPane);
+    }
+    if (showFibra && !fibraFrame) {
+      fibraFrame = document.createElement('iframe');
+      fibraFrame.className = 'portal-fibra-frame';
+      fibraFrame.title = 'Fibra Import — preparação de KML e KMZ';
+      fibraFrame.src = new URL('../fibra-import/', location.origin + '/').href;
+      fibraPane.append(fibraFrame);
     }
     if (changed) {
       window.scrollTo(0,scrollPositions[module] || 0);
@@ -199,6 +211,8 @@
         fleetFrame = null;
         fleetStatus.hidden = true;
         fttxPane.replaceChildren();
+        fibraFrame?.remove();
+        fibraFrame = null;
         overview.replaceChildren();
         for (const module of Object.keys(scrollPositions)) delete scrollPositions[module];
         activeModule = null;

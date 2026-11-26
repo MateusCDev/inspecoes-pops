@@ -34,6 +34,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.52 system-ui,-ap
       <a href="./?modulo=inspecoes" data-module="inspecoes">Inspeções POPs</a>
       <a href="./?modulo=frota" data-module="frota" hidden>Frota</a>
       <a href="./?modulo=fttx" data-module="fttx" hidden>FTTx</a>
+      <a href="./?modulo=fibra" data-module="fibra" hidden>Fibra Import</a>
     </nav>
     <div class="portal-actions"><span id="save" role="status">Dados neste dispositivo</span><button class="btn tiny" type="button" id="goHome">Estações</button><button id="portal-signout" class="btn tiny" type="button" hidden>Sair do portal</button></div>
   </div>
@@ -44,6 +45,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.52 system-ui,-ap
   <div class="portal-module-status" id="portal-fleet-status" role="status" hidden></div>
 </section>
 <section id="portal-fttx-pane" aria-label="Levantamento FTTx" hidden></section>
+<section id="portal-fibra-pane" aria-label="Fibra Import" hidden></section>
 <script src="./config.js?v=__BUILD_ID__"></script>
 <script src="./inspection-photos.js?v=__BUILD_ID__"></script>
 <script src="./google-sync.js?v=__BUILD_ID__"></script>

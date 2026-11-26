@@ -120,7 +120,7 @@ function doPost(e) {
     if(!user)return reply_({ok:false,code:'AUTH',error:'Chave inválida, revogada ou ainda não vinculada a uma pessoa ativa.'});
     requirePrivateData_();
     if(input.version!==1)throw Error('Versão incompatível.');
-    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,accessAdmin:true,reportRefresh:true,assetInventory:true,assetReconciliation:true,assetComparisonV2:true,climateOptional:true,actionPlans:true}});
+    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,accessAdmin:true,reportRefresh:true,assetInventory:true,assetReconciliation:true,assetComparisonV2:true,assetAdjustments:true,climateOptional:true,actionPlans:true}});
     if(input.action==='fleetLoad'||input.action==='fleetSave')return reply_(fleetRequest_(input,user));
     if(input.action==='users')return reply_(listAccess_(user));
     if(input.action==='manageOperator')return reply_(manageOperator_(input,user));
@@ -133,6 +133,7 @@ function doPost(e) {
     if(input.action==='pdf')return reply_(downloadPdf_(input,user));
     if(input.action==='inspectionAssets')return reply_(inspectionAssets_(input,user));
     if(input.action==='assetIssues')return reply_(assetIssues_(input,user));
+    if(input.action==='applyAssetAdjustment')return reply_(applyAssetAdjustment_(input,user));
     if(input.action==='centralBatteryBanks')return reply_(centralBatteryBanks_(user));
     if(input.action==='centralAssetsForInspection')return reply_(centralAssetsForInspection_(input,user));
     if(input.action==='compareInspectionAssets')return reply_(compareInspectionAssets_(input,user));
@@ -982,7 +983,8 @@ function appendNativeAssetRow_(table){
   table.values.splice(target-1,0,Array(table.width).fill(''));return target;
 }
 function syncAssets_(r,version){
-  const {candidates,warnings}=assetCandidates_(r),result={created:0,updated:0,unchanged:0,pending:0,warnings:[]},events=[],tables={};
+  const corrections=recordRevision_(r.id)?assetAuditRows_(r.id):[];
+  const {candidates,warnings}=assetCandidatesWithAdjustments_(r,corrections),result={created:0,updated:0,unchanged:0,pending:0,warnings:[]},events=[],tables={};
   const log=(tab,id,action,detail,before,after)=>events.push([hash_(r.id+'|'+version+'|'+tab+'|'+id+'|'+action+'|'+detail+'|'+JSON.stringify(after||{})),new Date(),r.id,r.codigoPop,tab,id,action,detail,JSON.stringify(before||{}),JSON.stringify(after||{}),version]);
   for(const warning of warnings){result.pending++;result.warnings.push(warning);log('', '', 'PENDENCIA',warning);}
   for(const candidate of candidates){
@@ -1006,9 +1008,9 @@ function syncAssets_(r,version){
       if(action!=='SEM_ALTERACAO')log(candidate.tab,id,action,candidate.label,written.before,written.after);
       for(const warning of fieldWarnings){
         const detail=candidate.tab+' · '+candidate.label+': '+warning;
-        result.pending++;result.warnings.push(detail);log(candidate.tab,id,'PENDENCIA',detail,{candidate:assetCandidateKey_(candidate)});
+        result.pending++;result.warnings.push(detail);log(candidate.tab,id,'PENDENCIA',detail,{candidate:candidate.key});
       }
-    }catch(error){const detail=candidate.tab+' · '+candidate.label+': '+error.message;result.pending++;result.warnings.push(detail);log(candidate.tab,candidate.ref,'PENDENCIA',detail,{candidate:assetCandidateKey_(candidate)});}
+    }catch(error){const detail=candidate.tab+' · '+candidate.label+': '+error.message;result.pending++;result.warnings.push(detail);log(candidate.tab,candidate.ref,'PENDENCIA',detail,{candidate:candidate.key});}
   }
   appendAssetEvents_(events);
   // O resumo nas propriedades tem tamanho limitado; os detalhes integrais ficam no histórico privado.
@@ -1019,17 +1021,160 @@ function appendAssetEvents_(events){
   const seen=new Set(audit.getLastRow()>1?audit.getRange(2,1,audit.getLastRow()-1,1).getValues().flat():[]),fresh=events.filter(e=>!seen.has(e[0]));
   if(fresh.length){const target=audit.getLastRow()+1;if(target+fresh.length-1>audit.getMaxRows())audit.insertRowsAfter(audit.getMaxRows(),fresh.length+100);audit.getRange(target,1,fresh.length,AUDIT_HEADERS.length).setValues(fresh.map(row=>row.map(v=>v instanceof Date?v:text_(v))));}
 }
-function openAssetIssues_(id,revision){
+function assetAuditRows_(id){
   const sheet=book_(config_().ACCESS_SPREADSHEET_ID).getSheetByName(ASSET_AUDIT);
-  const rows=sheet&&sheet.getLastRow()>1?sheet.getRange(2,1,sheet.getLastRow()-1,AUDIT_HEADERS.length).getValues():[];
-  const current=rows.filter(r=>r[2]===id&&r[10]===(revision?.assetAuditVersion||revision?.hash));
-  const closed=new Set(current.filter(r=>['VINCULADO','SUBSTITUIDO'].includes(r[6])).map(r=>r[7].split('|')[0]));
+  return sheet&&sheet.getLastRow()>1?sheet.getRange(2,1,sheet.getLastRow()-1,AUDIT_HEADERS.length).getValues().filter(row=>row[2]===id):[];
+}
+function openAssetIssues_(id,revision,rows=assetAuditRows_(id)){
+  const current=rows.filter(r=>r[10]===(revision?.assetAuditVersion||revision?.hash));
+  const closed=new Set(current.filter(r=>['VINCULADO','SUBSTITUIDO','AJUSTE_PENDENCIA'].includes(r[6])).map(r=>r[7].split('|')[0]));
   return current.filter(r=>r[6]==='PENDENCIA'&&!closed.has(r[0]));
 }
+
+function assetIssueCandidateKey_(issue){
+  try{return JSON.parse(issue[8]).candidate;}catch(_){return undefined;}
+}
+function assetCandidatesWithAdjustments_(record,rows=assetAuditRows_(record.id)){
+  const result=assetCandidates_(record);
+  for(const candidate of result.candidates)candidate.key=assetCandidateKey_(candidate);
+  const indexed=new Map(result.candidates.map(candidate=>[candidate.key,candidate]));
+  for(const row of rows){
+    if(row[6]!=='AJUSTE_PENDENCIA')continue;
+    const adjustment=JSON.parse(row[9]);
+    if(adjustment.updated!==record.updated)continue;
+    const candidate=indexed.get(adjustment.candidate);
+    if(!candidate)continue;
+    if(adjustment.fields){
+      Object.assign(candidate.values,adjustment.fields);
+      if(adjustment.fields['Data Instalação'])candidate.values['Data Instalação']=assetDate_(adjustment.fields['Data Instalação']);
+    }
+    if(adjustment.identity)Object.assign(candidate,adjustment.identity);
+  }
+  return result;
+}
+
+const CLIMATE_ADJUSTMENTS={
+  'Última Medição Temperatura':{field:'Temperatura medida (°C)',optional:true},
+  'Última Medição Corrente':{field:'Corrente medida (A)',optional:true},
+  'Carga Gás':{field:'Carga de gás (g ou kg)'},
+  'Data Instalação':{field:'Data de instalação (DD/MM/AAAA)'}
+};
+function assetPendingAdjustment_(issue,record,revision,candidates,tables){
+  const tab=issue[4],detail=issue[7];
+  const field=tab==='Climatização_Voanet'&&Object.keys(CLIMATE_ADJUSTMENTS).find(key=>
+    detail.startsWith(key+': ')||detail.includes(': '+key+': '));
+  const identity=tab==='Ativos'&&/mais de um equipamento|informe número de série ou patrimônio|a série diverge/i.test(detail);
+  if(!field&&!identity)return null;
+  const recordedKey=assetIssueCandidateKey_(issue);
+  let matching=candidates.filter(candidate=>candidate.tab===tab&&(recordedKey
+    ? candidate.key===recordedKey
+    : detail.startsWith(tab+' · '+candidate.label+': ')||Boolean(field&&detail.startsWith(field+': '))));
+  if(!recordedKey&&matching.length>1&&identity){
+    const table=tables[tab]||(tables[tab]=assetTable_(tab));
+    matching=matching.filter(candidate=>{
+      try{findAssetRow_(table,candidate,record);}
+      catch(error){return detail===tab+' · '+candidate.label+': '+error.message;}
+      return false;
+    });
+  }
+  if(matching.length!==1)return null;
+  const candidate=matching[0];
+  const token=hash_(JSON.stringify([record.id,revision.assetAuditVersion||revision.hash,issue[0],candidate.key,field||'identity']));
+  const raw=field?candidate.values[field]:null;
+  const form=field
+    ? {...CLIMATE_ADJUSTMENTS[field],value:raw instanceof Date?dateKey_(raw):raw?._invalidDate??raw??'',type:'value'}
+    : {type:'identity',serial:candidate.serial,patr:candidate.patr};
+  return {candidate,field,form:{...form,token,asset:candidate.label}};
+}
 function assetIssues_(input,user){
-  const owner=recordOwner_(input.inspectionId);if(!owner||(owner!==user.email&&user.role!=='GESTAO'))throw Error('Registro indisponível.');
-  const revision=recordRevision_(input.inspectionId);
-  return {ok:true,issues:openAssetIssues_(input.inspectionId,revision).map(r=>({tab:r[4],detail:r[7]}))};
+  const id=input.inspectionId,owner=recordOwner_(id);
+  if(!owner||(owner!==user.email&&user.role!=='GESTAO'))throw Error('Registro indisponível.');
+  const revision=recordRevision_(id),rows=assetAuditRows_(id),issues=openAssetIssues_(id,revision,rows);
+  const record=user.role==='GESTAO'&&revision?.payloadId&&issues.length?readJsonFile_(revision.payloadId):null;
+  const candidates=record?assetCandidatesWithAdjustments_(record,rows).candidates:[];
+  const tables={};
+  return {ok:true,issues:issues.map(row=>({tab:row[4],detail:row[7],
+    adjustment:record?assetPendingAdjustment_(row,record,revision,candidates,tables)?.form:undefined}))};
+}
+
+function applyAssetAdjustment_(input,user){
+  if(user.role!=='GESTAO')throw Error('Ajuste disponível para a Gestão.');
+  const id=input.inspectionId,token=input.adjustmentToken,reason=String(input.reason??'').trim();
+  if(!/^INSP-[A-Za-z0-9-]+$/.test(id||'')||!/^[a-f0-9]{64}$/.test(token||''))throw Error('Abra a pendência novamente.');
+  if(reason.length<5||reason.length>300)throw Error('Informe o motivo do ajuste (5 a 300 caracteres).');
+  return withWriteLock_(()=>{
+    const revision=recordRevision_(id);
+    if(!revision?.payloadId||!recordOwner_(id))throw Error('Inspeção indisponível.');
+    if(privateValue_(jobKey_(id)))throw Error('Aguarde o processamento da inspeção e abra a pendência novamente.');
+    const rows=assetAuditRows_(id),issues=openAssetIssues_(id,revision,rows),eventId=hash_(token+'|AJUSTE_PENDENCIA');
+    if(rows.some(row=>row[0]===eventId)){
+      if(revision.assets?.pending!==issues.length){
+        revision.assets={...revision.assets,pending:issues.length};
+        setPrivate_('REVISION_'+hash_(id),JSON.stringify(revision));
+        setPrivate_('DATA_VERSION',Utilities.getUuid());
+      }
+      return {ok:true,pending:issues.length};
+    }
+    const record=readJsonFile_(revision.payloadId),tables={};
+    const {candidates}=assetCandidatesWithAdjustments_(record,rows);
+    const issue=issues.find(entry=>assetPendingAdjustment_(entry,record,revision,candidates,tables)?.form.token===token);
+    if(!issue)throw Error('A pendência mudou. Abra a lista novamente.');
+    const {candidate,field,form}=assetPendingAdjustment_(issue,record,revision,candidates,tables);
+    const adjustment={updated:record.updated,candidate:candidate.key};
+    let patch={};
+    const omitted=input.notMeasured===true;
+    if(omitted){
+      if(!form.optional)throw Error('Essa pendência requer um valor conferido.');
+      adjustment.fields={[field]:null};
+    }else if(field){
+      const value=String(input.value??'').trim();
+      if(!value||value.length>60)throw Error('Informe um valor válido para '+form.field+'.');
+      const accepted=validatedAssetValue_(null,field==='Data Instalação'?assetDate_(value):value,field);
+      if(accepted===undefined)throw Error('Informe um valor conferido ou selecione Medição não realizada.');
+      adjustment.fields={[field]:value};
+      patch={[field]:accepted};
+    }else{
+      const serial=String(input.serial??'').trim(),patr=String(input.patr??'').trim();
+      const identifiers=[...identityTokens_(serial,'S:'),...identityTokens_(patr,'P:')];
+      if(!identifiers.length||[serial,patr].some(value=>value.length>80||/[,;\r\n]/.test(value))){
+        throw Error('Informe uma única série ou patrimônio da etiqueta do equipamento.');
+      }
+      adjustment.identity={serial,patr,ref:''};
+      patch={'Nº Série':serial,'Patrimônio':patr};
+    }
+
+    let rowChange;
+    if(!omitted){
+      const table=tables[candidate.tab]||(tables[candidate.tab]=assetTable_(candidate.tab));
+      const corrected={...candidate,...adjustment.identity};
+      const found=findAssetRow_(table,corrected,record);
+      if(!found)throw Error('O ajuste precisa identificar um equipamento já cadastrado. Para criar um ativo, corrija a inspeção original.');
+      const match=comparisonAsset_(corrected,table,found,record);
+      const get=header=>found.row[table.headers.indexOf(header)];
+      const config=ASSET_TABS[candidate.tab],date=dateKey_(get(config.date||'Data_Ultima_Inspecao'));
+      if(date>record.data||(date===record.data&&String(get('Versao_Inspecao')||'')>record.updated)){
+        throw Error('O cadastro foi atualizado por uma vistoria mais recente.');
+      }
+      if(!field&&(!match?.sameStation||(!match.sameSerial&&!match.samePatr)||!match.sameModel||!match.sameCategory||match.patrDiff)){
+        throw Error('A série ou patrimônio precisa identificar uma única unidade do mesmo modelo e POP. Abra a comparação para conferir.');
+      }
+      for(const header of Object.keys(patch)){
+        const col=table.headers.indexOf(header);
+        if(col<0||table.sheet.getRange(found.index,col+1).getFormulas()[0][0])throw Error(header+': confira a coluna ou fórmula na planilha.');
+      }
+      rowChange=writeAssetPatch_(table,found.index,patch,[],true);
+    }
+    const before={value:form.value,serial:form.serial,patr:form.patr,central:rowChange?.before};
+    const after={...adjustment,central:rowChange?.after};
+    appendAssetEvents_([[eventId,new Date(),id,record.codigoPop,candidate.tab,issue[5],
+      'AJUSTE_PENDENCIA',issue[0]+'|'+user.email+'|'+reason,JSON.stringify(before),JSON.stringify(after),revision.assetAuditVersion||revision.hash]]);
+    const pending=issues.length-1;
+    revision.assets={...revision.assets,pending};
+    setPrivate_('REVISION_'+hash_(id),JSON.stringify(revision));
+    setPrivate_('DATA_VERSION',Utilities.getUuid());
+    SpreadsheetApp.flush();
+    return {ok:true,pending};
+  });
 }
 
 function inspectionAssets_(input,user){
@@ -1150,9 +1295,9 @@ function assetComparisonData_(id,user){
   if(!/^INSP-[A-Za-z0-9-]+$/.test(id||'')||user.role!=='GESTAO'||!recordOwner_(id))throw Error('Conferência indisponível.');
   const revision=recordRevision_(id);
   if(!revision?.payloadId)throw Error('O inventário arquivado desta inspeção está indisponível.');
-  const issues=openAssetIssues_(id,revision);
+  const rows=assetAuditRows_(id),issues=openAssetIssues_(id,revision,rows);
   const record=readJsonFile_(revision.payloadId);
-  const {candidates}=assetCandidates_(record);
+  const {candidates}=assetCandidatesWithAdjustments_(record,rows);
   for(const bank of record.invBatteryBanks||[]){
     const label=bank.identificacao||bank.id;
     if(candidates.some(item=>item.tab==='Controle_Baterias'&&item.label===label))continue;
@@ -1164,12 +1309,11 @@ function assetComparisonData_(id,user){
   const tables={},comparisons=[];
   for(const candidate of candidates){
     const prefix=candidate.tab+' · '+candidate.label+': ';
-    const identity=assetCandidateKey_(candidate);
+    const identity=candidate.key||assetCandidateKey_(candidate);
     const sameLabelCount=candidates.filter(item=>item.tab===candidate.tab&&item.label===candidate.label).length;
     const related=issues.filter(issue=>{
       // Nos envios recentes a pendência identifica a unidade, mesmo quando o modelo se repete.
-      let savedIdentity;
-      try{savedIdentity=JSON.parse(issue[8]).candidate;}catch(_){}
+    const savedIdentity=assetIssueCandidateKey_(issue);
       if(savedIdentity)return issue[4]===candidate.tab&&savedIdentity===identity;
       if(sameLabelCount>1&&issue[4]===candidate.tab&&issue[7].startsWith(prefix)){
         const table=tables[candidate.tab]||(tables[candidate.tab]=assetTable_(candidate.tab));

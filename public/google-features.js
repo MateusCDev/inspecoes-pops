@@ -251,27 +251,83 @@ function assetIssueGuidance(detail){
   }
   return '';
 }
+function assetAdjustmentForm(adjustment){
+  if(!adjustment||googleUser?.role!=='GESTAO'||!googleCapabilities.assetAdjustments)return '';
+  const identity=adjustment.type==='identity';
+  return `<details class="asset-adjustment"><summary>Ajustar pendência</summary>
+    <form data-asset-adjustment="${esc(adjustment.token)}">
+      <p class="small muted">${esc(adjustment.asset)} · O ajuste fica no histórico da vistoria.</p>
+      ${identity?`<div class="asset-adjustment-fields">
+        <label>Número de série <input name="serial" value="${esc(adjustment.serial)}" maxlength="80"></label>
+        <label>Patrimônio <input name="patr" value="${esc(adjustment.patr)}" maxlength="80"></label></div>
+        <p class="small muted">Use a etiqueta para identificar uma unidade já cadastrada neste POP.</p>`
+      :`<label>${esc(adjustment.field)} <input name="value" value="${esc(adjustment.value)}" maxlength="60" required></label>
+        ${adjustment.optional?'<label class="asset-adjustment-choice"><input type="checkbox" name="notMeasured"> Medição não realizada</label>':''}`}
+      <label>Motivo do ajuste <input name="reason" required minlength="5" maxlength="300"></label>
+      <button class="btn primary tiny" type="submit">Salvar ajuste</button><p class="small" role="status"></p>
+    </form></details>`;
+}
+
 async function googleShowAssetIssues(id){
   const session=googleSession;
   const {dialog,content}=openGoogleAssetDialog('Pendências de conferência',id,'Carregando pendências…');
-  try{
+  const active=()=>session===googleSession&&dialog.open;
+  async function refresh(saved=false){
     const result=await googleRpc('assetIssues',{inspectionId:id});
-    if(session!==googleSession||!dialog.open)return;
+    if(!active())return;
     if(!Array.isArray(result.issues))throw Error('A resposta do serviço não trouxe os detalhes das pendências.');
     const tabs=new Map();
     const names={Ativos:'Inventário de ativos',Climatização_Voanet:'Climatização',Controle_Baterias:'Baterias',Retificadores:'Retificadores'};
     for(const entry of result.issues){
       const title=names[entry.tab]||entry.tab||'Conferência de inventário';
       if(!tabs.has(title))tabs.set(title,[]);
-      tabs.get(title).push(entry.detail);
+      tabs.get(title).push(entry);
     }
-    content.innerHTML=tabs.size?[...tabs].map(([title,items])=>`<section><h3>${esc(title)}</h3><ul>${items.map(item=>{const guidance=assetIssueGuidance(item);return `<li>${esc(item)}${guidance?`<p class="asset-issue-guidance">${esc(guidance)}</p>`:''}</li>`;}).join('')}</ul></section>`).join(''):'<p>Sem pendências nesta versão.</p>';
-    if(tabs.size&&googleUser?.role==='GESTAO'&&googleCapabilities.assetReconciliation){
-      content.insertAdjacentHTML('beforeend',button('googleCompare:'+id,'Conferir com a base central','primary tiny'));
-    }
-  }catch(error){
-    if(session===googleSession&&dialog.open)content.innerHTML=`<p role="alert">${esc(error.message)}</p>`;
+    const actions=tabs.size&&googleUser?.role==='GESTAO'&&googleCapabilities.assetReconciliation
+      ? button('googleCompare:'+id,'Conferir com a base central','primary tiny'):'';
+    const update=tabs.size&&googleUser?.role==='GESTAO'&&!googleCapabilities.assetAdjustments
+      ? '<p class="small muted">O ajuste nesta tela fica disponível após atualizar a implantação do Apps Script.</p>':'';
+    const sections=[...tabs].map(([title,items])=>`<section><h3>${esc(title)}</h3>
+      <ul>${items.map(({detail,adjustment})=>{
+        const guidance=assetIssueGuidance(detail);
+        return `<li>${esc(detail)}${assetAdjustmentForm(adjustment)||
+          (guidance?`<p class="asset-issue-guidance">${esc(guidance)}</p>`:'')}</li>`;
+      }).join('')}</ul></section>`).join('');
+    content.innerHTML=`<p tabindex="-1" id="asset-remaining">${saved?'Ajuste salvo. ':''}${result.issues.length
+      ? result.issues.length+' pendência(s) para revisar.':'Sem pendências nesta versão.'}</p>${actions}${update}${sections}`;
+    if(saved)content.querySelector('#asset-remaining').focus();
   }
+
+  dialog.addEventListener('change',event=>{
+    if(event.target.name!=='notMeasured')return;
+    const value=event.target.form.elements.value;
+    value.disabled=event.target.checked;
+    value.required=!event.target.checked;
+  });
+  dialog.addEventListener('submit',async event=>{
+    const form=event.target;
+    if(!form.dataset.assetAdjustment)return;
+    event.preventDefault();
+    const submit=form.querySelector('button'),status=form.querySelector('[role="status"]'),fields=new FormData(form);
+    if(submit.disabled||!active())return;
+    submit.disabled=true;
+    status.textContent='Salvando ajuste…';
+    try{
+      await googleRpc('applyAssetAdjustment',{inspectionId:id,adjustmentToken:form.dataset.assetAdjustment,
+        reason:fields.get('reason'),value:fields.get('value'),serial:fields.get('serial'),patr:fields.get('patr'),
+        notMeasured:fields.has('notMeasured')});
+    }catch(error){
+      if(active()){status.textContent=error.message;submit.disabled=false;}
+      return;
+    }
+    if(session!==googleSession)return;
+    googleRefreshCentral();
+    if(!active())return;
+    try{await refresh(true);}
+    catch(_){if(active())status.textContent='Ajuste salvo. Reabra a lista para consultar as outras pendências.';}
+  });
+  try{await refresh();}
+  catch(error){if(active())content.innerHTML=`<p role="alert">${esc(error.message)}</p>`;}
 }
 document.addEventListener('click',e=>{
   const action=e.target.closest('[data-action]')?.dataset.action;if(!googleUser)return;

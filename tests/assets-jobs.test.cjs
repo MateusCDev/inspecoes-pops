@@ -291,3 +291,77 @@ test('Gestão vê modelo parecido sem vincular e pode confirmar identidade exata
  assert.equal(value(h,'Ativos',2,'Fabricante'),'XPS');
  assert.equal(h.request({action:'assetIssues',inspectionId:r.id},'manager').issues.length,2);
 });
+
+test('Gestão fecha medição não realizada pela pendência e o reprocessamento preserva a decisão',()=>{
+ const h=harness(),r=climateRecord(h);
+ h.asset('Climatização_Voanet',{'Estação':'POP fictício','Fabricante':'Gree','Modelo':'AC100','Nº Série':'SER-AC-1',
+  'Última Medição Temperatura':24});
+ r.equipamentos.climatizadores[0].temperatura='não anotada';
+ const original=h.send(r);
+ assert.equal(original.ok,true);
+ assert.equal(original.assets.pending,1);
+ // A vistoria de Urbis I foi enviada quando as pendências de campo não tinham chave da unidade.
+ const legacy=h.audit.find(row=>row[6]==='PENDENCIA');
+ legacy[7]='Última Medição Temperatura: Informe um valor numérico.';
+ legacy[8]='{}';
+ const list={action:'assetIssues',inspectionId:r.id};
+ const [issue]=h.request(list,'manager').issues;
+ assert.equal(issue.adjustment.optional,true);
+ assert.equal(h.request(list).issues[0].adjustment,undefined);
+ const adjustment={action:'applyAssetAdjustment',inspectionId:r.id,adjustmentToken:issue.adjustment.token,
+  reason:'Medição não realizada nesta visita',notMeasured:true};
+ assert.equal(h.request(adjustment).ok,false);
+ assert.equal(h.request(adjustment,'manager').pending,0);
+ assert.equal(h.request(adjustment,'manager').pending,0);
+ assert.equal(h.request(list,'manager').issues.length,0);
+ assert.equal(value(h,'Climatização_Voanet',1,'Última Medição Temperatura'),24);
+ assert.equal(h.audit.filter(row=>row[6]==='AJUSTE_PENDENCIA').length,1);
+ assert.equal(h.request({action:'reprocessAssets',inspectionId:r.id},'manager').pending,true);
+ h.c.processQueue();
+ const done=h.request({action:'status',inspectionId:r.id},'manager');
+ assert.equal(done.assets.pending,0);
+ assert.equal(done.pdfUrl,original.pdfUrl);
+ assert.equal(value(h,'Climatização_Voanet',1,'Última Medição Temperatura'),24);
+});
+
+test('ajusta somente o campo numérico selecionado e conserva o valor no reprocessamento',()=>{
+ const h=harness(),r=climateRecord(h);
+ Object.assign(r.equipamentos.climatizadores[0],{temperatura:'?',corrente:'?'});
+ assert.equal(h.send(r).assets.pending,2);
+ const list={action:'assetIssues',inspectionId:r.id};
+ const issue=h.request(list,'manager').issues.find(x=>x.adjustment?.field.includes('Temperatura'));
+ const adjustment={action:'applyAssetAdjustment',inspectionId:r.id,adjustmentToken:issue.adjustment.token,
+  reason:'Leitura confirmada no registro de campo'};
+ assert.equal(h.request({...adjustment,value:'erro'},'manager').ok,false);
+ assert.equal(h.request({...adjustment,value:'23,6'},'manager').pending,1);
+ assert.equal(value(h,'Climatização_Voanet',1,'Última Medição Temperatura'),23.6);
+ assert.match(h.request(list,'manager').issues[0].detail,/Corrente/);
+ assert.equal(h.request({action:'reprocessAssets',inspectionId:r.id},'manager').pending,true);
+ h.c.processQueue();
+ assert.equal(h.request(list,'manager').issues.length,1);
+ assert.equal(value(h,'Climatização_Voanet',1,'Última Medição Temperatura'),23.6);
+});
+
+test('ajuste de identificação exige unidade existente e rejeita série e patrimônio de linhas distintas',()=>{
+ const h=harness(),r=h.record();
+ r.inventoryReview={transceivers:'alterado'};
+ r.invTransceivers=[{id:'TX1',tipo:'GPON',fabricante:'Datacom',modelo:'WXTRGP22SSC1'}];
+ for(const [serial,patr] of [['S1','P1'],['S2','P2']]){
+  h.asset('Ativos',{'Local':'POP fictício','Categoria':'Transmissão','Equipamento':'Transceiver GPON','Fabricante':'Datacom',
+   'Modelo':'WXTRGP22SSC1','Nº Série':serial,'Patrimônio':patr});
+ }
+ assert.equal(h.send(r).assets.pending,1);
+ const list={action:'assetIssues',inspectionId:r.id};
+ const [issue]=h.request(list,'manager').issues;
+ assert.equal(issue.adjustment.type,'identity');
+ const adjustment={action:'applyAssetAdjustment',inspectionId:r.id,adjustmentToken:issue.adjustment.token,
+  reason:'Etiqueta da unidade conferida'};
+ assert.equal(h.request({...adjustment,serial:'S1',patr:'P2'},'manager').ok,false);
+ assert.equal(h.request({...adjustment,serial:'S-inexistente'},'manager').ok,false);
+ assert.equal(h.request({...adjustment,serial:'S2',patr:'P2'},'manager').pending,0);
+ assert.equal(h.assets.Ativos.length,3);
+ assert.equal(h.request({action:'reprocessAssets',inspectionId:r.id},'manager').pending,true);
+ h.c.processQueue();
+ assert.equal(h.request(list,'manager').issues.length,0);
+ assert.equal(h.assets.Ativos.length,3);
+});

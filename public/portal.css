@@ -468,3 +468,27 @@ body:has(.portal-login) .portal-actions { display: none; }
   background: #fff7e8;
   color: #61420a;
 }
+
+.asset-adjustment {
+  margin: .45rem 0 .85rem;
+  padding: .55rem .75rem;
+  border: 1px solid var(--portal-line);
+  border-radius: .55rem;
+}
+.asset-adjustment summary {
+  color: var(--portal-red-dark);
+  font-weight: 700;
+  cursor: pointer;
+}
+.asset-adjustment form {
+  display: grid;
+  gap: .65rem;
+  margin-top: .6rem;
+}
+.asset-adjustment form p { margin: 0; }
+.asset-adjustment label { display: grid; gap: .25rem; font-size: .875rem; }
+.asset-adjustment input:not([type="checkbox"]) { width: 100%; min-width: 0; box-sizing: border-box; }
+.asset-adjustment .asset-adjustment-choice { display: flex; align-items: center; gap: .45rem; }
+.asset-adjustment-fields { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,11rem),1fr)); gap: .65rem; }
+.asset-adjustment button { justify-self: start; }
+.asset-adjustment [role="status"]:empty { display: none; }

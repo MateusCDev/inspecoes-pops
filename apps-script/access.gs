@@ -18,14 +18,18 @@ function accessSheet_() {
   return sheet;
 }
 function accessUsers_() {
+  const ctx = context_();
+  if (ctx.users) return ctx.users;
   const sheet = accessSheet_(), seen = new Set();
-  return sheet.getLastRow() < 2 ? [] : sheet.getRange(2,1,sheet.getLastRow()-1,4).getValues().flatMap((r,i)=>{
+  const users = sheet.getLastRow() < 2 ? [] : sheet.getRange(2,1,sheet.getLastRow()-1,4).getValues().flatMap((r,i)=>{
     if (!String(r[0]||'').trim()) return [];
     const email=String(r[0]).trim().toLowerCase(),role=String(r[1]).trim().toUpperCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !['GESTAO','OPERACAO'].includes(role) || seen.has(email)) throw Error('E-mail/perfil inválido ou duplicado na aba de acessos.');
     seen.add(email);
     return [{email,role,active:r[2]===true,issue:r[3]===true,row:i+2}];
   });
+  ctx.users = users;
+  return users;
 }
 function issueAccessKeys_() {
   beginRequest_();
@@ -49,6 +53,7 @@ function issueAccessKeys_() {
       sheet.getRange(user.row,4).setValue(false);
       console.log('E-mail: '+user.email+' | Perfil: '+user.role+'\nChave individual: '+token);
     });
+    context_().users = null;
     console.log('Entregue cada chave somente à pessoa correspondente. Não publique as chaves na planilha.');
   } finally {lock.releaseLock();}
 }
@@ -66,7 +71,7 @@ function canReadRow_(row,headers,user) {
 function recordOwner_(id) {return privateValue_('OWNER_'+hash_(String(id)))||'';}
 function recordRevision_(id) {return JSON.parse(privateValue_('REVISION_'+hash_(String(id)))||'null');}
 function listInspections_(input,user) {
-  const sheet=sheet_(),headers=headers_(),limit=50;
+  const sheet=sheet_(),headers=headers_(),idx=headerMap_(headers),limit=50;
   let cursor=input.cursor===undefined?sheet.getLastRow():Number(input.cursor);
   if (!Number.isInteger(cursor)||cursor<1||cursor>sheet.getLastRow()) throw Error('Página inválida.');
   const items=[];
@@ -77,7 +82,7 @@ function listInspections_(input,user) {
       cursor=start+i-1;
       const row=block[i];
       if(!row[0]||!canReadRow_(row,headers,user))continue;
-      const get=k=>row[headers.indexOf(k)];
+      const get=k=>row[idx[k]];
       items.push({id:row[0],stationCode:get('codigo_pop'),station:get('nome'),date:get('data'),updated:get('updated'),technician:get('inspetor'),owner:recordOwner_(row[0])||'Autoria não vinculada',criticality:get('classificacao'),nc:get('itens_nao_conformes'),conform:get('itens_conformes'),unverified:get('itens_nao_verificados'),due:get('scheduleDueDate'),period:get('schedulePeriod'),issues:get('qtd_pendencias')});
       if(items.length===limit)break;
     }

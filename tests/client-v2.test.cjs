@@ -144,3 +144,65 @@ test('falhas repetidas deixam a inspeção e o progresso disponíveis para reenv
  assert.match(saved.googleError,/foto 1 de 1.*Reenviar esta inspeção/);
  assert.equal(saved.photos[0].id,'PH-1');
 });
+
+test('login aproveita stations retornado pela sessão em uma única chamada',async()=>{
+ const {harness}=require('./support/gas.cjs');
+ const h=harness();
+ const plain=h.request({action:'session'});
+ assert.equal(plain.ok,true);
+ assert.equal(plain.stations,undefined);
+ const combined=h.request({action:'session',includeStations:true});
+ assert.equal(combined.ok,true);
+ assert.ok(Array.isArray(combined.stations)&&combined.stations.length>0);
+
+ const actions=[];
+ const c=vm.createContext({
+  console,Blob,cfg:{mode:'google',google:{endpoint:'https://script.google.com/macros/s/mock/exec'}},
+  window:{addEventListener(){}},document:{addEventListener(){},getElementById(){return null}},navigator:{onLine:false},
+  records:[],view:'home',activeId:null,photosCache:new Map(),loadAll:()=>[],render(){},
+  fetch:async(_url,{body})=>{
+   const req=JSON.parse(body);
+   actions.push(req.action);
+   return {ok:true,json:async()=>h.request(req)};
+  }
+ });
+ vm.runInContext(clientScripts,c);
+ const button={disabled:false,isConnected:true};
+ const form={elements:{key:{value:'chave-teste'}},querySelector:()=>button};
+ await c.googleLogin(form);
+ assert.deepEqual(actions,['session','dashboard']);
+ assert.ok(vm.runInContext('googleStations.length',c)>0);
+});
+
+test('envio de fotos v2 sobe até 3 fotos em paralelo preservando a ordem final',async()=>{
+ const photos=['p1','p2','p3','p4','p5'].map(id=>({id,name:id+'.jpg'}));
+ const record={id:'INSP-CLIENT-6',finalizedAt:'2026-11-27T12:00:00Z',updated:'2026-11-27T12:00:00Z',photos};
+ let active=0,peak=0,submitted=null;
+ const resolvers=[];
+ const c=vm.createContext({
+  console,Blob,cfg:{mode:'google',google:{endpoint:'https://script.google.com/macros/s/mock/exec'}},
+  window:{addEventListener(){}},document:{addEventListener(){},getElementById(){return null}},navigator:{onLine:true},
+  view:'resumo',cur:()=>record,records:[record],saveAll:()=>true,render(){},alert:message=>assert.fail(message),
+  getPhoto:async()=>({blob:new Blob(['foto'],{type:'image/jpeg'})}),
+  fileToDataUrl:async()=> 'data:image/jpeg;base64,Zm90bw==',
+  fetch:async(_url,{body})=>{
+   const req=JSON.parse(body);
+   if(req.action==='photo'){
+    active++;peak=Math.max(peak,active);
+    await new Promise(resolve=>resolvers.push(()=>{active--;resolve();}));
+    return {ok:true,json:async()=>({ok:true,photo:{id:req.photoId,fileId:'drive-'+req.photoId,signature:'sig'}})}
+   }
+   if(req.action==='submit')submitted=req.record;
+   return {ok:true,json:async()=>({ok:true,inspectionId:record.id,pdfUrl:'https://drive.google.com/file/d/teste/view',receivedAt:record.updated})};
+  }
+ });
+ vm.runInContext(clientScripts+'\ngoogleUser={email:"ops@example.test"};googleAccessKey="teste";',c);
+ const sending=c.googleSendV2(record);
+ for(let step=0;step<20;step++){
+  await new Promise(ok=>setImmediate(ok));
+  while(resolvers.length)resolvers.shift()();
+ }
+ assert.equal(await sending,true);
+ assert.equal(peak,3);
+ assert.deepEqual(submitted.photoFiles.map(p=>p.id),photos.map(p=>p.id));
+});

@@ -78,11 +78,11 @@ async function googleLogin(form){
   const key=form.elements.key.value.trim();if(!key)return;
   const submit=form.querySelector('button');submit.disabled=true;const session=++googleSession;
   try{
-    const result=await googleRpc('session',{},key);if(session!==googleSession)return;
+    const result=await googleRpc('session',{includeStations:true},key);if(session!==googleSession)return;
     if(!result.user?.email||!['GESTAO','OPERACAO'].includes(result.user.role))throw Error('Perfil não confirmado.');
-    const catalog=await googleRpc('stations',{},key);if(session!==googleSession)return;
-    if(!Array.isArray(catalog.stations))throw Error('Cadastro de POPs indisponível.');
-    googleStations=catalog.stations;googleCapabilities=result.capabilities||{};
+    const stations=Array.isArray(result.stations)?result.stations:(await googleRpc('stations',{},key)).stations;if(session!==googleSession)return;
+    if(!Array.isArray(stations))throw Error('Cadastro de POPs indisponível.');
+    googleStations=stations;googleCapabilities=result.capabilities||{};
     googleAccessKey=key;googleUser=result.user;records=loadAll();activeId=null;view='home';photosCache.clear();
     googleCentralItems=[];googleSummary=null;googleNextCursor=null;googleCentralUpdated='';googleCentralError='';render();if(typeof googlePollJobs==='function')googlePollJobs();
     window.VOANET_PORTAL?.refresh();
@@ -94,14 +94,17 @@ async function googleLogin(form){
 function googleLogout(){
   if(typeof closeGoogleAssetIssues==='function')closeGoogleAssetIssues();
   if(typeof googleClearAccessState==='function')googleClearAccessState();
-  if(typeof flushLocalSave==='function')flushLocalSave();googleCapabilities={};googleSummary=null;googleNextCursor=null;
+  if(typeof flushLocalSave==='function')flushLocalSave();
+  if(typeof closePhotoDB==='function')closePhotoDB();
+  if(googleHistoryFilterTimer!==null){clearTimeout(googleHistoryFilterTimer);googleHistoryFilterTimer=null;}
+  googleCapabilities={};googleSummary=null;googleNextCursor=null;
   googleSession++;googleAccessKey='';googleUser=null;records=[];activeId=null;view='home';
   googleCentralItems=[];googleStations=[];googleCentralUpdated='';googleCentralError='';googleCentralBusy=false;
   googlePageBusy=false;googlePageError='';googleStationOptics=null;googleHistoryQuery='';googleHistoryPendingOnly=false;photosCache.clear();render();
   window.VOANET_PORTAL?.refresh();
 }
 function googleStation(record){return googleStations.find(s=>s.code===String(record.codigoPop??'').trim()&&!s.duplicate&&!s.inactive);}
-function googleStationField(r){return `<div class="field full"><label>POP cadastrado — prazo por criticidade</label><select data-google-station><option value="">Selecione o POP</option>${googleStations.filter(s=>!s.inactive).map(s=>`<option value="${esc(s.code)}" ${r.codigoPop===s.code?'selected':''} ${s.duplicate||!s.days?'disabled':''}>${esc(s.code+' — '+s.name+' · '+s.criticality+(s.duplicate?' — código duplicado':s.days?' · '+s.days+' dias':' — regra não definida'))}</option>`).join('')}</select></div>`;}
+function googleStationField(r){return `<div class="field full"><label>POP cadastrado — prazo por criticidade<span class="req-mark" aria-hidden="true">*</span></label><select data-google-station required><option value="">Selecione o POP</option>${googleStations.filter(s=>!s.inactive).map(s=>`<option value="${esc(s.code)}" ${r.codigoPop===s.code?'selected':''} ${s.duplicate||!s.days?'disabled':''}>${esc(s.code+' — '+s.name+' · '+s.criticality+(s.duplicate?' — código duplicado':s.days?' · '+s.days+' dias':' — regra não definida'))}</option>`).join('')}</select></div>`;}
 function googleScheduleForm(r){
   const station=googleStation(r),due=station?.days?addLocalDays(r.data,station.days):'';
   return `<div class="card"><h2>Próxima inspeção preventiva</h2>${googleStationField(r)}<p>ALTA/CRÍTICA: 45 dias · MÉDIA: 90 dias.</p><p>Contagem em dias corridos a partir da data da vistoria. Recalculada a cada nova inspeção.</p><p><b>Criticidade do POP:</b> ${esc(station?.criticality||'Selecione o POP')} · <b>Prazo:</b> ${station?.days||'—'} dias</p><p><b>Próxima inspeção:</b> ${esc(due?fmt(due):'Informe POP e data da vistoria')}</p><p class="small muted">O servidor confirma o prazo usando o cadastro de POPs. A criticidade operacional da vistoria é registrada separadamente.</p></div>`;
@@ -233,9 +236,19 @@ async function googleFinalize(){
     if(typeof googlePollJobs==='function')await googlePollJobs(r);
     return;
   }
-  if(!r?.nome?.trim()||!r.inspetor?.trim()||!r.data)return alert('Informe estação, Técnico 01 e data.');
+  if(typeof inspectionValidation==='function'){
+    const check=inspectionValidation(r);
+    if(check.errors.length){
+      alert('Preencha os itens obrigatórios antes de finalizar:\n• '+check.errors.map(item=>item.message).join('\n• '));
+      if(typeof navigate==='function'&&check.errors[0].step)navigate(check.errors[0].step);
+      return;
+    }
+  } else if(!r?.nome?.trim()||!r.inspetor?.trim()||!r.data){
+    return alert('Informe estação, Técnico 01 e data.');
+  }
   const station=googleStation(r);if(!station?.days)return alert('Selecione um POP cadastrado com criticidade ALTA ou MÉDIA.');
   if(!confirm('Finalizar e enviar a inspeção e o PDF? Sem conexão, o envio ficará pendente.'))return;
+  if(!String(r.fim||'').trim()&&typeof localTimeNow==='function')r.fim=localTimeNow();
   r.nome=station.name;r.popCriticality=station.criticality;r.schedulePeriod=station.days;
   if(!r.finalizedAt){r.finalizedAt=new Date().toISOString();r.updated=r.finalizedAt;}
   r.scheduleBaseDate=r.data;r.scheduleDueDate=addLocalDays(r.data,station.days);r.syncState='pendente';
@@ -350,14 +363,27 @@ function googleHistoryView(items,manager){
     ${googleMoreButton()}</section>`;
 }
 
+let googleHistoryFilterTimer=null;
+function renderGoogleHistoryResultsNow(){
+  const container=document.getElementById('google-history-results');
+  if(container)container.innerHTML=googleHistoryResults(googleCentralItems,googleUser?.role==='GESTAO');
+}
 function updateGoogleHistoryFilters(event){
-  if(event.target.id==='google-history-query')googleHistoryQuery=event.target.value;
-  else if(event.target.id==='google-history-pending')googleHistoryPendingOnly=event.target.checked;
-  else return;
-  document.getElementById('google-history-results').innerHTML=googleHistoryResults(googleCentralItems,googleUser?.role==='GESTAO');
+  if(event.target.id==='google-history-query'){
+    googleHistoryQuery=event.target.value;
+    if(googleHistoryFilterTimer!==null)clearTimeout(googleHistoryFilterTimer);
+    googleHistoryFilterTimer=setTimeout(()=>{googleHistoryFilterTimer=null;renderGoogleHistoryResultsNow();},120);
+    return;
+  }
+  if(event.target.id==='google-history-pending'){
+    googleHistoryPendingOnly=event.target.checked;
+    if(googleHistoryFilterTimer!==null){clearTimeout(googleHistoryFilterTimer);googleHistoryFilterTimer=null;}
+    renderGoogleHistoryResultsNow();
+  }
 }
 document.addEventListener('input',updateGoogleHistoryFilters);
 
+const googleNumberFormat=new Intl.NumberFormat('pt-BR');
 function googleUpcomingInspections(items){
   const latest=new Map();
   for(const item of googleSummary?.latest||items){
@@ -365,8 +391,9 @@ function googleUpcomingInspections(items){
     const previous=latest.get(key);
     if(!previous||String(item.date)+String(item.updated)>String(previous.date)+String(previous.updated))latest.set(key,item);
   }
+  const inactive=new Set(googleStations.filter(station=>station.inactive).map(station=>String(station.code)+'|'+station.name));
   return [...latest.values()]
-    .filter(item=>!googleStations.some(station=>station.inactive&&station.code===String(item.stationCode)&&station.name===item.station))
+    .filter(item=>!inactive.has(String(item.stationCode)+'|'+item.station))
     .sort((a,b)=>String(a.due||'9999').localeCompare(String(b.due||'9999')));
 }
 
@@ -406,7 +433,7 @@ function googleCentralSchedule(items){
 }
 
 function googleCentralDashboard(items){
-  const number=new Intl.NumberFormat('pt-BR');
+  const number=googleNumberFormat;
   const sum=key=>items.reduce((total,item)=>total+(Number(item[key])||0),0);
   const conform=Number(googleSummary?.conform??sum('conform'))||0;
   const nonconform=Number(googleSummary?.nc??sum('nc'))||0;

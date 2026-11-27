@@ -24,6 +24,7 @@ function manageOperator_(input,user){
     const sheet=accessSheet_();let row=existing?.row;
     if(!row){row=Math.max(2,sheet.getLastRow());sheet.insertRowsBefore(row,1);const source=sheet.getRange(row+1,1,1,4),destination=sheet.getRange(row,1,1,4);source.copyTo(destination,SpreadsheetApp.CopyPasteType.PASTE_FORMAT,false);source.copyTo(destination,SpreadsheetApp.CopyPasteType.PASTE_DATA_VALIDATION,false);}
     sheet.getRange(row,1,1,4).setValues([[email,'OPERACAO',input.operation==='issue',false]]);
+    context_().users=null;
     logAccessChange_(user.email,email,input.operation==='deactivate'?'DESATIVADO':existing?'CHAVE_REEMITIDA':'OPERADOR_CADASTRADO');
     return {ok:true,email,token,active:input.operation==='issue'};
   });

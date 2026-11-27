@@ -258,3 +258,65 @@
 .transceiver-reference p { margin: .35rem 0 0; overflow-wrap: anywhere; }
 .transceiver-reference > .btn { margin-top: .5rem; }
 .transceiver-reference:has(> .transceiver-base-feedback:only-child:empty) { display: none; }
+
+.req-mark {
+  color: var(--portal-red-dark, #b90018);
+  font-weight: 800;
+  margin-inline-start: 2px;
+}
+.optional-fields {
+  grid-column: 1 / -1;
+  border: 1px dashed var(--portal-line, #dce3ec);
+  border-radius: .75rem;
+  padding: .75rem .95rem;
+  background: var(--portal-bg, #f6f8fb);
+}
+.optional-fields > summary {
+  cursor: pointer;
+  font-size: .84rem;
+  font-weight: 700;
+  color: var(--portal-ink, #17212f);
+}
+.optional-fields[open] > summary { margin-bottom: .75rem; }
+.checkrow textarea.nc-note-required {
+  border-color: #e29ca5;
+  background: #fff8f9;
+}
+.validation-card {
+  border-inline-start: 4px solid var(--portal-red, #e5001c);
+}
+.validation-card.validation-ready {
+  border-inline-start-color: #168052;
+}
+.validation-list {
+  list-style: none;
+  margin: .65rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: .5rem;
+}
+.validation-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem .85rem;
+  padding: .55rem .75rem;
+  border-radius: .6rem;
+  font-size: .85rem;
+}
+.validation-item-error {
+  background: #fff2f4;
+  border: 1px solid #f5ccd2;
+  color: #7f101f;
+}
+.validation-item-warning {
+  background: #fff8eb;
+  border: 1px solid #f0d7a3;
+  color: #6b470c;
+}
+.validation-item-ok {
+  background: #edf8f2;
+  border: 1px solid #bfe6d0;
+  color: #13593a;
+}

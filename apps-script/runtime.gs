@@ -2,7 +2,12 @@
 let requestContext_ = null;
 function beginRequest_(){
   const store=PropertiesService.getScriptProperties();
-  requestContext_={store,values:Object.assign({},store.getProperties()),books:{}};
+  requestContext_={store,values:Object.assign({},store.getProperties()),books:{},fallbackRules:{},sheet:null,users:null,stations:null};
+}
+function headerMap_(headers){
+  const map=Object.create(null);
+  for(let i=0;i<headers.length;i++)map[headers[i]]=i;
+  return map;
 }
 function context_(){if(!requestContext_)beginRequest_();return requestContext_;}
 function privateValue_(key){return context_().values[key];}

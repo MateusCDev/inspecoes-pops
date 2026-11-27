@@ -20,6 +20,8 @@ function headers_() {
     'interligacoes_status','interligacoes_observacoes','pendencias_json','inventario_json','pdf_url','backup_url','recebido_em','operador_envio','hash_versao'];
 }
 function sheet_() {
+  const ctx = context_();
+  if (ctx.sheet) return ctx.sheet;
   const book = book_(config_().SPREADSHEET_ID);
   const expected = headers_();
   let sheet = book.getSheetByName(DESTINATION_SHEET);
@@ -31,6 +33,7 @@ function sheet_() {
     sheet.getRange(1,1,1,expected.length).createFilter();
   }
   if (JSON.stringify(sheet.getRange(1,1,1,expected.length).getValues()[0]) !== JSON.stringify(expected)) throw Error('Cabeçalho incompatível. Não foi gravado nenhum registro.');
+  ctx.sheet = sheet;
   return sheet;
 }
 function setup() {
@@ -81,7 +84,7 @@ function doPost(e) {
     if(!user)return reply_({ok:false,code:'AUTH',error:'Chave inválida, revogada ou ainda não vinculada a uma pessoa ativa.'});
     requirePrivateData_();
     if(input.version!==1)throw Error('Versão incompatível.');
-    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,accessAdmin:true,reportRefresh:true,assetInventory:true,stationTransceivers:true,assetReconciliation:true,assetComparisonV2:true,assetAdjustments:true,climateOptional:true,actionPlans:true,linkCatalog:true}});
+    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,accessAdmin:true,reportRefresh:true,assetInventory:true,stationTransceivers:true,assetReconciliation:true,assetComparisonV2:true,assetAdjustments:true,climateOptional:true,actionPlans:true,linkCatalog:true},...(input.includeStations?{stations:stations_()}:{})});
     if(input.action==='linkCatalogLoad'||input.action==='linkCatalogSave')return reply_(linkCatalogRequest_(input,user));
     if(input.action==='fleetLoad'||input.action==='fleetSave')return reply_(fleetRequest_(input,user));
     if(input.action==='users')return reply_(listAccess_(user));

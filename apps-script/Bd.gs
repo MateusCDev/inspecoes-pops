@@ -59,6 +59,8 @@ function headers_() {
     'interligacoes_status','interligacoes_observacoes','pendencias_json','inventario_json','pdf_url','backup_url','recebido_em','operador_envio','hash_versao'];
 }
 function sheet_() {
+  const ctx = context_();
+  if (ctx.sheet) return ctx.sheet;
   const book = book_(config_().SPREADSHEET_ID);
   const expected = headers_();
   let sheet = book.getSheetByName(DESTINATION_SHEET);
@@ -70,6 +72,7 @@ function sheet_() {
     sheet.getRange(1,1,1,expected.length).createFilter();
   }
   if (JSON.stringify(sheet.getRange(1,1,1,expected.length).getValues()[0]) !== JSON.stringify(expected)) throw Error('Cabeçalho incompatível. Não foi gravado nenhum registro.');
+  ctx.sheet = sheet;
   return sheet;
 }
 function setup() {
@@ -120,7 +123,7 @@ function doPost(e) {
     if(!user)return reply_({ok:false,code:'AUTH',error:'Chave inválida, revogada ou ainda não vinculada a uma pessoa ativa.'});
     requirePrivateData_();
     if(input.version!==1)throw Error('Versão incompatível.');
-    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,accessAdmin:true,reportRefresh:true,assetInventory:true,stationTransceivers:true,assetReconciliation:true,assetComparisonV2:true,assetAdjustments:true,climateOptional:true,actionPlans:true,linkCatalog:true}});
+    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,accessAdmin:true,reportRefresh:true,assetInventory:true,stationTransceivers:true,assetReconciliation:true,assetComparisonV2:true,assetAdjustments:true,climateOptional:true,actionPlans:true,linkCatalog:true},...(input.includeStations?{stations:stations_()}:{})});
     if(input.action==='linkCatalogLoad'||input.action==='linkCatalogSave')return reply_(linkCatalogRequest_(input,user));
     if(input.action==='fleetLoad'||input.action==='fleetSave')return reply_(fleetRequest_(input,user));
     if(input.action==='users')return reply_(listAccess_(user));
@@ -434,14 +437,18 @@ function accessSheet_() {
   return sheet;
 }
 function accessUsers_() {
+  const ctx = context_();
+  if (ctx.users) return ctx.users;
   const sheet = accessSheet_(), seen = new Set();
-  return sheet.getLastRow() < 2 ? [] : sheet.getRange(2,1,sheet.getLastRow()-1,4).getValues().flatMap((r,i)=>{
+  const users = sheet.getLastRow() < 2 ? [] : sheet.getRange(2,1,sheet.getLastRow()-1,4).getValues().flatMap((r,i)=>{
     if (!String(r[0]||'').trim()) return [];
     const email=String(r[0]).trim().toLowerCase(),role=String(r[1]).trim().toUpperCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !['GESTAO','OPERACAO'].includes(role) || seen.has(email)) throw Error('E-mail/perfil inválido ou duplicado na aba de acessos.');
     seen.add(email);
     return [{email,role,active:r[2]===true,issue:r[3]===true,row:i+2}];
   });
+  ctx.users = users;
+  return users;
 }
 function issueAccessKeys_() {
   beginRequest_();
@@ -465,6 +472,7 @@ function issueAccessKeys_() {
       sheet.getRange(user.row,4).setValue(false);
       console.log('E-mail: '+user.email+' | Perfil: '+user.role+'\nChave individual: '+token);
     });
+    context_().users = null;
     console.log('Entregue cada chave somente à pessoa correspondente. Não publique as chaves na planilha.');
   } finally {lock.releaseLock();}
 }
@@ -482,7 +490,7 @@ function canReadRow_(row,headers,user) {
 function recordOwner_(id) {return privateValue_('OWNER_'+hash_(String(id)))||'';}
 function recordRevision_(id) {return JSON.parse(privateValue_('REVISION_'+hash_(String(id)))||'null');}
 function listInspections_(input,user) {
-  const sheet=sheet_(),headers=headers_(),limit=50;
+  const sheet=sheet_(),headers=headers_(),idx=headerMap_(headers),limit=50;
   let cursor=input.cursor===undefined?sheet.getLastRow():Number(input.cursor);
   if (!Number.isInteger(cursor)||cursor<1||cursor>sheet.getLastRow()) throw Error('Página inválida.');
   const items=[];
@@ -493,7 +501,7 @@ function listInspections_(input,user) {
       cursor=start+i-1;
       const row=block[i];
       if(!row[0]||!canReadRow_(row,headers,user))continue;
-      const get=k=>row[headers.indexOf(k)];
+      const get=k=>row[idx[k]];
       items.push({id:row[0],stationCode:get('codigo_pop'),station:get('nome'),date:get('data'),updated:get('updated'),technician:get('inspetor'),owner:recordOwner_(row[0])||'Autoria não vinculada',criticality:get('classificacao'),nc:get('itens_nao_conformes'),conform:get('itens_conformes'),unverified:get('itens_nao_verificados'),due:get('scheduleDueDate'),period:get('schedulePeriod'),issues:get('qtd_pendencias')});
       if(items.length===limit)break;
     }
@@ -540,6 +548,8 @@ function schedulingDays_(criticality){
   return null;
 }
 function stations_(){
+  const ctx=context_();
+  if(ctx.stations)return ctx.stations;
   const sheet=book_(config_().SPREADSHEET_ID).getSheetByName('POPs');
   if(!sheet||sheet.getLastRow()<1)throw Error('Cadastro de POPs indisponível.');
   const data=sheet.getRange(1,1,sheet.getLastRow(),10).getValues(),header=data.shift();
@@ -552,7 +562,8 @@ function stations_(){
     return [{code,name,city:String(row[3]||''),criticality,days:schedulingDays_(criticality),inactive}];
   });
   const counts=Object.create(null);stations.filter(s=>!s.inactive).forEach(s=>counts[s.code]=(counts[s.code]||0)+1);
-  return stations.map(s=>({...s,duplicate:!s.inactive&&counts[s.code]>1}));
+  ctx.stations=stations.map(s=>({...s,duplicate:!s.inactive&&counts[s.code]>1}));
+  return ctx.stations;
 }
 function addInspectionDays_(date,days){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw Error('Data de vistoria inválida.');
@@ -577,7 +588,12 @@ function applyScheduling_(record){
 let requestContext_ = null;
 function beginRequest_(){
   const store=PropertiesService.getScriptProperties();
-  requestContext_={store,values:Object.assign({},store.getProperties()),books:{}};
+  requestContext_={store,values:Object.assign({},store.getProperties()),books:{},fallbackRules:{},sheet:null,users:null,stations:null};
+}
+function headerMap_(headers){
+  const map=Object.create(null);
+  for(let i=0;i<headers.length;i++)map[headers[i]]=i;
+  return map;
 }
 function context_(){if(!requestContext_)beginRequest_();return requestContext_;}
 function privateValue_(key){return context_().values[key];}
@@ -721,20 +737,20 @@ function installQueueTrigger_(){
   if(!ScriptApp.getProjectTriggers().some(t=>t.getHandlerFunction()==='processarFilaInspecoesPOPs'))ScriptApp.newTrigger('processarFilaInspecoesPOPs').timeBased().everyMinutes(1).create();
 }
 
-function summaryItem_(row,headers){
-  const get=k=>row[headers.indexOf(k)],revision=recordRevision_(row[0]);
+function summaryItem_(row,idx){
+  const get=k=>row[idx[k]],revision=recordRevision_(row[0]);
   return {id:row[0],stationCode:get('codigo_pop'),station:get('nome'),date:get('data'),updated:get('updated'),technician:get('inspetor'),owner:recordOwner_(row[0])||'Autoria não vinculada',criticality:get('classificacao'),nc:Number(get('itens_nao_conformes'))||0,conform:Number(get('itens_conformes'))||0,unverified:Number(get('itens_nao_verificados'))||0,due:get('scheduleDueDate'),period:get('schedulePeriod'),issues:Number(get('qtd_pendencias'))||0,assets:revision?.assets||null};
 }
 function dashboard_(input,user){
   const scope=user.role==='GESTAO'?'GESTAO':user.email+'|OPERACAO';
   const key='dash_'+hash_(scope+'|'+(privateValue_('DATA_VERSION')||'0'));
   const cache=CacheService.getScriptCache(),cached=cache.get(key);if(cached)return JSON.parse(cached);
-  const sheet=sheet_(),headers=headers_(),last=sheet.getLastRow();
+  const sheet=sheet_(),headers=headers_(),idx=headerMap_(headers),last=sheet.getLastRow();
   const rows=last>1?sheet.getRange(2,1,last-1,43).getValues():[];
   let total=0,c=0,nc=0;const byPOP=Object.create(null),latest=new Map(),items=[];let nextCursor=null;
   for(let i=rows.length-1;i>=0;i--){
     const row=rows[i];if(!row[0]||!canReadRow_(row,headers,user))continue;
-    const item=summaryItem_(row,headers);total++;c+=item.conform;nc+=item.nc;byPOP[item.station]=(byPOP[item.station]||0)+item.nc;
+    const item=summaryItem_(row,idx);total++;c+=item.conform;nc+=item.nc;byPOP[item.station]=(byPOP[item.station]||0)+item.nc;
     const stationKey=String(item.stationCode||'')+'|'+item.station,old=latest.get(stationKey);
     if(!old||String(item.date)+String(item.updated)>String(old.date)+String(old.updated))latest.set(stationKey,item);
     if(items.length<50){items.push(item);if(items.length===50&&i>0)nextCursor=i+1;}
@@ -859,14 +875,14 @@ function assetTable_(name){
   const sheet=book_(config_().SPREADSHEET_ID).getSheetByName(name);if(!sheet)throw Error('Aba ausente: '+name);
   const width=sheet.getLastColumn(),range=sheet.getRange(1,1,Math.max(1,sheet.getLastRow()),width),values=range.getValues();
   assertAssetHeaders_(values[0],name);
-  return {sheet,headers:values[0],values,width};
+  return {sheet,headers:values[0],index:headerMap_(values[0]),values,width};
 }
-function sameAssetStation_(row,headers,r,config){
-  const code=row[headers.indexOf('Codigo_POP')];if(code)return String(code).trim()===String(r.codigoPop);
-  return stationAssetKey_(row[headers.indexOf(config.station)])===stationAssetKey_(r.nome);
+function sameAssetStation_(row,headers,r,config,idx){
+  const code=row[idx?idx['Codigo_POP']:headers.indexOf('Codigo_POP')];if(code)return String(code).trim()===String(r.codigoPop);
+  return stationAssetKey_(row[idx?idx[config.station]:headers.indexOf(config.station)])===stationAssetKey_(r.nome);
 }
 function findAssetRow_(table,candidate,r){
-  const h=table.headers,config=ASSET_TABS[candidate.tab],get=(row,k)=>row[h.indexOf(k)];
+  const h=table.headers,idx=table.index||headerMap_(h),config=ASSET_TABS[candidate.tab],get=(row,k)=>row[idx[k]];
   const incoming=[...identityTokens_(candidate.serial,'S:'),...identityTokens_(candidate.patr,'P:')];
   const rows=table.values.slice(1).map((row,i)=>({row,index:i+2})).filter(x=>x.row.some(v=>v!==''));
   let matches=[];
@@ -878,7 +894,7 @@ function findAssetRow_(table,candidate,r){
   if(!matches.length){
     const model=normalizeAsset_(candidate.values.Modelo),maker=normalizeAsset_(candidate.values.Fabricante);
     if(model&&maker){
-      const similar=rows.filter(x=>sameAssetStation_(x.row,h,r,config)&&normalizeAsset_(get(x.row,'Modelo'))===model
+      const similar=rows.filter(x=>sameAssetStation_(x.row,h,r,config,idx)&&normalizeAsset_(get(x.row,'Modelo'))===model
         &&normalizeAsset_(get(x.row,'Fabricante'))===maker&&(candidate.tab!=='Ativos'||normalizeAsset_(get(x.row,'Categoria'))===normalizeAsset_(candidate.values.Categoria)));
       const serial=identityTokens_(candidate.serial,'S:'),patr=identityTokens_(candidate.patr,'P:');
       matches=similar.filter(x=>{
@@ -889,7 +905,7 @@ function findAssetRow_(table,candidate,r){
     }
   }
   if(matches.length>1)throw Error('Mais de um equipamento corresponde à identificação.');
-  if(matches.length&&!sameAssetStation_(matches[0].row,h,r,config))throw Error('O equipamento está vinculado a outro POP; movimentação exige conferência.');
+  if(matches.length&&!sameAssetStation_(matches[0].row,h,r,config,idx))throw Error('O equipamento está vinculado a outro POP; movimentação exige conferência.');
   if(matches.length){const oldMaker=normalizeAsset_(get(matches[0].row,'Fabricante')),newMaker=normalizeAsset_(candidate.values.Fabricante);if(oldMaker&&newMaker&&oldMaker!==newMaker)throw Error('Fabricante divergente para a mesma identificação; solicite conferência.');}
   if(matches.length&&/^Transceiver\b/.test(candidate.values.Equipamento||'')){
     const modelKey=value=>normalizeAsset_(value).replace(/[^A-Z0-9]/g,'');
@@ -929,10 +945,11 @@ function validatedAssetValue_(rule,value,header){
   return value instanceof Date?value:text_(value);
 }
 function writeAssetPatch_(table,rowIndex,patch,warnings,strict=false){
+  const idx=table.index||headerMap_(table.headers);
   const range=table.sheet.getRange(rowIndex,1,1,table.width),formulas=range.getFormulas()[0],rules=range.getDataValidations()[0],before=range.getValues()[0],after=before.slice(),changed=[];
   for(const [header,value] of Object.entries(patch)){
-    const col=table.headers.indexOf(header);
-    if(col<0)continue;
+    const col=idx[header];
+    if(col===undefined)continue;
     if(formulas[col]){
       if(strict&&['Nº Série','Patrimônio'].includes(header)&&identityTokens_(value,'').length&&String(before[col])!==String(value)){
         warnings.push(header+': a célula usa uma fórmula que precisa ser conferida na planilha.');
@@ -944,15 +961,17 @@ function writeAssetPatch_(table,rowIndex,patch,warnings,strict=false){
   }
   if(strict&&warnings.length)throw Error(warnings.join(' · '));
   for(const header of ['Nº Série','Patrimônio']){
-    const col=table.headers.indexOf(header);
-    if(changed.includes(col)&&typeof after[col]==='string')table.sheet.getRange(rowIndex,col+1).setNumberFormat('@');
+    const col=idx[header];
+    if(col!==undefined&&changed.includes(col)&&typeof after[col]==='string')table.sheet.getRange(rowIndex,col+1).setNumberFormat('@');
   }
   changed.sort((a,b)=>a-b);
   for(let i=0;i<changed.length;){let j=i;while(j+1<changed.length&&changed[j+1]===changed[j]+1)j++;table.sheet.getRange(rowIndex,changed[i]+1,1,changed[j]-changed[i]+1).setValues([after.slice(changed[i],changed[j]+1)]);i=j+1;}
-  for(const header of ['Data_Ultima_Inspecao','Data de Verficação','Proxima Verificação']){const col=table.headers.indexOf(header);if(changed.includes(col))table.sheet.getRange(rowIndex,col+1).setNumberFormat('dd/MM/yyyy');}
+  for(const header of ['Data_Ultima_Inspecao','Data de Verficação','Proxima Verificação']){const col=idx[header];if(col!==undefined&&changed.includes(col))table.sheet.getRange(rowIndex,col+1).setNumberFormat('dd/MM/yyyy');}
   table.values[rowIndex-1]=after;return {changed:changed.length,before,after};
 }
 function assetFallbackRule_(tab,header){
+  const cache=context_().fallbackRules,key=tab+'|'+header;
+  if(Object.prototype.hasOwnProperty.call(cache,key))return cache[key];
   // Tabelas nativas podem expor a validação somente na propriedade da coluna.
   const lists={
     Ativos:{Categoria:['Retificadora','Bateria','Ar-condicionado','Gerador','Nobreak','Inversor','Transmissão','OLT','Roteador','Segurança','Outro','Inversor de Potência','Switch'],Status:['Operacional','Atenção','Crítico','Inativo']},
@@ -961,7 +980,8 @@ function assetFallbackRule_(tab,header){
   let allowed=lists[tab]?.[header];
   if(tab==='Climatização_Voanet'&&header==='Tipo Local')allowed=book_(config_().SPREADSHEET_ID).getSheetByName('FONTES').getRange('A2:A3').getDisplayValues().flat();
   if(tab==='Controle_Baterias'&&header==='Tecnologia')allowed=book_(config_().SPREADSHEET_ID).getSheetByName('FONTES').getRange('D2:D6').getDisplayValues().flat();
-  return allowed?{getCriteriaType:()=> 'VALUE_IN_LIST',getCriteriaValues:()=>[allowed]}:null;
+  cache[key]=allowed?{getCriteriaType:()=> 'VALUE_IN_LIST',getCriteriaValues:()=>[allowed]}:null;
+  return cache[key];
 }
 function appendNativeAssetRow_(table){
   // Insere dentro do limite atual para as tabelas nativas acompanharem a nova linha.
@@ -1453,6 +1473,7 @@ function manageOperator_(input,user){
     const sheet=accessSheet_();let row=existing?.row;
     if(!row){row=Math.max(2,sheet.getLastRow());sheet.insertRowsBefore(row,1);const source=sheet.getRange(row+1,1,1,4),destination=sheet.getRange(row,1,1,4);source.copyTo(destination,SpreadsheetApp.CopyPasteType.PASTE_FORMAT,false);source.copyTo(destination,SpreadsheetApp.CopyPasteType.PASTE_DATA_VALIDATION,false);}
     sheet.getRange(row,1,1,4).setValues([[email,'OPERACAO',input.operation==='issue',false]]);
+    context_().users=null;
     logAccessChange_(user.email,email,input.operation==='deactivate'?'DESATIVADO':existing?'CHAVE_REEMITIDA':'OPERADOR_CADASTRADO');
     return {ok:true,email,token,active:input.operation==='issue'};
   });

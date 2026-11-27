@@ -114,14 +114,14 @@ function assetTable_(name){
   const sheet=book_(config_().SPREADSHEET_ID).getSheetByName(name);if(!sheet)throw Error('Aba ausente: '+name);
   const width=sheet.getLastColumn(),range=sheet.getRange(1,1,Math.max(1,sheet.getLastRow()),width),values=range.getValues();
   assertAssetHeaders_(values[0],name);
-  return {sheet,headers:values[0],values,width};
+  return {sheet,headers:values[0],index:headerMap_(values[0]),values,width};
 }
-function sameAssetStation_(row,headers,r,config){
-  const code=row[headers.indexOf('Codigo_POP')];if(code)return String(code).trim()===String(r.codigoPop);
-  return stationAssetKey_(row[headers.indexOf(config.station)])===stationAssetKey_(r.nome);
+function sameAssetStation_(row,headers,r,config,idx){
+  const code=row[idx?idx['Codigo_POP']:headers.indexOf('Codigo_POP')];if(code)return String(code).trim()===String(r.codigoPop);
+  return stationAssetKey_(row[idx?idx[config.station]:headers.indexOf(config.station)])===stationAssetKey_(r.nome);
 }
 function findAssetRow_(table,candidate,r){
-  const h=table.headers,config=ASSET_TABS[candidate.tab],get=(row,k)=>row[h.indexOf(k)];
+  const h=table.headers,idx=table.index||headerMap_(h),config=ASSET_TABS[candidate.tab],get=(row,k)=>row[idx[k]];
   const incoming=[...identityTokens_(candidate.serial,'S:'),...identityTokens_(candidate.patr,'P:')];
   const rows=table.values.slice(1).map((row,i)=>({row,index:i+2})).filter(x=>x.row.some(v=>v!==''));
   let matches=[];
@@ -133,7 +133,7 @@ function findAssetRow_(table,candidate,r){
   if(!matches.length){
     const model=normalizeAsset_(candidate.values.Modelo),maker=normalizeAsset_(candidate.values.Fabricante);
     if(model&&maker){
-      const similar=rows.filter(x=>sameAssetStation_(x.row,h,r,config)&&normalizeAsset_(get(x.row,'Modelo'))===model
+      const similar=rows.filter(x=>sameAssetStation_(x.row,h,r,config,idx)&&normalizeAsset_(get(x.row,'Modelo'))===model
         &&normalizeAsset_(get(x.row,'Fabricante'))===maker&&(candidate.tab!=='Ativos'||normalizeAsset_(get(x.row,'Categoria'))===normalizeAsset_(candidate.values.Categoria)));
       const serial=identityTokens_(candidate.serial,'S:'),patr=identityTokens_(candidate.patr,'P:');
       matches=similar.filter(x=>{
@@ -144,7 +144,7 @@ function findAssetRow_(table,candidate,r){
     }
   }
   if(matches.length>1)throw Error('Mais de um equipamento corresponde à identificação.');
-  if(matches.length&&!sameAssetStation_(matches[0].row,h,r,config))throw Error('O equipamento está vinculado a outro POP; movimentação exige conferência.');
+  if(matches.length&&!sameAssetStation_(matches[0].row,h,r,config,idx))throw Error('O equipamento está vinculado a outro POP; movimentação exige conferência.');
   if(matches.length){const oldMaker=normalizeAsset_(get(matches[0].row,'Fabricante')),newMaker=normalizeAsset_(candidate.values.Fabricante);if(oldMaker&&newMaker&&oldMaker!==newMaker)throw Error('Fabricante divergente para a mesma identificação; solicite conferência.');}
   if(matches.length&&/^Transceiver\b/.test(candidate.values.Equipamento||'')){
     const modelKey=value=>normalizeAsset_(value).replace(/[^A-Z0-9]/g,'');
@@ -184,10 +184,11 @@ function validatedAssetValue_(rule,value,header){
   return value instanceof Date?value:text_(value);
 }
 function writeAssetPatch_(table,rowIndex,patch,warnings,strict=false){
+  const idx=table.index||headerMap_(table.headers);
   const range=table.sheet.getRange(rowIndex,1,1,table.width),formulas=range.getFormulas()[0],rules=range.getDataValidations()[0],before=range.getValues()[0],after=before.slice(),changed=[];
   for(const [header,value] of Object.entries(patch)){
-    const col=table.headers.indexOf(header);
-    if(col<0)continue;
+    const col=idx[header];
+    if(col===undefined)continue;
     if(formulas[col]){
       if(strict&&['Nº Série','Patrimônio'].includes(header)&&identityTokens_(value,'').length&&String(before[col])!==String(value)){
         warnings.push(header+': a célula usa uma fórmula que precisa ser conferida na planilha.');
@@ -199,15 +200,17 @@ function writeAssetPatch_(table,rowIndex,patch,warnings,strict=false){
   }
   if(strict&&warnings.length)throw Error(warnings.join(' · '));
   for(const header of ['Nº Série','Patrimônio']){
-    const col=table.headers.indexOf(header);
-    if(changed.includes(col)&&typeof after[col]==='string')table.sheet.getRange(rowIndex,col+1).setNumberFormat('@');
+    const col=idx[header];
+    if(col!==undefined&&changed.includes(col)&&typeof after[col]==='string')table.sheet.getRange(rowIndex,col+1).setNumberFormat('@');
   }
   changed.sort((a,b)=>a-b);
   for(let i=0;i<changed.length;){let j=i;while(j+1<changed.length&&changed[j+1]===changed[j]+1)j++;table.sheet.getRange(rowIndex,changed[i]+1,1,changed[j]-changed[i]+1).setValues([after.slice(changed[i],changed[j]+1)]);i=j+1;}
-  for(const header of ['Data_Ultima_Inspecao','Data de Verficação','Proxima Verificação']){const col=table.headers.indexOf(header);if(changed.includes(col))table.sheet.getRange(rowIndex,col+1).setNumberFormat('dd/MM/yyyy');}
+  for(const header of ['Data_Ultima_Inspecao','Data de Verficação','Proxima Verificação']){const col=idx[header];if(col!==undefined&&changed.includes(col))table.sheet.getRange(rowIndex,col+1).setNumberFormat('dd/MM/yyyy');}
   table.values[rowIndex-1]=after;return {changed:changed.length,before,after};
 }
 function assetFallbackRule_(tab,header){
+  const cache=context_().fallbackRules,key=tab+'|'+header;
+  if(Object.prototype.hasOwnProperty.call(cache,key))return cache[key];
   // Tabelas nativas podem expor a validação somente na propriedade da coluna.
   const lists={
     Ativos:{Categoria:['Retificadora','Bateria','Ar-condicionado','Gerador','Nobreak','Inversor','Transmissão','OLT','Roteador','Segurança','Outro','Inversor de Potência','Switch'],Status:['Operacional','Atenção','Crítico','Inativo']},
@@ -216,7 +219,8 @@ function assetFallbackRule_(tab,header){
   let allowed=lists[tab]?.[header];
   if(tab==='Climatização_Voanet'&&header==='Tipo Local')allowed=book_(config_().SPREADSHEET_ID).getSheetByName('FONTES').getRange('A2:A3').getDisplayValues().flat();
   if(tab==='Controle_Baterias'&&header==='Tecnologia')allowed=book_(config_().SPREADSHEET_ID).getSheetByName('FONTES').getRange('D2:D6').getDisplayValues().flat();
-  return allowed?{getCriteriaType:()=> 'VALUE_IN_LIST',getCriteriaValues:()=>[allowed]}:null;
+  cache[key]=allowed?{getCriteriaType:()=> 'VALUE_IN_LIST',getCriteriaValues:()=>[allowed]}:null;
+  return cache[key];
 }
 function appendNativeAssetRow_(table){
   // Insere dentro do limite atual para as tabelas nativas acompanharem a nova linha.

@@ -27,18 +27,50 @@ async function googleSendV2(r){
     const files=await googlePreparePhotoFiles(r,snapshot,session);
     if(!files||session!==googleSession)return false;
     r.googlePhotoRefs||={};
+    const photoRefs=new Array(files.length);
+    const maxConcurrency=3;
+    let completedPhotos=0;
+    const inFlight=new Set();
+    let firstError=null;
     for(let i=0;i<files.length;i++){
       if(session!==googleSession)return false;
-      const {photo,blob}=files[i];googleProgress(r,`Enviando foto ${i+1} de ${files.length}…`);
+      if(firstError)break;
+      const {photo,blob}=files[i];
+      googleProgress(r,`Enviando foto ${i+1} de ${files.length}…`);
       const data=await googlePhotoData(photo,blob),digest=await googleDigest(data),cached=r.googlePhotoRefs[photo.id];
       if(session!==googleSession)return false;
-      const reference=digest&&cached?.digest===digest?cached:
-        (await googleRpc('photo',{inspectionId:r.id,photoId:photo.id,data},key,
-          uploadOptions(`Reconectando para enviar a foto ${i+1} de ${files.length}…`))).photo;
-      if(session!==googleSession)return false;
-      if(!reference?.fileId||!reference.signature)throw Error('Foto não confirmada.');
-      r.googlePhotoRefs[photo.id]=reference;snapshot.photoFiles.push(reference);
+      if(firstError)break;
+      if(digest&&cached?.digest===digest){
+        photoRefs[i]=cached;
+        completedPhotos++;
+        continue;
+      }
+      const index=i;
+      const upload=googleRpc('photo',{inspectionId:r.id,photoId:photo.id,data},key,
+        uploadOptions(`Reconectando para enviar a foto ${index+1} de ${files.length}…`))
+        .then(res=>{
+          if(session!==googleSession)return;
+          const reference=res.photo;
+          if(!reference?.fileId||!reference.signature)throw Error('Foto não confirmada.');
+          r.googlePhotoRefs[photo.id]=reference;
+          photoRefs[index]=reference;
+          completedPhotos++;
+          if(completedPhotos<files.length)googleProgress(r,`Enviando foto ${Math.min(files.length,completedPhotos+1)} de ${files.length}…`);
+        })
+        .catch(error=>{
+          if(!firstError){
+            firstError=error;
+            googleProgress(r,`Enviando foto ${index+1} de ${files.length}…`);
+          }
+        })
+        .finally(()=>{inFlight.delete(upload);});
+      inFlight.add(upload);
+      if(inFlight.size>=maxConcurrency)await Promise.race(inFlight);
     }
+    if(inFlight.size)await Promise.all(inFlight);
+    if(session!==googleSession)return false;
+    if(firstError)throw firstError;
+    snapshot.photoFiles.push(...photoRefs);
     if(session!==googleSession)return false;
     googleProgress(r,'Registrando envio…');
     const result=await googleRpc('submit',{record:snapshot,queue:true},key,uploadOptions('Reconectando para confirmar o recebimento…'));
@@ -347,7 +379,12 @@ document.addEventListener('click',e=>{
   if(action?.startsWith('googleInventory:'))googleShowInventory(action.slice('googleInventory:'.length));
   if(action?.startsWith('googleIssues:'))googleShowAssetIssues(action.slice(13));
 });
-if(typeof window.setInterval==='function')window.setInterval(googlePollJobs,5000);
+if(typeof window.setInterval==='function')window.setInterval(()=>{
+  if(document.visibilityState!=='hidden')googlePollJobs();
+},5000);
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible')googlePollJobs();
+});
 
 document.addEventListener('change',e=>{if(e.target.dataset.bankComplete&&googleUser){const bank=cur()?.invBatteryBanks?.find(b=>b.id===e.target.dataset.bankComplete);if(bank){bank.cadastroCompleto=e.target.checked;change();}}});
 

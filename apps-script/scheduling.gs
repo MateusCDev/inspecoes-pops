@@ -5,6 +5,8 @@ function schedulingDays_(criticality){
   return null;
 }
 function stations_(){
+  const ctx=context_();
+  if(ctx.stations)return ctx.stations;
   const sheet=book_(config_().SPREADSHEET_ID).getSheetByName('POPs');
   if(!sheet||sheet.getLastRow()<1)throw Error('Cadastro de POPs indisponível.');
   const data=sheet.getRange(1,1,sheet.getLastRow(),10).getValues(),header=data.shift();
@@ -17,7 +19,8 @@ function stations_(){
     return [{code,name,city:String(row[3]||''),criticality,days:schedulingDays_(criticality),inactive}];
   });
   const counts=Object.create(null);stations.filter(s=>!s.inactive).forEach(s=>counts[s.code]=(counts[s.code]||0)+1);
-  return stations.map(s=>({...s,duplicate:!s.inactive&&counts[s.code]>1}));
+  ctx.stations=stations.map(s=>({...s,duplicate:!s.inactive&&counts[s.code]>1}));
+  return ctx.stations;
 }
 function addInspectionDays_(date,days){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw Error('Data de vistoria inválida.');

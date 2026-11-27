@@ -120,12 +120,13 @@ function doPost(e) {
     if(!user)return reply_({ok:false,code:'AUTH',error:'Chave inválida, revogada ou ainda não vinculada a uma pessoa ativa.'});
     requirePrivateData_();
     if(input.version!==1)throw Error('Versão incompatível.');
-    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,accessAdmin:true,reportRefresh:true,assetInventory:true,assetReconciliation:true,assetComparisonV2:true,assetAdjustments:true,climateOptional:true,actionPlans:true,linkCatalog:true}});
+    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,accessAdmin:true,reportRefresh:true,assetInventory:true,stationTransceivers:true,assetReconciliation:true,assetComparisonV2:true,assetAdjustments:true,climateOptional:true,actionPlans:true,linkCatalog:true}});
     if(input.action==='linkCatalogLoad'||input.action==='linkCatalogSave')return reply_(linkCatalogRequest_(input,user));
     if(input.action==='fleetLoad'||input.action==='fleetSave')return reply_(fleetRequest_(input,user));
     if(input.action==='users')return reply_(listAccess_(user));
     if(input.action==='manageOperator')return reply_(manageOperator_(input,user));
     if(input.action==='stations')return reply_({ok:true,stations:stations_()});
+    if(input.action==='stationTransceivers')return reply_(stationTransceivers_(input,user));
     if(input.action==='list')return reply_(listInspections_(input,user));
     if(input.action==='dashboard')return reply_(dashboard_(input,user));
     if(input.action==='inspectionActionPlan')return reply_(inspectionActionPlan_(input,user));
@@ -890,6 +891,11 @@ function findAssetRow_(table,candidate,r){
   if(matches.length>1)throw Error('Mais de um equipamento corresponde à identificação.');
   if(matches.length&&!sameAssetStation_(matches[0].row,h,r,config))throw Error('O equipamento está vinculado a outro POP; movimentação exige conferência.');
   if(matches.length){const oldMaker=normalizeAsset_(get(matches[0].row,'Fabricante')),newMaker=normalizeAsset_(candidate.values.Fabricante);if(oldMaker&&newMaker&&oldMaker!==newMaker)throw Error('Fabricante divergente para a mesma identificação; solicite conferência.');}
+  if(matches.length&&/^Transceiver\b/.test(candidate.values.Equipamento||'')){
+    const modelKey=value=>normalizeAsset_(value).replace(/[^A-Z0-9]/g,'');
+    const oldModel=modelKey(get(matches[0].row,'Modelo')),model=modelKey(candidate.values.Modelo);
+    if(oldModel&&model&&oldModel!==model)throw Error('Modelo divergente para a mesma identificação; confira a etiqueta.');
+  }
   if(matches.length&&candidate.kind!=='Banco de baterias'){
     const oldSerial=identityTokens_(get(matches[0].row,'Nº Série'),'S:'),newSerial=identityTokens_(candidate.serial,'S:');
     const samePatr=overlappingAssetIds_(identityTokens_(get(matches[0].row,'Patrimônio'),'P:'),identityTokens_(candidate.patr,'P:'));
@@ -1218,6 +1224,29 @@ function centralBatteryBanks_(user){
       nextTest:get('Próxima Teste'),status:get('Status')}];
   });
   return {ok:true,banks};
+}
+
+function stationTransceivers_(input,user){
+  if(!['GESTAO','OPERACAO'].includes(user.role))throw Error('Consulta indisponível para este perfil.');
+  const code=String(input.stationCode??'').trim();
+  const station=stations_().find(item=>item.code===code&&!item.inactive&&!item.duplicate);
+  if(!station)throw Error('Selecione um POP ativo do cadastro.');
+  const table=assetTable_('Ativos');
+  // Valores exibidos preservam zeros à esquerda dos identificadores legados.
+  const rows=table.sheet.getRange(1,1,table.values.length,table.width).getDisplayValues();
+  const fields=['Fabricante','Modelo','Nº Série','Patrimônio','Equipamento'];
+  const columns=fields.map(field=>table.headers.indexOf(field));
+  const result=[];
+  for(const row of rows.slice(1)){
+    if(!sameAssetStation_(row,table.headers,{codigoPop:code,nome:station.name},ASSET_TABS.Ativos))continue;
+    const [fabricante,modelo,serie,patrimonio,equipamento]=columns.map(col=>String(row[col]||'').trim());
+    const type=normalizeAsset_(equipamento);
+    if(!/^TRANSCEIVER\b/.test(type)||(!modelo&&!serie&&!patrimonio))continue;
+    const tipo=/ELETRIC|RJ[ -]?45/.test(type)?'Elétrico (RJ45)':(type.match(/\b(GPON|QSFP28|QSFP\+|SFP\+|SFP|OUTRO)(?=\s|$)/)?.[1]||'');
+    result.push({fabricante,modelo,tipo:tipo==='OUTRO'?'Outro':tipo,serie:identityTokens_(serie,'S:').length?serie:'',
+      patrimonio:identityTokens_(patrimonio,'P:').length?patrimonio:''});
+  }
+  return {ok:true,stationCode:code,items:result.sort((a,b)=>a.modelo.localeCompare(b.modelo))};
 }
 
 function centralAssetsForInspection_(input,user){

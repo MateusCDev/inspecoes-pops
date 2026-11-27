@@ -232,6 +232,9 @@ function assetIssueGuidance(detail){
   if(/última medição (corrente|temperatura)/i.test(message)){
     return 'Se a medição não aconteceu, deixe o campo em branco. Se houve medição, informe o número. Na inspeção arquivada, use Reprocessar ativos após atualizar o Apps Script.';
   }
+  if(/modelo divergente/i.test(message)){
+    return 'Compare o modelo registrado com a etiqueta. Se houve troca de equipamento, encaminhe a divergência à Gestão.';
+  }
   if(/fabricante divergente/i.test(message)){
     return 'Abra a comparação. Confira modelo, série ou patrimônio com a etiqueta. Se a identidade for única, a Gestão pode manter o fabricante cadastrado ao confirmar o vínculo.';
   }

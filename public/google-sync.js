@@ -97,7 +97,7 @@ function googleLogout(){
   if(typeof flushLocalSave==='function')flushLocalSave();googleCapabilities={};googleSummary=null;googleNextCursor=null;
   googleSession++;googleAccessKey='';googleUser=null;records=[];activeId=null;view='home';
   googleCentralItems=[];googleStations=[];googleCentralUpdated='';googleCentralError='';googleCentralBusy=false;
-  googlePageBusy=false;googlePageError='';googleHistoryQuery='';googleHistoryPendingOnly=false;photosCache.clear();render();
+  googlePageBusy=false;googlePageError='';googleStationOptics=null;googleHistoryQuery='';googleHistoryPendingOnly=false;photosCache.clear();render();
   window.VOANET_PORTAL?.refresh();
 }
 function googleStation(record){return googleStations.find(s=>s.code===String(record.codigoPop??'').trim()&&!s.duplicate&&!s.inactive);}
@@ -535,10 +535,94 @@ if(typeof window.setInterval==='function')window.setInterval(()=>{
     &&navigator.onLine&&document.visibilityState==='visible')googleRefreshCentral();
 },60000);
 
+let googleStationOptics=null;
+const transceiverIdentityFields={
+  tipo:'Tipo',fabricante:'Fabricante',modelo:'Modelo',serie:'Série',patrimonio:'Patrimônio'
+};
+function transceiverReferenceDifferences(record,transceiver){
+  const reference=transceiver.baseReference;
+  if(!reference)return '';
+  if(reference.stationCode!==record.codigoPop)return 'A referência veio de outro POP. Confira a identificação nesta vistoria.';
+  const normalize=value=>String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase().replace(/\s+/g,' ');
+  const differences=Object.keys(transceiverIdentityFields).filter(field=>reference[field]&&normalize(reference[field])!==normalize(transceiver[field]));
+  if(!differences.length)return 'Dados compatíveis com o cadastro consultado. Confirme pela etiqueta em campo.';
+  return 'Diferença em '+differences.map(field=>transceiverIdentityFields[field]+' (base: '+reference[field]+')').join(', ')+'. Confira em campo antes de confirmar o inventário.';
+}
+function renderTransceiverReference(record,transceiver){
+  if(!isGoogleMode()||!googleUser)return '';
+  const state=googleStationOptics?.session===googleSession&&googleStationOptics.stationCode===record.codigoPop?googleStationOptics:null;
+  const items=state?.items||[];
+  return `<div class="transceiver-reference">
+    ${items.length?`<label class="field">Consultar transceiver cadastrado no POP
+      <select data-transceiver-base="${esc(transceiver.id)}">
+      <option value="">Selecione pela etiqueta</option>${items.map((item,index)=>`<option value="${index}">${esc([item.modelo,item.fabricante,item.serie&&'Série '+item.serie,item.patrimonio&&'Pat. '+item.patrimonio].filter(Boolean).join(' · '))}</option>`).join('')}
+      </select></label>`:
+      googleCapabilities.stationTransceivers?`<p class="small muted">${esc(state?.loading?'Consultando o cadastro deste POP…':state?.error||(state?'Nenhum transceiver cadastrado neste POP.':'Selecione um POP para consultar os transceivers cadastrados.'))}</p>${state?.error?'<button type="button" class="btn tiny" data-transceiver-retry>Tentar novamente</button>':''}`:''}
+    <p id="tx-base-${esc(transceiver.id)}" class="small transceiver-base-feedback" role="status">${esc(transceiverReferenceDifferences(record,transceiver))}</p>
+  </div>`;
+}
+async function loadStationTransceivers(record,{refresh=false}={}){
+  if(!isGoogleMode()||!googleUser||!googleCapabilities.stationTransceivers||!googleStation(record))return;
+  const session=googleSession,stationCode=record.codigoPop;
+  if(!refresh&&googleStationOptics?.session===session&&googleStationOptics.stationCode===stationCode)return;
+  const state={session,stationCode,loading:true};
+  googleStationOptics=state;
+  try{
+    const result=await googleRpc('stationTransceivers',{stationCode});
+    if(result.stationCode!==stationCode||!Array.isArray(result.items))throw Error('Cadastro retornado para um POP diferente.');
+    state.items=result.items;
+  }catch(error){
+    state.error=error.message;
+  }finally{
+    state.loading=false;
+    if(googleStationOptics===state&&session===googleSession&&cur()===record&&view==='inventario'){
+      // Atualiza só a referência para preservar o foco dos campos da vistoria.
+      for(const item of record.invTransceivers||[]){
+        const parent=document.getElementById('tx-base-'+item.id)?.parentElement;
+        if(parent)parent.outerHTML=renderTransceiverReference(record,item);
+      }
+    }
+  }
+}
+document.addEventListener('click',event=>{
+  if(!event.target.closest('[data-transceiver-retry]'))return;
+  const record=cur();
+  if(record)loadStationTransceivers(record,{refresh:true});
+});
+document.addEventListener('change',event=>{
+  const select=event.target;
+  if(!select.dataset.transceiverBase||select.value===''||!googleUser)return;
+  const record=cur(),state=googleStationOptics;
+  if(!record||state?.session!==googleSession||state.stationCode!==record.codigoPop)return;
+  const item=record.invTransceivers?.find(entry=>entry.id===select.dataset.transceiverBase);
+  const reference=state.items?.[Number(select.value)];
+  if(!item||!reference)return;
+  item.baseReference={stationCode:record.codigoPop,...reference};
+  for(const field of Object.keys(transceiverIdentityFields)){
+    const previous=String(item[field]??'').trim();
+    if(reference[field]&&(!previous||(field==='tipo'&&item.tipoAutomatico===true)))item[field]=reference[field];
+  }
+  delete item.tipoAutomatico;
+  change();
+  render();
+});
+document.addEventListener('input',event=>{
+  const field=event.target.dataset;
+  if(field.inv13Group!=='tx'||!Object.hasOwn(transceiverIdentityFields,field.inv13Field))return;
+  const record=cur(),item=record?.invTransceivers?.find(entry=>entry.id===field.inv13Id);
+  if(!item)return;
+  if(field.inv13Field==='tipo')delete item.tipoAutomatico;
+  // The inventory listener copies the input value later in the same event.
+  const feedback=document.getElementById('tx-base-'+item.id);
+  if(feedback)feedback.textContent=transceiverReferenceDifferences(record,{...item,[field.inv13Field]:event.target.value});
+});
+
 document.addEventListener('change',e=>{
   if(e.target.dataset.googleStation!==undefined&&googleUser){
     const r=cur(),station=googleStations.find(s=>s.code===e.target.value&&!s.duplicate&&!s.inactive);if(!r)return;
+    const previous=googleStation(r);
+    if(station?.city&&(!String(r.municipio??'').trim()||r.municipio===previous?.city))r.municipio=station.city;
     r.codigoPop=station?.code||'';r.nome=station?.name||r.nome;r.popCriticality=station?.criticality||'';
-    r.schedulePeriod=station?.days||'';r.scheduleBaseDate=r.data;r.scheduleDueDate=station?.days?addLocalDays(r.data,station.days):'';change();render();
+    r.schedulePeriod=station?.days||'';r.scheduleBaseDate=r.data;r.scheduleDueDate=station?.days?addLocalDays(r.data,station.days):'';change();loadStationTransceivers(r,{refresh:true});render();
   }
 });

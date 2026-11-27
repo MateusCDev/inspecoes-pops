@@ -382,3 +382,29 @@ test('ajuste retroativo preserva a leitura de uma vistoria mais recente',()=>{
  assert.equal(h.request({...request,notMeasured:true},'manager').pending,0);
  assert.equal(value(h,'Climatização_Voanet',1,'Última Medição Temperatura'),25);
 });
+
+test('consulta mostra transceivers elétricos somente do POP escolhido e preserva identificadores',()=>{
+ const h=harness();
+ h.asset('Ativos',{'Local':'POP fictício','Equipamento':'Transceiver Elétrico (RJ45)','Modelo':'SFP-T','Fabricante':'Datacom','Nº Série':'00123','Patrimônio':'0068','Observações':'Acesso restrito'});
+ h.asset('Ativos',{'Local':'POP fictício','Equipamento':'Transceiver Outro','Modelo':'Outro teste'});
+ h.asset('Ativos',{'Local':'POP fictício','Codigo_POP':'TEST-MED','Equipamento':'Transceiver GPON','Modelo':'Outro POP'});
+ h.asset('Ativos',{'Local':'POP fictício','Equipamento':'Roteador','Modelo':'Equipamento fora da consulta'});
+ assert.equal(h.request({action:'stationTransceivers',stationCode:'NAO-EXISTE'}).ok,false);
+ assert.equal(h.request({action:'stationTransceivers',stationCode:'TEST-HIGH'},'inválida').ok,false);
+ const catalog=h.request({action:'stationTransceivers',stationCode:'TEST-HIGH'});
+ assert.equal(catalog.stationCode,'TEST-HIGH');
+ assert.deepEqual(catalog.items,[
+  {fabricante:'',modelo:'Outro teste',tipo:'Outro',serie:'',patrimonio:''},
+  {fabricante:'Datacom',modelo:'SFP-T',tipo:'Elétrico (RJ45)',serie:'00123',patrimonio:'0068'}
+ ]);
+});
+
+test('modelo divergente de transceiver gera pendência e mantém cadastro anterior',()=>{
+ const h=harness(),r=h.record();
+ h.asset('Ativos',{'Local':r.nome,'Equipamento':'Transceiver Elétrico (RJ45)','Categoria':'Transmissão','Fabricante':'Datacom','Modelo':'SFP-T','Nº Série':'ET1'});
+ r.inventoryReview={transceivers:'alterado'};
+ r.invTransceivers=[{id:'TX1',tipo:'Elétrico (RJ45)',fabricante:'Datacom',modelo:'Outro modelo',serie:'ET1'}];
+ assert.match(h.send(r).assets.warnings[0],/Modelo divergente/);
+ assert.equal(value(h,'Ativos',1,'Modelo'),'SFP-T');
+ assert.equal(h.assets.Ativos.length,2);
+});

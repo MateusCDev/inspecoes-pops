@@ -129,7 +129,7 @@ function inv22ReviewHtml(r){
 }
 function batteryReview22(r,b){return (r.batteryReview||{})[b.id]||'pendente'}
 function batteryReview22Html(r){
- inv13(r);return `<div class="card"><h2>Conferência individual das baterias · v2.2</h2><p class="muted small">Verifique cada unidade. Manter a bateria preserva a data de instalação e o cálculo da vida útil. Na substituição, edite os dados da nova unidade e informe a nova data de instalação no inventário 13.3. As leituras e evidências da inspeção atual continuam necessárias.</p>${r.invBatteryBanks.map((bk,bi)=>`<div class="v22-confirm"><b>Banco ${bi+1} — ${esc(bk.identificacao||'Sem identificação')}</b>${(bk.baterias||[]).map((b,i)=>`<div class="v22-bat"><div class="field"><label>Bateria ${i+1}: ${esc(b.identificacao||b.serie||'Sem identificação')} · instalada em ${esc(fmt(b.instalacao))}</label><select data-battery-review="${esc(b.id)}"><option value="pendente" ${batteryReview22(r,b)==='pendente'?'selected':''}>Não verificada</option><option value="mantida" ${batteryReview22(r,b)==='mantida'?'selected':''}>Mantida — sem substituição</option><option value="substituida" ${batteryReview22(r,b)==='substituida'?'selected':''}>Substituída — atualizar cadastro e data de instalação</option><option value="nao_conferida" ${batteryReview22(r,b)==='nao_conferida'?'selected':''}>Não foi possível conferir</option></select></div>${batteryReview22(r,b)==='substituida'?'<p class="v22-small">Atenção: registre a retirada do ativo anterior e atualize o número de série e a data de instalação do novo. A substituição não é concluída somente com esta seleção.</p>':''}</div>`).join('')||'<p class="muted small">Nenhuma bateria cadastrada neste banco.</p>'}</div>`).join('')||'<div class="v22-note">Nenhum banco de baterias cadastrado. Utilize Inventário → 13.3 para cadastrar.</div>'}</div>`;
+ inv13(r);return `<div class="card"><h2>Conferência individual das baterias · v2.2</h2><p class="muted small">Verifique cada unidade. Manter a bateria preserva a data de instalação e o cálculo da vida útil. Na substituição, edite os dados da nova unidade e informe a nova data de instalação no inventário 13.3. As leituras e evidências da inspeção atual continuam necessárias.</p>${r.invBatteryBanks.map((bk,bi)=>`<div class="v22-confirm"><b id="battery-review-bank-${esc(bk.id)}">Banco ${bi+1} — ${esc(bk.identificacao||'Sem identificação')}</b>${(bk.baterias||[]).map((b,i)=>`<div class="v22-bat"><div class="field"><label id="battery-review-unit-${esc(b.id)}">Bateria ${i+1}: ${esc(b.identificacao||b.serie||'Sem identificação')} · instalada em ${esc(fmt(b.instalacao))}</label><select data-battery-review="${esc(b.id)}"><option value="pendente" ${batteryReview22(r,b)==='pendente'?'selected':''}>Não verificada</option><option value="mantida" ${batteryReview22(r,b)==='mantida'?'selected':''}>Mantida — sem substituição</option><option value="substituida" ${batteryReview22(r,b)==='substituida'?'selected':''}>Substituída — atualizar cadastro e data de instalação</option><option value="nao_conferida" ${batteryReview22(r,b)==='nao_conferida'?'selected':''}>Não foi possível conferir</option></select></div>${batteryReview22(r,b)==='substituida'?'<p class="v22-small">Atenção: registre a retirada do ativo anterior e atualize o número de série e a data de instalação do novo. A substituição não é concluída somente com esta seleção.</p>':''}</div>`).join('')||'<p class="muted small">Nenhuma bateria cadastrada neste banco.</p>'}</div>`).join('')||'<div class="v22-note">Nenhum banco de baterias cadastrado. Utilize Inventário → 13.3 para cadastrar.</div>'}</div>`;
 }
 function reuseInventory22(){
  const r=cur();if(!r){return}const old=previousInventory22(r);
@@ -180,6 +180,50 @@ function scheduleForm(r){if(isGoogleMode())return googleScheduleForm(r);const pe
 // ===== v1.9: Inventário de ativos ópticos e bancos de baterias =====
 function inv13(r){if(!Array.isArray(r.invTransceivers))r.invTransceivers=[];if(!Array.isArray(r.invBatteryBanks))r.invBatteryBanks=[];for(const b of r.invBatteryBanks){if(!Array.isArray(b.baterias))b.baterias=[]}return r}
 function inv13Id(prefix){return prefix+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8)}
+function measuredBankKey(label){
+ const key=stationKey22(label).replace(/^banco de baterias\b/,'banco');
+ return key.replace(/^banco\s+0*(\d+)$/,'banco $1');
+}
+function measuredBankInventoryMatches(r,source){
+ const banks=r.invBatteryBanks||[],label=measuredBankKey(source.identificacao);
+ const linked=banks.filter(bank=>bank.medicaoId===source.id);
+ return linked.length?linked:banks.filter(bank=>label&&measuredBankKey(bank.identificacao)===label);
+}
+function openMeasuredBatteryBank(sourceId){
+ const r=cur(),source=r?.equipamentos?.bancos?.find(bank=>bank.id===sourceId);
+ if(!source)return;
+ const matches=measuredBankInventoryMatches(r,source);
+ let bank=matches.length===1?matches[0]:null;
+ if(!matches.length){
+  const label=String(source.identificacao??'').trim();
+  const units=(source.baterias||[]).filter(unit=>[unit.identificacao,unit.modelo,unit.serie].some(value=>String(value??'').trim()));
+  const declaredCount=String(source.quantidade??'').trim();
+  const expected=declaredCount?Number(declaredCount):units.length;
+  const notice=document.getElementById('battery-handoff-'+sourceId);
+  const error=!label?'Informe a identificação do banco.'
+   :!units.length?'Preencha os dados de pelo menos uma bateria.'
+   :!Number.isSafeInteger(expected)||expected<1?'Informe um número inteiro de baterias maior que zero.'
+   :units.length!==expected?`O banco informa ${expected} baterias e tem ${units.length} preenchidas. Confira a quantidade e as unidades.`:'';
+  if(error){
+   if(notice)notice.textContent=error;
+   return;
+  }
+  const capacity=String(source.capacidade??'').trim().replace(',','.');
+  bank={id:inv13Id('BK'),medicaoId:source.id,identificacao:label,capacidade:/^\d+(?:\.\d+)?$/.test(capacity)?capacity:'',
+   baterias:units.map(({identificacao,modelo,serie})=>({id:inv13Id('BT'),identificacao,modelo,serie,estado:'Não verificado'}))};
+  inv13(r).invBatteryBanks.push(bank);
+  change(r);
+ }
+ navigate('inventario');
+ const heading=document.getElementById(bank?'inventory-bank-'+bank.id:'inventory-battery-banks');
+ heading?.focus({preventScroll:true});
+ heading?.scrollIntoView({block:'start'});
+}
+function measuredBatteryHandoff(r,bank){
+ const existing=measuredBankInventoryMatches(r,bank).length;
+ return `<div class="v22-note battery-handoff"><p class="small">${existing?'Já existe um cadastro com esta identificação. Abra o inventário para conferir os dados.':'Preencha os dados de todas as baterias para aproveitar a identificação, a capacidade, o modelo e a série no inventário. As tensões medidas e as fotos ficam na vistoria.'}</p>${button('openMeasuredBatteryBank:'+esc(bank.id),existing?'Abrir inventário de baterias':'Aproveitar dados no inventário','tiny')}
+ <p class="small" id="battery-handoff-${esc(bank.id)}" role="status"></p></div>`;
+}
 function lifeData(b){
  const install=b.instalacao, years=Number(b.vidaAnos);
  if(!install||!Number.isFinite(years)||years<=0)return {key:'sem',label:'Sem programação',days:null,due:''};
@@ -195,6 +239,29 @@ function lifeData(b){
  if(diff<0)return {key:'vencida',label:'Prazo ultrapassado ('+(-diff)+' dias)',days:diff,due:iso};
  if(diff<=warn)return {key:'alerta',label:diff===0?'Limite previsto para hoje':'Próxima do limite ('+diff+' dias)',days:diff,due:iso};
  return {key:'em-dia',label:'Dentro do prazo ('+diff+' dias)',days:diff,due:iso};
+}
+function batteryLifeDescription(battery){
+ const life=lifeData(battery);
+ return `<b>Fim da vida útil prevista:</b> ${life.due?fmt(life.due):'Não calculado'} · <b>${esc(life.label)}</b>. Estimativa de planejamento, não substitui ensaio de capacidade.`;
+}
+function updateBatteryInventoryField(record,item,group,field){
+ const setText=(id,value)=>{
+  const label=document.getElementById(id+'-'+item.id);
+  if(label)label.textContent=value;
+ };
+ const bank=group==='bank'?item:record.invBatteryBanks.find(entry=>entry.baterias.includes(item));
+ if(group==='bank'&&field==='identificacao'){
+  const title='Banco '+(record.invBatteryBanks.indexOf(bank)+1)+' — '+(bank.identificacao||'Sem identificação');
+  setText('inventory-bank',title);
+  setText('battery-review-bank',title);
+ }
+ if(group==='bat'){
+  const title='Bateria '+(bank.baterias.indexOf(item)+1);
+  setText('inventory-battery',title+' — '+(item.identificacao||'Sem identificação'));
+  setText('battery-review-unit',title+': '+(item.identificacao||item.serie||'Sem identificação')+' · instalada em '+fmt(item.instalacao));
+  const lifespan=document.getElementById('battery-life-'+item.id);
+  if(lifespan)lifespan.innerHTML=batteryLifeDescription(item);
+ }
 }
 function inv13Input(group,id,field,val,label,type='text'){
  return `<div class="field"><label>${esc(label)}</label><input type="${type}" data-inv13-group="${group}" data-inv13-id="${esc(id)}" data-inv13-field="${field}" value="${esc(val??'')}"></div>`;
@@ -216,17 +283,17 @@ function inv13View(r){inv13(r);loadStationTransceivers(r);
  ${inv13Select('tx',t.id,'estado',t.estado,'Situação',['Instalado','Reserva / estoque','Defeito','Retirado','Não verificado'])}
  ${inv13Input('tx',t.id,'observacao',t.observacao,'Observações')}
  </div><p class="muted small">Equipamento selecionado: ${esc(options.find(x=>x.id===t.equipamentoId)?.modelo||options.find(x=>x.id===t.equipamentoId)?.tipo||'Não vinculado — selecione no campo acima')}</p>${photoAttachments(r,'inv13:tx:'+t.id)}</div>`).join('');
- const bankCards=r.invBatteryBanks.map((bank,i)=>`<div class="card" style="border-color:#dde2e8"><div class="card-head"><h3>Banco ${i+1} — ${esc(bank.identificacao||'Sem identificação')}</h3><div class="btnrow">${button('inv13-add-bat:'+bank.id,'+ Bateria','primary tiny')}${button('inv13-del-bank:'+bank.id,'Remover banco','danger tiny')}</div></div><div class="grid">
+ const bankCards=r.invBatteryBanks.map((bank,i)=>`<div class="card" style="border-color:#dde2e8"><div class="card-head"><h3 id="inventory-bank-${esc(bank.id)}" class="inventory-battery-anchor" tabindex="-1">Banco ${i+1} — ${esc(bank.identificacao||'Sem identificação')}</h3><div class="btnrow">${button('inv13-add-bat:'+bank.id,'+ Bateria','primary tiny')}${button('inv13-del-bank:'+bank.id,'Remover banco','danger tiny')}</div></div><div class="grid">
  ${inv13Input('bank',bank.id,'identificacao',bank.identificacao,'Identificação do banco')}
  ${inv13Input('bank',bank.id,'local',bank.local,'Localização / rack')}
  ${inv13Input('bank',bank.id,'tensao',bank.tensao,'Tensão nominal do banco (V)')}
  ${inv13Input('bank',bank.id,'topologia',bank.topologia,'Configuração (série / paralelo)')}<div class="field full"><label><input type="checkbox" data-bank-complete="${esc(bank.id)}" ${bank.cadastroCompleto?'checked':''}> Conferi todas as baterias deste banco; o cadastro está completo.</label></div>${inv13Input('bank',bank.id,'capacidade',bank.capacidade,'Capacidade nominal do banco (Ah)','number')}${inv13Input('bank',bank.id,'autonomiaHoras',bank.autonomiaHoras,'Autonomia verificada do banco (horas)','number')}
  </div>${photoAttachments(r,'inv13:bank:'+bank.id)}
- ${(bank.baterias||[]).map((b,j)=>{const v=lifeData(b);return `<div class="card" style="background:#fafbfc"><div class="card-head"><h3>Bateria ${j+1} — ${esc(b.identificacao||'Sem identificação')}</h3>${button('inv13-del-bat:'+bank.id+':'+b.id,'Remover','danger tiny')}</div><div class="grid">
+ ${(bank.baterias||[]).map((b,j)=>`<div class="card" style="background:#fafbfc"><div class="card-head"><h3 id="inventory-battery-${esc(b.id)}">Bateria ${j+1} — ${esc(b.identificacao||'Sem identificação')}</h3>${button('inv13-del-bat:'+bank.id+':'+b.id,'Remover','danger tiny')}</div><div class="grid">
  ${inv13Input('bat',b.id,'identificacao',b.identificacao,'Identificação da bateria')}
  ${inv13Input('bat',b.id,'fabricante',b.fabricante,'Fabricante')}
  ${inv13Input('bat',b.id,'modelo',b.modelo,'Modelo')}
- ${inv13Select('bat',b.id,'tecnologia',b.tecnologia,'Tecnologia',['Chumbo-ácido','AGM','GEL','LiFePO4','Outra'])}
+ ${inv13Select('bat',b.id,'tecnologia',b.tecnologia,'Tecnologia',['','Chumbo-ácido','AGM','GEL','LiFePO4','Outra'])}
  ${inv13Input('bat',b.id,'tensao',b.tensao,'Tensão nominal (V)','number')}
  ${inv13Input('bat',b.id,'capacidade',b.capacidade,'Capacidade nominal (Ah)','number')}
  ${inv13Input('bat',b.id,'serie',b.serie,'Número de série')}
@@ -237,10 +304,10 @@ function inv13View(r){inv13(r);loadStationTransceivers(r);
  ${inv13Select('bat',b.id,'alertaDias',String(b.alertaDias||90),'Alertar com antecedência (dias)',['90','180','365'])}
  ${inv13Select('bat',b.id,'estado',b.estado,'Condição',['Operacional','Em observação','Substituição recomendada','Retirada','Não verificado'])}
  ${inv13Input('bat',b.id,'observacao',b.observacao,'Observações / condição atual')}
- </div><p class="muted small"><b>Fim da vida útil prevista:</b> ${v.due?fmt(v.due):'Não calculado'} · <b>${esc(v.label)}</b>. Estimativa de planejamento, não substitui ensaio de capacidade.</p>${photoAttachments(r,'inv13:bat:'+b.id)}</div>`}).join('')||'<p class="muted small">Nenhuma bateria neste banco. Use + Bateria.</p>'}</div>`).join('');
+ </div><p class="muted small" id="battery-life-${esc(b.id)}">${batteryLifeDescription(b)}</p>${photoAttachments(r,'inv13:bat:'+b.id)}</div>`).join('')||'<p class="muted small">Nenhuma bateria neste banco. Use + Bateria.</p>'}</div>`).join('');
  // Improve select labels after generating controls: values remain stable UUIDs.
  let txHtml=txCards;
- return `<div class="card"><div class="card-head"><div><h2>13.2 — Transceivers ópticos e elétricos</h2><p class="muted small">Vincule cada módulo a um equipamento cadastrado em 13.1 e informe a porta. Para reserva, deixe o equipamento sem vínculo.</p></div>${button('inv13-add-tx','+ Transceiver','primary tiny')}</div>${txHtml||'<p class="muted">Nenhum transceiver cadastrado.</p>'}</div><div class="card"><div class="card-head"><div><h2>13.3 — Inventário de bancos e baterias</h2><p class="muted small">Cadastre cada banco e suas baterias individualmente. A vida útil começa na data de instalação.</p></div>${button('inv13-add-bank','+ Banco de baterias','primary tiny')}</div>${bankCards||'<p class="muted">Nenhum banco cadastrado.</p>'}</div>`;
+ return `<div class="card"><div class="card-head"><div><h2>13.2 — Transceivers ópticos e elétricos</h2><p class="muted small">Vincule cada módulo a um equipamento cadastrado em 13.1 e informe a porta. Para reserva, deixe o equipamento sem vínculo.</p></div>${button('inv13-add-tx','+ Transceiver','primary tiny')}</div>${txHtml||'<p class="muted">Nenhum transceiver cadastrado.</p>'}</div><div class="card"><div class="card-head"><div><h2 id="inventory-battery-banks" class="inventory-battery-anchor" tabindex="-1">13.3 — Inventário de bancos e baterias</h2><p class="muted small">Informe fabricante e modelo em campos separados. Confira cada unidade em “Conferência individual das baterias” e marque o banco como completo após verificar todas as unidades. A data de instalação permite acompanhar a vida útil.</p></div>${button('inv13-add-bank','+ Banco de baterias','primary tiny')}</div>${bankCards||'<p class="muted">Nenhum banco cadastrado.</p>'}</div>`;
 }
 function inv13Batteries(r){inv13(r);return r.invBatteryBanks.flatMap(bank=>bank.baterias.map(b=>({...b,_bank:bank.identificacao||bank.id}))).filter(b=>b.estado!=='Retirada')}
 function inv13Dashboard(){const last=stationSummaries(records.filter(r=>r.finalizedAt)).map(x=>x.r), all=last.flatMap(r=>inv13Batteries(r).map(b=>({...b,_station:r.nome||'Não identificada'})));
@@ -420,6 +487,12 @@ function inspectionValidation(r){
   }
  }
  if(missingAssetId>0)warnings.push({step:"inventario",message:`${missingAssetId} equipamento(s) em grupo conferido estão sem nº de série nem patrimônio (geram pendência na base central).`});
+ for(const source of r.equipamentos?.bancos||[]){
+  const hasReadings=(source.baterias||[]).some(unit=>[unit.identificacao,unit.modelo,unit.serie,unit.tensao].some(value=>String(value??'').trim()));
+  if(hasReadings&&!measuredBankInventoryMatches(r,source).length){
+   warnings.push({step:'baterias',message:`Banco “${source.identificacao||'sem identificação'}”: aproveite os dados das medições no inventário para atualizar a planilha.`});
+  }
+ }
  for(const bank of r.invBatteryBanks||[]){
   const units=bank.baterias||[];
   if(units.length&&bank.cadastroCompleto!==true)warnings.push({step:"inventario",message:`Banco "${bank.identificacao||"sem identificação"}": marque "cadastro completo" após conferir todas as baterias.`});
@@ -498,7 +571,7 @@ function climateReview(r){
    <p class="muted small">${skipped?'O cadastro de climatização fica preservado. Os dados deste bloco ficam no rascunho.':
     'Temperatura e corrente são opcionais. Preencha somente o que foi medido nesta visita. Campo vazio preserva a última medição da base central.'}</p></div>`;
 }
-function renderUnits(r,type){ensureUnits(r);const def=unitDefinitions[type];const skipped=type==='climatizadores'&&review22(r,type)==='fora_escopo';return `<div class="card"><div class="card-head"><div><h2>${def.title}</h2><p class="muted small">Cadastre os equipamentos efetivamente existentes na estação, com foto por unidade.</p></div>${skipped?'':button('addUnit:'+type,'+ Adicionar','primary tiny')}</div>${type==='climatizadores'?climateReview(r):''}${skipped?'':r.equipamentos[type].length?r.equipamentos[type].map((u,i)=>`<div class="unit-block"><div class="card-head"><strong>${def.unit} ${i+1}</strong>${button('removeUnit:'+type+':'+u.id,'Remover','danger tiny')}</div><div class="grid">${def.fields.map(f=>unitField(type,i,f)).join('')}</div>${type==='bancos'?`<div class="card-head"><strong>Baterias individuais</strong>${button('addBattery:'+u.id,'+ Bateria','tiny')}</div>${(u.baterias||[]).map((b,j)=>`<div class="battery-unit"><strong>Bateria ${j+1}</strong>${button('removeBattery:'+u.id+':'+b.id,'Remover','danger tiny')}<div class="grid">${['identificacao','modelo','serie','tensao','observacao'].map(k=>`<div class="field"><label>${({identificacao:'Identificação',modelo:'Modelo',serie:'Número de série',tensao:'Tensão medida (V)',observacao:'Observação'})[k]}</label><input data-battery="${u.id}" data-battery-id="${b.id}" data-battery-field="${k}" value="${esc(b[k]||'')}"></div>`).join('')}</div>${photoAttachments(r,'bateria:'+b.id)}</div>`).join('')}`:''}${photoAttachments(r,'unidade:'+u.id)}</div>`).join(''):'<p class="muted">Nenhuma unidade cadastrada. Use “Adicionar” para registrar uma ou mais.</p>'}</div>`}
+function renderUnits(r,type){ensureUnits(r);const def=unitDefinitions[type];const skipped=type==='climatizadores'&&review22(r,type)==='fora_escopo';return `<div class="card"><div class="card-head"><div><h2>${def.title}</h2><p class="muted small">${type==='bancos'?'Registre as medições e as fotos desta vistoria. Ao terminar cada banco, use o botão para aproveitar os dados no inventário que alimenta a planilha.':'Cadastre os equipamentos efetivamente existentes na estação, com foto por unidade.'}</p></div>${skipped?'':button('addUnit:'+type,'+ Adicionar','primary tiny')}</div>${type==='climatizadores'?climateReview(r):''}${skipped?'':r.equipamentos[type].length?r.equipamentos[type].map((u,i)=>`<div class="unit-block"><div class="card-head"><strong>${def.unit} ${i+1}</strong>${button('removeUnit:'+type+':'+u.id,'Remover','danger tiny')}</div><div class="grid">${def.fields.map(f=>unitField(type,i,f)).join('')}</div>${type==='bancos'?`<div class="card-head"><strong>Baterias individuais</strong>${button('addBattery:'+u.id,'+ Bateria','tiny')}</div>${(u.baterias||[]).map((b,j)=>`<div class="battery-unit"><strong>Bateria ${j+1}</strong>${button('removeBattery:'+u.id+':'+b.id,'Remover','danger tiny')}<div class="grid">${['identificacao','modelo','serie','tensao','observacao'].map(k=>`<div class="field"><label>${({identificacao:'Identificação',modelo:'Modelo',serie:'Número de série',tensao:'Tensão medida (V)',observacao:'Observação'})[k]}</label><input data-battery="${u.id}" data-battery-id="${b.id}" data-battery-field="${k}" ${k==='tensao'?'inputmode="decimal"':''} value="${esc(b[k]||'')}"></div>`).join('')}</div>${photoAttachments(r,'bateria:'+b.id)}</div>`).join('')}${measuredBatteryHandoff(r,u)}`:''}${photoAttachments(r,'unidade:'+u.id)}</div>`).join(''):'<p class="muted">Nenhuma unidade cadastrada. Use “Adicionar” para registrar uma ou mais.</p>'}</div>`}
 
 function interData(r){if(!r.interligacoes||typeof r.interligacoes!=='object')r.interligacoes={};return r.interligacoes}
 function interField(r,key,label,type='text',opts=null){const v=interData(r)[key]||'';if(type==='select')return `<div class="field"><label for="inter-${key}">${esc(label)}</label><select data-inter="${key}" id="inter-${key}">${opts.map(([value,title])=>`<option value="${esc(value)}" ${v===value?'selected':''}>${esc(title)}</option>`).join('')}</select></div>`;if(type==='textarea')return `<div class="field full"><label for="inter-${key}">${esc(label)}</label><textarea data-inter="${key}" id="inter-${key}" placeholder="Informe detalhes da validação, divergências e referências">${esc(v)}</textarea></div>`;return `<div class="field"><label for="inter-${key}">${esc(label)}</label><input data-inter="${key}" id="inter-${key}" type="${type}" value="${esc(v)}"></div>`}
@@ -584,6 +657,7 @@ if(s==='homeIssues'||s==='homeReports'){document.getElementById('estacoes')?.scr
 if(s==='homePending'){document.getElementById('sync-section')?.scrollIntoView({behavior:'smooth'});alert('Confira a seção de sincronização nesta página. A confirmação de envio exige servidor corporativo configurado.');return}
 if(s==='homeAccess'){alert('O cadastro de identidades, papéis e permissões será realizado pelo TI no Microsoft Entra ID e pela API corporativa. Esta tela é apenas uma demonstração.');return}
 if(s==='reuseInventory22')return reuseInventory22();if(s==='captureGps')return captureGps();if(s==='inv13-add-tx'){const r=inv13(cur());r.invTransceivers.push({id:inv13Id('TX'),tipo:'SFP+',tipoAutomatico:true,velocidade:'',estado:'Instalado',equipamentoId:''});change();render();return}
+if(s.startsWith('openMeasuredBatteryBank:'))return openMeasuredBatteryBank(s.slice('openMeasuredBatteryBank:'.length));
 if(s==='inv13-add-bank'){const r=inv13(cur());r.invBatteryBanks.push({id:inv13Id('BK'),identificacao:'Banco '+String(r.invBatteryBanks.length+1).padStart(2,'0'),local:'',tensao:'48',topologia:'4 baterias em série',baterias:[]});change();render();return}
 if(s.startsWith('inv13-add-bat:')){const bank=inv13(cur()).invBatteryBanks.find(b=>b.id===s.slice(14));if(bank){bank.baterias.push({id:inv13Id('BT'),identificacao:'Bateria '+String(bank.baterias.length+1).padStart(2,'0'),vidaAnos:'4',alertaDias:'90',estado:'Não verificado',tecnologia:'Chumbo-ácido'});change();render()}return}
 if(s.startsWith('inv13-del-tx:')){const r=inv13(cur());if(confirm('Remover transceiver do inventário?')){r.invTransceivers=r.invTransceivers.filter(t=>t.id!==s.slice(13));change();render()}return}
@@ -594,7 +668,7 @@ document.addEventListener('click',e=>{const nav=e.target.closest('[data-nav]');i
 document.addEventListener('input',e=>{const t=e.target,r=cur();if(t.dataset.scheduleNotes!==undefined&&r){r.scheduleNotes=t.value;change();return}if(!r)return;
 if(t.dataset.inv13Group){const inv=inv13(r),id=t.dataset.inv13Id,field=t.dataset.inv13Field;let obj=t.dataset.inv13Group==='tx'?inv.invTransceivers.find(x=>x.id===id):t.dataset.inv13Group==='bank'?inv.invBatteryBanks.find(x=>x.id===id):inv.invBatteryBanks.flatMap(x=>x.baterias).find(x=>x.id===id);if(obj){obj[field]=t.value;change()}return}
 if(t.dataset.inter){interData(r)[t.dataset.inter]=t.value;change();return}if(t.dataset.field){r[t.dataset.field]=t.value;change();if(['latitude','longitude'].includes(t.dataset.field)){const a=document.activeElement;if(a&&a.dataset.field===t.dataset.field){/* Atualizar link ao sair do campo */}}if(t.dataset.field==='nome')document.title=(t.value||'Estação')+' | VOANET';return}if(t.dataset.unit){ensureUnits(r);const a=r.equipamentos[t.dataset.unit]?.[Number(t.dataset.unitIndex)];if(a){a[t.dataset.unitField]=t.value;change()}return}if(t.dataset.battery){ensureUnits(r);const b=r.equipamentos.bancos.flatMap(x=>x.baterias||[]).find(x=>x.id===t.dataset.batteryId);if(b){b[t.dataset.batteryField]=t.value;change()}return}if(t.dataset.reading){r.readings[t.dataset.reading]=t.value;change();return}if(t.dataset.checkNote){r.checks[t.dataset.checkNote] ||= {status:'NV',note:''};r.checks[t.dataset.checkNote].note=t.value;t.classList.toggle('nc-note-required',r.checks[t.dataset.checkNote].status==='NC'&&!t.value.trim());change();return}if(t.dataset.photoCaption){const p=r.photos.find(x=>x.id===t.dataset.photoCaption);if(p){p.caption=t.value;change()}return}});
-document.addEventListener('change',e=>{const t=e.target,r=cur();if(t.dataset.inventoryReview&&r){r.inventoryReview ||= {};r.inventoryReview[t.dataset.inventoryReview]=t.value;change();if(t.dataset.inventoryReview==='climatizadores')render();return}if(t.dataset.batteryReview&&r){r.batteryReview ||= {};r.batteryReview[t.dataset.batteryReview]=t.value;change();render();return}if(t.matches('[data-role-preview]')){rolePreview=t.value;render();return}if(t.dataset.inv13Group&&r){const inv=inv13(r),id=t.dataset.inv13Id,field=t.dataset.inv13Field;let obj=t.dataset.inv13Group==='tx'?inv.invTransceivers.find(x=>x.id===id):t.dataset.inv13Group==='bank'?inv.invBatteryBanks.find(x=>x.id===id):inv.invBatteryBanks.flatMap(x=>x.baterias).find(x=>x.id===id);if(obj){obj[field]=t.value;change();if(t.dataset.inv13Group!=='tx'||t.tagName==='SELECT')render()}return}if(t.dataset.schedulePeriod!==undefined&&r){r.schedulePeriod=t.value;r.scheduleDueDate=deriveSchedule(r);change();render();return}if(t.dataset.inter&&r){interData(r)[t.dataset.inter]=t.value;change();render();return}if(t.dataset.check&&r){r.checks[t.dataset.check] ||= {status:'NV',note:''};r.checks[t.dataset.check].status=t.value;change();t.classList.toggle('nc',t.value==='NC');const note=t.closest('.checkrow')?.querySelector('[data-check-note]');if(note){note.placeholder=t.value==='NC'?'Descreva a não conformidade (obrigatório para NC)':'Observação, evidência, foto ou OS (opcional)';note.classList.toggle('nc-note-required',t.value==='NC'&&!note.value.trim());}return}if(['ocupacao','acesso','classificacao'].includes(t.dataset.field)&&r){r[t.dataset.field]=t.value;change();render();return}if(t.dataset.field==='torrePresenca'&&r){
+document.addEventListener('change',e=>{const t=e.target,r=cur();if(t.dataset.inventoryReview&&r){r.inventoryReview ||= {};r.inventoryReview[t.dataset.inventoryReview]=t.value;change();if(t.dataset.inventoryReview==='climatizadores')render();return}if(t.dataset.batteryReview&&r){r.batteryReview ||= {};r.batteryReview[t.dataset.batteryReview]=t.value;change();render();return}if(t.matches('[data-role-preview]')){rolePreview=t.value;render();return}if(t.dataset.inv13Group&&r){const inv=inv13(r),id=t.dataset.inv13Id,field=t.dataset.inv13Field;let obj=t.dataset.inv13Group==='tx'?inv.invTransceivers.find(x=>x.id===id):t.dataset.inv13Group==='bank'?inv.invBatteryBanks.find(x=>x.id===id):inv.invBatteryBanks.flatMap(x=>x.baterias).find(x=>x.id===id);if(obj){obj[field]=t.value;change();if(t.tagName==='SELECT')render();else if(t.dataset.inv13Group!=='tx')updateBatteryInventoryField(r,obj,t.dataset.inv13Group,field)}return}if(t.dataset.schedulePeriod!==undefined&&r){r.schedulePeriod=t.value;r.scheduleDueDate=deriveSchedule(r);change();render();return}if(t.dataset.inter&&r){interData(r)[t.dataset.inter]=t.value;change();render();return}if(t.dataset.check&&r){r.checks[t.dataset.check] ||= {status:'NV',note:''};r.checks[t.dataset.check].status=t.value;change();t.classList.toggle('nc',t.value==='NC');const note=t.closest('.checkrow')?.querySelector('[data-check-note]');if(note){note.placeholder=t.value==='NC'?'Descreva a não conformidade (obrigatório para NC)':'Observação, evidência, foto ou OS (opcional)';note.classList.toggle('nc-note-required',t.value==='NC'&&!note.value.trim());}return}if(['ocupacao','acesso','classificacao'].includes(t.dataset.field)&&r){r[t.dataset.field]=t.value;change();render();return}if(t.dataset.field==='torrePresenca'&&r){
    const tower=groups.find(g=>g.key==='torre');
    for(const [id] of tower.items){
      const current=r.checks[id]||{status:'NV',note:''};

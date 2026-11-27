@@ -42,6 +42,11 @@
 }
 .inspection-section-head h2,
 .inspection-section-head p { margin: 0; }
+.inventory-battery-anchor { scroll-margin-top: calc(var(--portal-header-height, 0px) + 1rem); }
+.battery-handoff { margin-top: .75rem; }
+.battery-handoff p { margin: 0 0 .5rem; }
+.battery-handoff [role="status"] { margin: .5rem 0 0; }
+.battery-handoff [role="status"]:empty { margin: 0; }
 .inspection-schedule .inspection-section-head { display: block; }
 .inspection-schedule .inspection-section-head p { margin-top: .25rem; }
 

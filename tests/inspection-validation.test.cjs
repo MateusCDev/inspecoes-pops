@@ -62,6 +62,17 @@ function loadAppContext() {
   return { context, alerts, navigated };
 }
 
+test('medições de bateria sem inventário geram aviso e reconhecem o mesmo banco pelo nome', () => {
+  const { context } = loadAppContext();
+  const record = context.blank();
+  record.equipamentos.bancos = [{ id: 'EQ-1', identificacao: 'Banco de baterias 01', baterias: [{ tensao: '13,32' }] }];
+  const hasBatteryWarning = () => context.inspectionValidation(record).warnings.some(warning => warning.step === 'baterias');
+
+  assert.equal(hasBatteryWarning(), true);
+  record.invBatteryBanks = [{ identificacao: 'Banco 1' }];
+  assert.equal(hasBatteryWarning(), false);
+});
+
 test('blank preenche horário de início automaticamente e validação exige campos obrigatórios', () => {
   const { context } = loadAppContext();
   const r = context.blank();

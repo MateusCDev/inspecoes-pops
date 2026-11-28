@@ -317,6 +317,7 @@
       const next = document.documentElement?.dataset?.theme === 'dark' ? 'light' : 'dark';
       if (document.documentElement?.dataset) document.documentElement.dataset.theme = next;
       try { localStorage.setItem('voanet_theme', next); } catch (_) {}
+      try { fleetFrame?.contentWindow?.postMessage({ type: 'voanet-theme', theme: next }, location.origin); } catch (_) {}
       syncThemeButton();
     });
   }

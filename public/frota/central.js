@@ -131,6 +131,16 @@ function auditScreen() {
     <tbody>${(state.audit || []).slice().reverse().map(a => `<tr><td>${h(new Date(a.at).toLocaleString('pt-BR'))}</td><td>${h(a.actor)}</td><td>${h(a.id)}</td></tr>`).join('')}</tbody></table></div></div>`;
 }
 
+window.addEventListener('message', event => {
+  if (event.origin === location.origin && event.data?.type === 'voanet-theme') {
+    document.documentElement.dataset.theme = event.data.theme === 'dark' ? 'dark' : 'light';
+  }
+});
+window.addEventListener('storage', event => {
+  if (event.key === 'voanet_theme') {
+    document.documentElement.dataset.theme = event.newValue === 'dark' ? 'dark' : 'light';
+  }
+});
 window.addEventListener('unhandledrejection', event => {
   if (event.reason instanceof Error) notify(event.reason.message);
 });

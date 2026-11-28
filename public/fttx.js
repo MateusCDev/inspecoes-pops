@@ -17,12 +17,14 @@ const FTTX_ROUTE_DETAILS=[
   ['dielectricGroups','Grupos de três postes aptos para dielétrico','Informe um grupo por suporte, com olhal nas pontas e dielétrico no meio. Confira curvas, vegetação e vãos longos.'],
   ['extraEyelets','Olhais adicionais','Some os demais olhais nas curvas, cruzamentos, ancoragens e pontas dos grupos. O olhal básico de cada poste com CTO entra automaticamente.'],
   ['bolt','Parafusos','Informe quantos serão usados na montagem prevista.'],
-  ['bapSupport','Suportes para BAP','Conte os suportes conforme os pontos de fixação do trajeto.'],
-  ['loopSmall','Alças pré-formadas de 06 a 12 FO','Some as alças previstas para cabos de 6 a 12 fibras.'],
-  ['loop24','Alças pré-formadas de 24 FO','Some as alças previstas para cabo de 24 fibras.'],
-  ['loop36','Alças pré-formadas de 36 FO','Some as alças previstas para cabo de 36 fibras.'],
-  ['loop48','Alças pré-formadas de 48 FO','Some as alças previstas para cabo de 48 fibras.'],
-  ['loop72','Alças pré-formadas de 72 FO','Some as alças previstas para cabo de 72 fibras.']
+  ['bapSupport','Suportes para BAP','Conte os suportes conforme os pontos de fixação do trajeto.']
+];
+const FTTX_LOOP_FIELDS=[
+  ['loopSmall','Alças pré-formadas de 06 a 12 FO','Ancoragem para cabos de 6 a 12 fibras (ex.: ASU80 6,4–7,4 mm).'],
+  ['loop24','Alças pré-formadas de 24 FO','Ancoragem para cabo de 24 fibras (ex.: AS80 9,4–10,1 mm).'],
+  ['loop36','Alças pré-formadas de 36 FO','Ancoragem para cabo de 36 fibras (ex.: AS80 10,8–11,6 mm).'],
+  ['loop48','Alças pré-formadas de 48 FO','Ancoragem para cabo de 48 fibras.'],
+  ['loop72','Alças pré-formadas de 72 FO','Ancoragem para cabo de 72 fibras (ex.: AS80 12,4–13,5 mm).']
 ];
 const FTTX_CTO_MODELS=[
   ['cto8','CTO 1:8 (8 portas)',8,false],
@@ -186,6 +188,25 @@ function fttxEstimatedSleeves(draft){
   return bareSplitSplices+12*ceoTotal+2*conventionalCto;
 }
 
+function fttxAutoLoops(draft){
+  const loopMap={6:'loopSmall',12:'loopSmall',24:'loop24',36:'loop36',48:'loop48',72:'loop72'};
+  const loops={loopSmall:0,loop24:0,loop36:0,loop48:0,loop72:0};
+  let dominantField='',maxMeters=-1;
+  for(const fibers of FTTX_FIBERS){
+    const row=draft.cables?.[fibers]||{};
+    const meters=fttxQuantity(row.meters,true),cto=fttxQuantity(row.cto),endCto=fttxQuantity(row.endCto),ceo=fttxQuantity(row.ceo);
+    if(meters>0||cto>0||endCto>0||ceo>0){
+      const anchors=2*cto+endCto+2*ceo+(meters>0?2:0);
+      const field=loopMap[fibers];
+      loops[field]+=anchors;
+      if(meters>maxMeters){maxMeters=meters;dominantField=field;}
+    }
+  }
+  const extraEyelets=fttxQuantity(draft.extraEyelets);
+  if(extraEyelets>0&&dominantField)loops[dominantField]+=2*extraEyelets;
+  return loops;
+}
+
 function fttxEstimateHardware(draft){
   const get=field=>fttxQuantity(draft[field]);
   const asPoles=get('asPoles')||get('poles');
@@ -196,16 +217,7 @@ function fttxEstimateHardware(draft){
     patch.bapSupport=asPoles;
   }
   if(dielectricGroups>0)patch.extraEyelets=2*dielectricGroups;
-  const loopMap={6:'loopSmall',12:'loopSmall',24:'loop24',36:'loop36',48:'loop48',72:'loop72'};
-  const loops={loopSmall:0,loop24:0,loop36:0,loop48:0,loop72:0};
-  for(const fibers of FTTX_FIBERS){
-    const row=draft.cables?.[fibers]||{};
-    const meters=fttxQuantity(row.meters,true),cto=fttxQuantity(row.cto),endCto=fttxQuantity(row.endCto),ceo=fttxQuantity(row.ceo);
-    if(meters>0||cto>0||endCto>0||ceo>0){
-      const anchors=2*cto+endCto+2*ceo+(meters>0?2:0);
-      loops[loopMap[fibers]]+=anchors;
-    }
-  }
+  const loops=fttxAutoLoops(draft);
   for(const [field,val] of Object.entries(loops)){
     if(val>0)patch[field]=val;
   }
@@ -231,6 +243,18 @@ function calculateFttx(draft){
   const cep=get('cep'),guidePoles=get('guidePoles'),poles=get('poles'),ctoPoles=get('ctoPoles'),asPoles=get('asPoles');
   const contingencyPct=[5,10].includes(Number(draft.contingencyPct))?Number(draft.contingencyPct):0;
   const includeGuideBuckle=draft.includeGuideBuckle===true||draft.includeGuideBuckle==='true';
+  const autoLoops=draft.autoLoops!==false&&draft.autoLoops!=='false';
+  const estimatedLoops=fttxAutoLoops(draft);
+  const loopQty=field=>{
+    const raw=draft[field];
+    if(raw!==undefined&&raw!==null&&String(raw).trim()!=='')return get(field);
+    return autoLoops?estimatedLoops[field]:0;
+  };
+  const resolvedLoops={
+    loopSmall:loopQty('loopSmall'),loop24:loopQty('loop24'),loop36:loopQty('loop36'),
+    loop48:loopQty('loop48'),loop72:loopQty('loop72')
+  };
+  const totalCableLoops=Object.values(resolvedLoops).reduce((sum,val)=>sum+val,0);
 
   const ctoBreakdown=FTTX_CTO_MODELS.map(([field,label,ports,pre])=>({field,label,ports,pre,qty:get(field)}));
   const ctoTypedTotal=ctoBreakdown.reduce((sum,entry)=>sum+entry.qty,0);
@@ -270,11 +294,11 @@ function calculateFttx(draft){
       ['Olhal reto M12','un',ctoPoles+get('extraEyelets')],
       ['Parafuso','un',get('bolt')],
       ['Suporte para BAP','un',get('bapSupport')],
-      ['Alça pré-formada para cabo de 06 a 12 FO','un',get('loopSmall')],
-      ['Alça pré-formada para cabo de 24 FO','un',get('loop24')],
-      ['Alça pré-formada para cabo de 36 FO','un',get('loop36')],
-      ['Alça pré-formada para cabo de 48 FO','un',get('loop48')],
-      ['Alça pré-formada para cabo de 72 FO','un',get('loop72')],
+      ['Alça pré-formada para cabo de 06 a 12 FO','un',resolvedLoops.loopSmall],
+      ['Alça pré-formada para cabo de 24 FO','un',resolvedLoops.loop24],
+      ['Alça pré-formada para cabo de 36 FO','un',resolvedLoops.loop36],
+      ['Alça pré-formada para cabo de 48 FO','un',resolvedLoops.loop48],
+      ['Alça pré-formada para cabo de 72 FO','un',resolvedLoops.loop72],
       ['Suporte dielétrico','un',get('dielectricGroups')],
       ['Plaqueta de identificação do cabo','un',poles],
       ['Anel guia AGFE para postes sem CTO e sem BAP','un',2*guidePoles],
@@ -330,6 +354,9 @@ function calculateFttx(draft){
   }else if(avgSpan!==null&&avgSpan<15){
     warnings.push({step:1,text:`Vão médio de ${fttxQuantityFormat.format(avgSpan)} m está abaixo de 15 m. Confira a metragem lançada e o número de postes.`});
   }
+  if(routeTotal>0&&totalCableLoops===0){
+    warnings.push({step:1,text:'Nenhuma alça pré-formada informada para os cabos lançados. Ative o cálculo automático ou informe as quantidades por bitola.'});
+  }
   const optical=calculateOpticalBudget(draft,routeTotal);
   if(optical.active&&optical.status==='fail'){
     warnings.push({step:3,text:`Orçamento óptico acima do limite (${optical.totalLossDb.toFixed(2)} dB > ${optical.budgetDb} dB em ${optical.classLabel}). Revise splitters ou classe SFP.`});
@@ -338,6 +365,7 @@ function calculateFttx(draft){
   const ponPortsNeeded=ctoPorts>0?Math.ceil(ctoPorts/ponRatio):0;
   return {
     cables,groups,ctoTotal,ceoTotal,ctoPorts,ponRatio,ponPortsNeeded,avgSpan,optical,contingencyPct,
+    autoLoops,estimatedLoops,resolvedLoops,
     cableTotal:fttxQuantity(cableTotal,true),reserveTotal,routeTotal:fttxQuantity(routeTotal,true),
     issues,warnings,alerts:issues.map(issue=>issue.text)
   };
@@ -516,7 +544,10 @@ async function loadFttxReferences(){
     if(!response.ok)throw Error('Referências indisponíveis.');
     const {references}=await response.json();
     fttxReferences=references||{};
-    fttxReferenceStatus='Referências públicas consultadas automaticamente. O almoxarifado confirma os preços de compra.';
+    const entries=Object.values(fttxReferences);
+    const latest=entries.map(r=>r?.checkedOn||'').filter(Boolean).sort().pop();
+    const dateNote=latest?` · última atualização em ${fmt(latest)}`:'';
+    fttxReferenceStatus=`${entries.length} referências públicas atualizadas diariamente pelo portal${dateNote}. O almoxarifado confirma os preços de compra.`;
   }catch(_){
     fttxReferenceStatus='Referências públicas indisponíveis nesta consulta. Você pode informar preços estimados.';
   }
@@ -528,11 +559,16 @@ function fttxMaterialKey(name){
 }
 
 function fttxLookupReference(key){
+  if((key==='CTO 1:8 (8 portas)'||key==='CTO 1:16 (16 portas)')&&fttxDraft.ctoAssembly==='vazia'){
+    return fttxReferences['CTO']||null;
+  }
   if(fttxReferences[key])return fttxReferences[key];
   const bareSplitter=key.match(/^(Splitter 1:(?:2|8|16)) sem conector$/);
   if(bareSplitter&&fttxReferences[bareSplitter[1]])return fttxReferences[bareSplitter[1]];
   if(key==='CEO 24 FO'&&fttxReferences['CEO'])return fttxReferences['CEO'];
-  if(key==='CTO 1:16 (16 portas)'&&fttxDraft.ctoAssembly==='vazia'&&fttxReferences['CTO'])return fttxReferences['CTO'];
+  if((key==='Plaqueta de CTO'||key==='Plaqueta de caixa de emenda')&&fttxReferences['Plaqueta de identificação do cabo']){
+    return fttxReferences['Plaqueta de identificação do cabo'];
+  }
   return null;
 }
 
@@ -639,6 +675,13 @@ function updateFttxOverview(result){
   }
   const optBox=document.getElementById('fttx-optical-output');
   if(optBox)optBox.innerHTML=renderOpticalResult(result.optical);
+  for(const [field] of FTTX_LOOP_FIELDS){
+    const input=document.getElementById('fttx-'+field);
+    if(input){
+      const est=result.estimatedLoops?.[field]||0;
+      input.placeholder=result.autoLoops&&est>0?`Automático: ${est}`:'0';
+    }
+  }
 }
 
 function fttxIssues(result,step){
@@ -846,6 +889,21 @@ function renderFttx(){
           <div class="fttx-fields">${FTTX_ROUTE_FIELDS.map(([field,label,help])=>fttxInput(field,label,help)).join('')}</div>
           <div class="fttx-quick-bar">
             <button type="button" class="btn tiny fttx-suggestion" data-fttx-suggestion="asPoles">Usar todos os postes para cabo AS</button>
+          </div>
+          <div class="fttx-subsection">
+            <h3>Alças pré-formadas de ancoragem</h3>
+            <p class="small muted">Calculadas automaticamente por bitola (2 por CTO comum, 1 por CTO de ponta, 2 por CEO, 2 nas extremidades do cabo e 2 por olhal adicional). Digite um valor para substituir manualmente.</p>
+            <label class="fttx-checkbox-inline">
+              <input type="checkbox" data-fttx-checkbox="autoLoops" ${result.autoLoops?'checked':''}>
+              Calcular alças pré-formadas automaticamente pelas ancoragens do trajeto
+            </label>
+            <div class="fttx-fields">${FTTX_LOOP_FIELDS.map(([field,label,help])=>{
+              const est=result.estimatedLoops?.[field]||0;
+              const ph=result.autoLoops&&est>0?`Automático: ${est}`:'0';
+              return `<div class="fttx-field"><label for="fttx-${field}">${label}</label><input id="fttx-${field}" type="number"
+                min="0" step="1" inputmode="numeric" aria-describedby="fttx-help-${field}" value="${esc(fttxDraft[field]??'')}"
+                data-fttx-field="${field}" placeholder="${ph}"><small id="fttx-help-${field}">${help}</small></div>`;
+            }).join('')}</div>
           </div>
           <details class="fttx-options" ${FTTX_ROUTE_DETAILS.some(([key])=>fttxQuantity(fttxDraft[key])>0)?'open':''}>
             <summary>Detalhar ferragens e ancoragem</summary>

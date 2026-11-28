@@ -4,113 +4,645 @@
       "price": 2.85,
       "store": "BaixadaNet Telecom",
       "url": "https://baixadanet.com/produto/alca-pre-formada-cabo-optico-36fo-108mm-a-116mm-verde",
-      "details": "Para cabos de 10,8 a 11,6 mm",
-      "checkedOn": "2026-11-24"
+      "details": "10,8 a 11,6 mm (verde · 36 FO)",
+      "checkedOn": "2026-11-28"
     },
     "Parafuso": {
       "price": 9.7,
       "store": "Power Network Store",
       "url": "https://www.powernetworkstore.com.br/redes-opticas/ferragens-e-ancoragem/parafuso-m12-x-35",
       "details": "M12 × 35 · pacote com 10",
-      "checkedOn": "2026-11-24"
+      "checkedOn": "2026-11-28"
     },
     "Fecho de aço 3/4″": {
       "price": 0.45,
       "store": "Power Network Store",
       "url": "https://www.powernetworkstore.com.br/redes-opticas/ferragens-e-ancoragem/fecho-de-aco-para-fita-de-aco-34-100un",
       "details": "3/4″ · pacote com 100",
-      "checkedOn": "2026-11-24"
+      "checkedOn": "2026-11-28"
     },
     "Fita de aço 3/4″": {
       "price": 1.96,
       "store": "Power Network Store",
       "url": "https://www.powernetworkstore.com.br/redes-opticas/ferragens-e-ancoragem/fita-de-aco-galvanizado-34-x-0-5cm-25m",
       "details": "Galvanizada 3/4″ · rolo de 25 m",
-      "checkedOn": "2026-11-24"
+      "checkedOn": "2026-11-28"
     },
     "Alça pré-formada para cordoalha": {
       "price": 3.85,
       "store": "Power Network Store",
       "url": "https://www.powernetworkstore.com.br/redes-opticas/ferragens-e-ancoragem/alca-preformada-para-cordoalha-4-8mm",
       "details": "Cordoalha de aço 4,8 mm · pacote com 100",
-      "checkedOn": "2026-11-24"
+      "checkedOn": "2026-11-28"
     },
     "CEO": {
       "price": 166.58,
       "store": "Unicaserv",
       "url": "https://www.unicaserv.com.br/fibras-opticas/dios-e-caixas-de-emenda/ceo-caixa-de-emenda-optica-24-fibras-aereasubterranea-2-flex",
       "details": "Caixa de emenda de 24 FO",
-      "checkedOn": "2026-11-24"
+      "checkedOn": "2026-11-28"
     },
     "CTO": {
       "price": 96.9,
       "store": "Loja PIVNET",
       "url": "https://lojapivnet.com.br/produtos/caixa-de-atendimento-cto-1x16-vazia-duas-travas-e-chave-preta-bencabos/",
       "details": "CTO de 16 portas, vazia",
-      "checkedOn": "2026-11-24"
+      "checkedOn": "2026-11-28"
     },
     "Cabo óptico 12 FO": {
       "price": 2.33,
       "store": "BaixadaNet Telecom",
       "url": "https://baixadanet.com/produto/cabo-optico-speed-star-transcend-asu80-tubo-unico-12fo-advantage-mt",
       "details": "ASU80 · preço por metro · pedido mínimo de 3.000",
-      "checkedOn": "2026-11-24"
+      "checkedOn": "2026-11-28"
     },
     "Suporte para BAP": {
       "price": 3.3,
       "store": "Isamig Telecom",
       "url": "https://isamigtelecom.com.br/produtos/suporte-p-bap-m12-kit-10un/",
       "details": "M12 · pacote com 10",
-      "checkedOn": "2026-11-24"
+      "checkedOn": "2026-11-28"
     },
     "Suporte dielétrico": {
       "price": 6.4,
       "store": "Isamig Telecom",
       "url": "https://isamigtelecom.com.br/produtos/10-un-suporte-dieletrico-conico-duplo-8-mm-p-bap/",
       "details": "Cônico duplo de 8 mm para BAP · pacote com 10",
-      "checkedOn": "2026-11-24"
+      "checkedOn": "2026-11-28"
     },
     "Splitter 1:2": {
       "price": 20.5,
       "store": "Loja PIVNET",
       "url": "https://lojapivnet.com.br/produtos/splitter-optico-1x2-balanceado-sem-conector-2f-fsplit-x2-2flex/",
       "details": "Balanceado, sem conector",
-      "checkedOn": "2026-11-24"
+      "checkedOn": "2026-11-28"
     },
     "Splitter 1:8": {
       "price": 32.9,
       "store": "Loja PIVNET",
       "url": "https://lojapivnet.com.br/produtos/splitter-optico-1x8-plc-sem-conector-2f-fsplit-x8-10196-1dfvj/",
       "details": "PLC, sem conector",
-      "checkedOn": "2026-11-24"
+      "checkedOn": "2026-11-28"
     },
     "Splitter 1:16": {
       "price": 52.4,
       "store": "Loja PIVNET",
       "url": "https://lojapivnet.com.br/produtos/splitter-optico-1x16-plc-sem-conector-o-tech/",
       "details": "PLC, sem conector",
-      "checkedOn": "2026-11-24"
+      "checkedOn": "2026-11-28"
     },
     "OLT GPON": {
       "price": 8693.9,
       "store": "Loja PIVNET",
       "url": "https://lojapivnet.com.br/produtos/olt-gpon-pon-4-portas-pon-v1600gt-v-sol1/",
       "details": "V-SOL V1600GT · 4 portas PON",
-      "checkedOn": "2026-11-24"
+      "checkedOn": "2026-11-28"
     },
     "Conector de montagem em campo SC/APC": {
       "price": 6.3,
       "store": "Loja PIVNET",
       "url": "https://lojapivnet.com.br/produtos/conector-de-campo-optico-click-apc-3-posicoes-2flex-2f-fcon-sc-apc-n-14b64/",
       "details": "SC/APC · 2Flex",
-      "checkedOn": "2026-11-24"
+      "checkedOn": "2026-11-28"
     },
     "Cabo óptico 06 FO": {
-      "price": 1.8434,
-      "store": "RS Connect",
-      "url": "https://rsconnect.com.br/produtos/cabo_de_fibra_optica_asu80_6fo_bobina_3km/",
+      "price": 1.8396,
+      "store": "Noxcom",
+      "url": "https://noxcom.com.br/produto/cabo-optico-asu80-6fo-3km-cfoa-sm-asu80-s-6fo-nr/",
       "details": "ASU80 · bobina de 3.000 m",
-      "checkedOn": "2026-11-24"
+      "checkedOn": "2026-11-28"
+    },
+    "Cabo óptico 24 FO": {
+      "price": 5.9782,
+      "store": "BaixadaNet Telecom",
+      "url": "https://baixadanet.com/produto/cabo-optico-outdoor-as80-24fo-3km-fiberhome",
+      "details": "AS80 · bobina de 3.000 m",
+      "checkedOn": "2026-11-28"
+    },
+    "Cabo óptico 36 FO": {
+      "price": 6.64,
+      "store": "BaixadaNet Telecom",
+      "url": "https://baixadanet.com/produto/cabo-optico-speed-star-transcend-as80-nucleo-seco-36fo",
+      "details": "AS80 núcleo seco · preço por metro · pedido mínimo de 2.000",
+      "checkedOn": "2026-11-28"
+    },
+    "Cabo óptico 72 FO": {
+      "price": 7.93,
+      "store": "BaixadaNet Telecom",
+      "url": "https://baixadanet.com/produto/cabo-optico-outdoor-as80-72fo-sumec-metro",
+      "details": "AS80 · preço por metro · pedido mínimo de 1.000",
+      "checkedOn": "2026-11-28"
+    },
+    "Cabo drop óptico 1 FO": {
+      "price": 0.5,
+      "store": "BaixadaNet Telecom",
+      "url": "https://baixadanet.com/produto/cabo-optico-outdoor-drop-flat-1fo-1km-2flex",
+      "details": "Drop flat 1 FO · bobina de 1.000 m",
+      "checkedOn": "2026-11-28"
+    },
+    "Cabo drop óptico 2 FO": {
+      "price": 0.699,
+      "store": "RS Connect",
+      "url": "https://rsconnect.com.br/produtos/cabo_fibra_optica_drop_flat_ftth_2fo_indooroutdoor/",
+      "details": "Drop flat 2 FO · bobina de 1.000 m",
+      "checkedOn": "2026-11-28"
+    },
+    "Alça pré-formada para cabo de 06 a 12 FO": {
+      "price": 1.78,
+      "store": "BaixadaNet Telecom",
+      "url": "https://baixadanet.com/produto/alca-pre-formada-cabo-optico-12fo-64mm-a-74mm-branca",
+      "details": "6,4 a 7,4 mm (branca · 06 a 12 FO)",
+      "checkedOn": "2026-11-28"
+    },
+    "Alça pré-formada para cabo de 24 FO": {
+      "price": 2.93,
+      "store": "BaixadaNet Telecom",
+      "url": "https://baixadanet.com/produto/alca-pre-formada-cabo-optico-24fo-94mm-a-101mm-roxa",
+      "details": "9,4 a 10,1 mm (roxa · 24 FO)",
+      "checkedOn": "2026-11-28"
+    },
+    "Alça pré-formada para cabo de 48 FO": {
+      "price": 4.23,
+      "store": "Unicaserv",
+      "url": "https://www.unicaserv.com.br/rede-externa/alcas-pre-formadas/alca-pre-formada-para-cabo-cce-apl-asf-12-40-a-13-50mm-laranja",
+      "details": "12,4 a 13,5 mm (laranja · AS80 48/72 FO)",
+      "checkedOn": "2026-11-28"
+    },
+    "Alça pré-formada para cabo de 72 FO": {
+      "price": 4.22,
+      "store": "BaixadaNet Telecom",
+      "url": "https://baixadanet.com/produto/alca-pre-formada-cabo-optico-72fo-124mm-a-135mm-laranja",
+      "details": "12,4 a 13,5 mm (laranja · 72 FO)",
+      "checkedOn": "2026-11-28"
+    },
+    "Alça pré-formada para drop": {
+      "price": 0.77,
+      "store": "BaixadaNet Telecom",
+      "url": "https://baixadanet.com/produto/alca-pre-formada-fio-fe-cabo-drop-100mm-160mm",
+      "details": "Para cabo drop / fio FE",
+      "checkedOn": "2026-11-28"
+    },
+    "Olhal reto M12": {
+      "price": 5.4,
+      "store": "Isamig Telecom",
+      "url": "https://isamigtelecom.com.br/produtos/porca-olhal-m12-kit-10un/",
+      "details": "Porca olhal M12 · pacote com 10",
+      "checkedOn": "2026-11-28"
+    },
+    "Abraçadeira BAP": {
+      "price": 7.999,
+      "store": "BAP e BAP",
+      "url": "https://bapebap.com.br/produtos/conjunto-bap-2-fp-1mm-10-unidades-completo/",
+      "details": "Conjunto BAP 2 completo · pacote com 10",
+      "checkedOn": "2026-11-28"
+    },
+    "Anel guia AGFE": {
+      "price": 0.86,
+      "store": "Isamig Telecom",
+      "url": "https://isamigtelecom.com.br/produtos/100-un-anel-guia-agfe/",
+      "details": "AGFE galvanizado · pacote com 100",
+      "checkedOn": "2026-11-28"
+    },
+    "Plaqueta de identificação do cabo": {
+      "price": 1.33,
+      "store": "Unicaserv",
+      "url": "https://www.unicaserv.com.br/pi-plaqueta-de-identificacao-3mm-9x4cm-em-plastico-c-relevo-amarela",
+      "details": "Plaqueta 9×4 cm amarela relevo UV",
+      "checkedOn": "2026-11-28"
+    },
+    "Conjunto de reserva técnica para caixa de emenda": {
+      "price": 30.31,
+      "store": "Unicaserv",
+      "url": "https://www.unicaserv.com.br/suporte-reserva-tecnica-cruzeta-550mm-aba-80-chapa-18",
+      "details": "Suporte cruzeta Optiloop 550 mm",
+      "checkedOn": "2026-11-28"
+    },
+    "Suporte de reserva técnica para poste": {
+      "price": 30.31,
+      "store": "Unicaserv",
+      "url": "https://www.unicaserv.com.br/suporte-reserva-tecnica-cruzeta-550mm-aba-80-chapa-18",
+      "details": "Suporte cruzeta Optiloop 550 mm",
+      "checkedOn": "2026-11-28"
+    },
+    "Cordoalha": {
+      "price": 3.1654,
+      "store": "Unicaserv",
+      "url": "https://www.unicaserv.com.br/cabos/cordoalha-de-aco-3-fios-316-4-8-mm-rolo-250-mt",
+      "details": "Aço 3/16″ (4,8 mm) · rolo de 250 m",
+      "checkedOn": "2026-11-28"
+    },
+    "Cordoalha dielétrica": {
+      "price": 1.998,
+      "store": "RS Connect",
+      "url": "https://rsconnect.com.br/produtos/cordoalha_dieletrica_de_64mm_rolo_com_500_metros/",
+      "details": "Dielétrica 6,4 mm · rolo de 500 m",
+      "checkedOn": "2026-11-28"
+    },
+    "Bandeja de caixa de emenda": {
+      "price": 11.9,
+      "store": "Loja PIVNET",
+      "url": "https://lojapivnet.com.br/produtos/bandeja-para-caixa-de-emenda-optica-24fo-252mm-10968-zybl6/",
+      "details": "Bandeja CEO 24 FO",
+      "checkedOn": "2026-11-28"
+    },
+    "Tubete protetor de emenda": {
+      "price": 0.0999,
+      "store": "BAP e BAP",
+      "url": "https://bapebap.com.br/produtos/protetor-de-fusao-tubete-60mm-2f-ftub60-100x1/",
+      "details": "Tubete 60 mm 2Flex · pacote com 100",
+      "checkedOn": "2026-11-28"
+    },
+    "Manta para CEO": {
+      "price": 31.26,
+      "store": "Unicaserv",
+      "url": "https://www.unicaserv.com.br/kit-de-derivacao-com-manta-oval-e-circular-termocontratil-ceo-kit-c-flx0003",
+      "details": "Kit derivação manta termocontrátil CEO",
+      "checkedOn": "2026-11-28"
+    },
+    "CTO 1:8 (8 portas)": {
+      "price": 115,
+      "store": "Isamig Telecom",
+      "url": "https://isamigtelecom.com.br/produtos/caixa-de-atendimento-optico-cto-1x8-sc-apc-completa/",
+      "details": "CTO 1:8 completa SC/APC",
+      "checkedOn": "2026-11-28"
+    },
+    "CTO 1:16 (16 portas)": {
+      "price": 131.91,
+      "store": "RS Connect",
+      "url": "https://rsconnect.com.br/produtos/caixa_terminacao_optica_cto_com_splitter_1x16_scapc_2_travas/",
+      "details": "CTO equipada com splitter 1:16 SC/APC",
+      "checkedOn": "2026-11-28"
+    },
+    "CEO 24 FO": {
+      "price": 166.58,
+      "store": "Unicaserv",
+      "url": "https://www.unicaserv.com.br/fibras-opticas/dios-e-caixas-de-emenda/ceo-caixa-de-emenda-optica-24-fibras-aereasubterranea-2-flex",
+      "details": "Caixa de emenda de 24 FO",
+      "checkedOn": "2026-11-28"
+    },
+    "CEO 48 FO": {
+      "price": 177.98,
+      "store": "Unicaserv",
+      "url": "https://www.unicaserv.com.br/fibras-opticas/dios-e-caixas-de-emenda/caixa-de-emenda-optica-48fo-termocontratil-aerea-subterranea",
+      "details": "CEO 48 FO termocontrátil",
+      "checkedOn": "2026-11-28"
+    },
+    "CEO 72 FO": {
+      "price": 117.31,
+      "store": "BaixadaNet Telecom",
+      "url": "https://baixadanet.com/produto/caixa-outdoor-de-emenda-de-fibra-12fo-termo-mini-ceo-ate-72fo",
+      "details": "Mini CEO até 72 FO termocontrátil",
+      "checkedOn": "2026-11-28"
+    },
+    "CEO 144 FO": {
+      "price": 257.61,
+      "store": "BaixadaNet Telecom",
+      "url": "https://baixadanet.com/produto/caixa-outdoor-de-emenda-de-fibra-144fo-svm-mecanica",
+      "details": "CEO 144 FO vedação mecânica",
+      "checkedOn": "2026-11-28"
+    },
+    "Splitter 1:2 conectorizado SC/APC": {
+      "price": 16,
+      "store": "BAP e BAP",
+      "url": "https://bapebap.com.br/produtos/splitter-1x2-sc-apc-vetrofiber/",
+      "details": "PLC 1:2 conectorizado SC/APC",
+      "checkedOn": "2026-11-28"
+    },
+    "Splitter 1:4 conectorizado SC/APC": {
+      "price": 17,
+      "store": "BAP e BAP",
+      "url": "https://bapebap.com.br/produtos/splitter-1x4-sc-apc-vetrofiber/",
+      "details": "PLC 1:4 conectorizado SC/APC",
+      "checkedOn": "2026-11-28"
+    },
+    "Splitter 1:8 conectorizado SC/APC": {
+      "price": 45.9,
+      "store": "Loja PIVNET",
+      "url": "https://lojapivnet.com.br/produtos/splitter-optico-1x8-balanceado-com-conector-sc-apc-2f-fsplit-x8-sc-apc-2flex/",
+      "details": "PLC 1:8 conectorizado SC/APC 2Flex",
+      "checkedOn": "2026-11-28"
+    },
+    "Splitter 1:16 conectorizado SC/APC": {
+      "price": 56.5,
+      "store": "Isamig Telecom",
+      "url": "https://isamigtelecom.com.br/produtos/splitter-1x16-sc-apc-0-9mm1/",
+      "details": "PLC 1:16 conectorizado SC/APC",
+      "checkedOn": "2026-11-28"
+    },
+    "Splitter 1:32 conectorizado SC/APC": {
+      "price": 159.9,
+      "store": "Loja PIVNET",
+      "url": "https://lojapivnet.com.br/produtos/splitter-optico-1x32-plc-com-conector-sc-apc-sm-xfs1322-intelbras/",
+      "details": "PLC 1:32 conectorizado SC/APC Intelbras",
+      "checkedOn": "2026-11-28"
+    },
+    "Splitter 1:2 sem conector": {
+      "price": 20.5,
+      "store": "Loja PIVNET",
+      "url": "https://lojapivnet.com.br/produtos/splitter-optico-1x2-balanceado-sem-conector-2f-fsplit-x2-2flex/",
+      "details": "Balanceado, sem conector",
+      "checkedOn": "2026-11-28"
+    },
+    "Splitter 1:4 sem conector": {
+      "price": 24.6,
+      "store": "Loja PIVNET",
+      "url": "https://lojapivnet.com.br/produtos/splitter-optico-1x4-plc-sem-conector-sm-o-tech/",
+      "details": "PLC 1:4 sem conector",
+      "checkedOn": "2026-11-28"
+    },
+    "Splitter 1:8 sem conector": {
+      "price": 32.9,
+      "store": "Loja PIVNET",
+      "url": "https://lojapivnet.com.br/produtos/splitter-optico-1x8-plc-sem-conector-2f-fsplit-x8-10196-1dfvj/",
+      "details": "PLC 1:8 sem conector",
+      "checkedOn": "2026-11-28"
+    },
+    "Splitter 1:16 sem conector": {
+      "price": 52.4,
+      "store": "Loja PIVNET",
+      "url": "https://lojapivnet.com.br/produtos/splitter-optico-1x16-plc-sem-conector-o-tech/",
+      "details": "PLC 1:16 sem conector",
+      "checkedOn": "2026-11-28"
+    },
+    "Splitter 1:32 sem conector": {
+      "price": 136,
+      "store": "Loja PIVNET",
+      "url": "https://lojapivnet.com.br/produtos/splitter-optico-1x32-plc-sem-conector-xfs1320-intelbras/",
+      "details": "PLC 1:32 sem conector Intelbras",
+      "checkedOn": "2026-11-28"
+    },
+    "Splitter desbalanceado 5/95 sem conector": {
+      "price": 12.5,
+      "store": "RS Connect",
+      "url": "https://rsconnect.com.br/produtos/splitter_1x2_desbalanceado_595_desconectorizado/",
+      "details": "FBT 5/95 sem conector",
+      "checkedOn": "2026-11-28"
+    },
+    "Splitter desbalanceado 10/90 sem conector": {
+      "price": 13,
+      "store": "Isamig Telecom",
+      "url": "https://isamigtelecom.com.br/produtos/splitter-desbalanceado-1x2-10-90-s-conec/",
+      "details": "10/90 sem conector",
+      "checkedOn": "2026-11-28"
+    },
+    "Splitter desbalanceado 15/85 sem conector": {
+      "price": 12.93,
+      "store": "Isamig Telecom",
+      "url": "https://isamigtelecom.com.br/produtos/splitter-desbalanceado-1x2-15-85-s-conec1/",
+      "details": "15/85 sem conector",
+      "checkedOn": "2026-11-28"
+    },
+    "Splitter desbalanceado 20/80 sem conector": {
+      "price": 12.5,
+      "store": "RS Connect",
+      "url": "https://rsconnect.com.br/produtos/splitter_1x2_desbalanceado_2080_desconectorizado/",
+      "details": "20/80 sem conector",
+      "checkedOn": "2026-11-28"
+    },
+    "Splitter desbalanceado 30/70 sem conector": {
+      "price": 14.16,
+      "store": "Unicaserv",
+      "url": "https://www.unicaserv.com.br/fibras-opticas/splitters/divisor-optico-passivo-splitter-1x2-sconversor-desbalanceado-30-70",
+      "details": "30/70 sem conector",
+      "checkedOn": "2026-11-28"
+    },
+    "Splitter desbalanceado 40/60 sem conector": {
+      "price": 9,
+      "store": "Isamig Telecom",
+      "url": "https://isamigtelecom.com.br/produtos/splitter-desbalanceado-1x2-40-60-s-conec1/",
+      "details": "40/60 sem conector",
+      "checkedOn": "2026-11-28"
+    },
+    "Splitter desbalanceado 50/50 sem conector": {
+      "price": 11.78,
+      "store": "Isamig Telecom",
+      "url": "https://isamigtelecom.com.br/produtos/splitter-balanceado-1x2-s-conector-50-50-50un/",
+      "details": "50/50 sem conector · pacote com 50",
+      "checkedOn": "2026-11-28"
+    },
+    "Splitter desbalanceado 5/95 conectorizado SC/APC": {
+      "price": 12.5,
+      "store": "RS Connect",
+      "url": "https://rsconnect.com.br/produtos/splitter_1x2_desbalanceado_595_scapc/",
+      "details": "5/95 conectorizado SC/APC",
+      "checkedOn": "2026-11-28"
+    },
+    "Splitter desbalanceado 10/90 conectorizado SC/APC": {
+      "price": 25.74,
+      "store": "Isamig Telecom",
+      "url": "https://isamigtelecom.com.br/produtos/splitter-1x2-sc-apc-10-90-0-9mm-conectorizado1/",
+      "details": "10/90 conectorizado SC/APC",
+      "checkedOn": "2026-11-28"
+    },
+    "Splitter desbalanceado 20/80 conectorizado SC/APC": {
+      "price": 26.61,
+      "store": "Isamig Telecom",
+      "url": "https://isamigtelecom.com.br/produtos/splitter-1x2-sc-apc-20-80-0-9mm-conectorizado1/",
+      "details": "20/80 conectorizado SC/APC",
+      "checkedOn": "2026-11-28"
+    },
+    "Splitter desbalanceado 30/70 conectorizado SC/APC": {
+      "price": 25.25,
+      "store": "Isamig Telecom",
+      "url": "https://isamigtelecom.com.br/produtos/splitter-1x2-sc-apc-30-70-0-9mm-conectorizado1/",
+      "details": "30/70 conectorizado SC/APC",
+      "checkedOn": "2026-11-28"
+    },
+    "Splitter desbalanceado 40/60 conectorizado SC/APC": {
+      "price": 12.5,
+      "store": "RS Connect",
+      "url": "https://rsconnect.com.br/produtos/splitter_1x2_desbalanceado_4060_scapc/",
+      "details": "40/60 conectorizado SC/APC",
+      "checkedOn": "2026-11-28"
+    },
+    "Splitter desbalanceado 50/50 conectorizado SC/APC": {
+      "price": 25.05,
+      "store": "RS Connect",
+      "url": "https://rsconnect.com.br/produtos/splitter_1x2_desbalanceado_5050_scapc/",
+      "details": "50/50 conectorizado SC/APC",
+      "checkedOn": "2026-11-28"
+    },
+    "Adaptador SC/APC": {
+      "price": 1.2,
+      "store": "Loja PIVNET",
+      "url": "https://lojapivnet.com.br/produtos/acoplador-optico-sc-apc-monomodo-simplex-verde-2f-fadt-sc-apc-2flex-10245/",
+      "details": "Simplex verde SC/APC 2Flex",
+      "checkedOn": "2026-11-28"
+    },
+    "Adaptador SC/UPC": {
+      "price": 0.66,
+      "store": "Isamig Telecom",
+      "url": "https://isamigtelecom.com.br/produtos/acoplador-optico-simplex-sc-upc-kit-100un/",
+      "details": "Simplex SC/UPC · pacote com 100",
+      "checkedOn": "2026-11-28"
+    },
+    "Pigtail SC/APC": {
+      "price": 4.275,
+      "store": "RS Connect",
+      "url": "https://rsconnect.com.br/produtos/pigtail_fibra_optica_12_fibras_scapc/",
+      "details": "Pigtail SC/APC · conjunto com 12",
+      "checkedOn": "2026-11-28"
+    },
+    "Cordão óptico SC/APC": {
+      "price": 7.35,
+      "store": "Isamig Telecom",
+      "url": "https://isamigtelecom.com.br/produtos/cordao-optico-simplex-sc-apc-sc-apc-5m1/",
+      "details": "Simplex SC/APC-SC/APC 5 m",
+      "checkedOn": "2026-11-28"
+    },
+    "Conector de montagem em campo SC/UPC": {
+      "price": 2.55,
+      "store": "Isamig Telecom",
+      "url": "https://isamigtelecom.com.br/produtos/conector-fast-rapido-fibra-optica-azul-sc-upc-kit-com-100/",
+      "details": "Fast SC/UPC · pacote com 100",
+      "checkedOn": "2026-11-28"
+    },
+    "Roseta óptica": {
+      "price": 3.71,
+      "store": "Unicaserv",
+      "url": "https://www.unicaserv.com.br/fibras-opticas/ftth/roseta-pto-para-fibra-optica-ftth-2-fibras-branca",
+      "details": "Roseta PTO 2 fibras branca",
+      "checkedOn": "2026-11-28"
+    },
+    "PTO de 1 ou 2 portas": {
+      "price": 3.71,
+      "store": "Unicaserv",
+      "url": "https://www.unicaserv.com.br/fibras-opticas/ftth/roseta-pto-para-fibra-optica-ftth-2-fibras-branca",
+      "details": "PTO 2 fibras branca",
+      "checkedOn": "2026-11-28"
+    },
+    "DIO de 12 FO": {
+      "price": 72.44,
+      "store": "Unicaserv",
+      "url": "https://www.unicaserv.com.br/mini-dio-em-aco-com-painel-sc-12-fibras-opticas-preto",
+      "details": "Mini DIO aço 12 FO",
+      "checkedOn": "2026-11-28"
+    },
+    "DIO de 24 FO": {
+      "price": 261.36,
+      "store": "RS Connect",
+      "url": "https://rsconnect.com.br/produtos/dio_distribuidor_interno_optico_vazio_para_24_fibras1/",
+      "details": "DIO 1U 24 FO vazio",
+      "checkedOn": "2026-11-28"
+    },
+    "DIO de 48 FO": {
+      "price": 300.08,
+      "store": "RS Connect",
+      "url": "https://rsconnect.com.br/produtos/dio_distribuidor_interno_optico_vazio_para_48_fibras1/",
+      "details": "DIO 1U 48 FO vazio",
+      "checkedOn": "2026-11-28"
+    },
+    "Atenuador óptico": {
+      "price": 42.75,
+      "store": "Unicaserv",
+      "url": "https://www.unicaserv.com.br/kits-de-produtos/kit-com-2-pecas-atenuador-optico-lc-upc-fixo-10-db",
+      "details": "Fixo 10 dB · pacote com 2",
+      "checkedOn": "2026-11-28"
+    },
+    "ONU GPON bridge": {
+      "price": 52.25,
+      "store": "Unicaserv",
+      "url": "https://www.unicaserv.com.br/onu-gpon-frete-gratis",
+      "details": "ONU GPON Bridge/PPPoE",
+      "checkedOn": "2026-11-28"
+    },
+    "ONT GPON com Wi-Fi": {
+      "price": 253.6,
+      "store": "Isamig Telecom",
+      "url": "https://isamigtelecom.com.br/produtos/ont-gpon-wifi-ac-1200voip-2flex-5un/",
+      "details": "ONT AC1200 2Flex · pacote com 5",
+      "checkedOn": "2026-11-28"
+    },
+    "Transceiver GPON para OLT": {
+      "price": 256.9,
+      "store": "Loja PIVNET",
+      "url": "https://lojapivnet.com.br/produtos/gbic-modulo-gpon-sfp-c-olt-v1600gt-v1600g1-v1600g1-b-v-sol/",
+      "details": "SFP GPON C+ V-SOL",
+      "checkedOn": "2026-11-28"
+    },
+    "Transceiver SFP / SFP+ de uplink": {
+      "price": 70,
+      "store": "Isamig Telecom",
+      "url": "https://isamigtelecom.com.br/produtos/gbic-mult-sfp-1-25g-la-20km-2-flex1/",
+      "details": "SFP 1,25G 20 km",
+      "checkedOn": "2026-11-28"
+    },
+    "Abraçadeira plástica com proteção UV": {
+      "price": 0.13,
+      "store": "Isamig Telecom",
+      "url": "https://isamigtelecom.com.br/produtos/abracadeira-de-nylon-200x48-preta-954-ferramentas-100un-fcst1/",
+      "details": "Nylon preta 200×4,8 mm · pacote com 100",
+      "checkedOn": "2026-11-28"
+    },
+    "Fita isolante": {
+      "price": 0.278,
+      "store": "Unicaserv",
+      "url": "https://www.unicaserv.com.br/ferramentas/ferramentas-de-uso-geral/fita-isolante-20-metros-eda",
+      "details": "PVC 19 mm · rolo de 20 m",
+      "checkedOn": "2026-11-28"
+    },
+    "Fita de autofusão": {
+      "price": 23.56,
+      "store": "Unicaserv",
+      "url": "https://www.unicaserv.com.br/ferramentas/ferramentas-de-uso-geral/fita-de-autofusao-25mm-x-1m-tekbond",
+      "details": "25 mm × 1 m · Tekbond",
+      "checkedOn": "2026-11-28"
+    },
+    "Clivador de fibra": {
+      "price": 187.6,
+      "store": "Isamig Telecom",
+      "url": "https://isamigtelecom.com.br/produtos/clivador-mecanico-para-fibra-optica/",
+      "details": "Clivador mecânico",
+      "checkedOn": "2026-11-28"
+    },
+    "Decapador de fibra": {
+      "price": 36.9,
+      "store": "Loja PIVNET",
+      "url": "https://lojapivnet.com.br/produtos/o-tech-alicate-decapador-de-fibra-optica-drop-verde/",
+      "details": "Alicate decapador cabo drop",
+      "checkedOn": "2026-11-28"
+    },
+    "Máquina de fusão": {
+      "price": 9934.9,
+      "store": "Loja PIVNET",
+      "url": "https://lojapivnet.com.br/produtos/maquina-de-fusao-de-fibra-optica-com-6-motores-vfl-opm-2flex-2f-fmf6m55-gq7c0/",
+      "details": "Máquina de fusão 6 motores 2Flex",
+      "checkedOn": "2026-11-28"
+    },
+    "OTDR": {
+      "price": 4980,
+      "store": "Loja PIVNET",
+      "url": "https://lojapivnet.com.br/produtos/mini-otdr-leitura-fibra-optica-medidor-de-potencia-1550nm-ukdkk/",
+      "details": "Mini OTDR 1550 nm",
+      "checkedOn": "2026-11-28"
+    },
+    "Power meter óptico": {
+      "price": 113.81,
+      "store": "Unicaserv",
+      "url": "https://www.unicaserv.com.br/ferramentas/ferramentas-de-fibra-optica/optical-power-meter-medidor-de-potencia-de-fibra-optica-para-cctv-catv-e-ftth",
+      "details": "Medidor de potência óptica FTTH",
+      "checkedOn": "2026-11-28"
+    },
+    "Identificador visual de falhas": {
+      "price": 65,
+      "store": "Isamig Telecom",
+      "url": "https://isamigtelecom.com.br/produtos/caneta-de-teste-vfl-para-fibra-optica-10mw/",
+      "details": "Caneta laser VFL 10 mW",
+      "checkedOn": "2026-11-28"
+    },
+    "Limpador de conectores ópticos": {
+      "price": 28,
+      "store": "BAP e BAP",
+      "url": "https://bapebap.com.br/produtos/caneta-de-limpeza-de-fibra-optica-vetrofiber/",
+      "details": "Caneta de limpeza 2,5 mm SC",
+      "checkedOn": "2026-11-28"
+    },
+    "Álcool isopropílico": {
+      "price": 71.9,
+      "store": "Loja PIVNET",
+      "url": "https://lojapivnet.com.br/produtos/alcool-isopropilico-transparente-998-1000ml-com-bico-aplicador-implastec/",
+      "details": "99,8% · frasco de 1 L",
+      "checkedOn": "2026-11-28"
     }
   }
 }

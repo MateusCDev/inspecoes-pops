@@ -75,8 +75,8 @@ async function loadOffer([name,store,url,pack,details]){
 async function main(){
   const previous=await loadPrevious(),confirmed={};
   // Agrupa consultas para não sobrecarregar as lojas.
-  for(let start=0;start<sources.length;start+=5){
-    const results=await Promise.all(sources.slice(start,start+5).map(loadOffer));
+  for(let start=0;start<sources.length;start+=8){
+    const results=await Promise.all(sources.slice(start,start+8).map(loadOffer));
     for(const offer of results){
       if(offer&&!confirmed[offer[0]])confirmed[offer[0]]=offer[1];
     }

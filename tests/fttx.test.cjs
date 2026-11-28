@@ -255,3 +255,40 @@ test('importa KML com cabos por bitola, postes, CTOs comuns/ponta, CEO e CEP',()
   assert.equal(parsed.ceo,1);
   assert.equal(parsed.cep,1);
 });
+
+test('calcula alças pré-formadas automaticamente na construção, aceita ajuste manual e resolve referências de CTO/plaqueta',()=>{
+  const ctx=model();
+  const auto=ctx.calculateFttx({
+    cables:{12:{meters:800,cto:3,endCto:1},24:{meters:500,ceo:2}},
+    poles:26,ctoPoles:4,extraEyelets:2
+  });
+  const qty=res=>name=>res.groups.flatMap(g=>g.items).find(i=>i[0]===name)?.[2];
+  // 12 FO (dominante): 2*3 + 1 + 2 (pontas) + 2*2 (olhais extras) = 13; 24 FO: 2*2 + 2 = 6
+  assert.equal(qty(auto)('Alça pré-formada para cabo de 06 a 12 FO'),13);
+  assert.equal(qty(auto)('Alça pré-formada para cabo de 24 FO'),6);
+
+  // Sobrescrita manual prevalece (inclusive 0 explícito)
+  const manual=ctx.calculateFttx({
+    cables:{12:{meters:800,cto:3}},poles:20,ctoPoles:3,loopSmall:'20'
+  });
+  assert.equal(qty(manual)('Alça pré-formada para cabo de 06 a 12 FO'),20);
+
+  // Desativando automático sem preencher gera aviso não bloqueante
+  const noLoops=ctx.calculateFttx({cables:{12:{meters:500}},poles:10,autoLoops:false});
+  assert.equal(qty(noLoops)('Alça pré-formada para cabo de 06 a 12 FO'),undefined);
+  assert.equal(noLoops.alerts.length,0);
+  assert.ok(noLoops.warnings.some(w=>/Nenhuma alça pré-formada/.test(w.text)));
+
+  // Referências de plaquetas e CTO montada vs vazia
+  vm.runInContext(`fttxReferences={
+    'Plaqueta de identificação do cabo':{price:1.33,store:'Loja'},
+    'CTO':{price:96.9,store:'Loja'},
+    'CTO 1:16 (16 portas)':{price:131.91,store:'Loja'}
+  }; fttxDraft={ctoAssembly:'montada'};`,ctx);
+  assert.equal(ctx.fttxEstimate('Plaqueta de CTO',2).unit,1.33);
+  assert.equal(ctx.fttxEstimate('Plaqueta de caixa de emenda',1).unit,1.33);
+  assert.equal(ctx.fttxEstimate('CTO 1:16 (16 portas)',1).unit,131.91);
+  vm.runInContext("fttxDraft={ctoAssembly:'vazia'};",ctx);
+  assert.equal(ctx.fttxEstimate('CTO 1:16 (16 portas)',1).unit,96.9);
+  assert.equal(ctx.fttxEstimate('CTO 1:8 (8 portas)',1).unit,96.9);
+});

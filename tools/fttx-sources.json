@@ -1,31 +1,223 @@
 [
+  ["Cabo óptico 06 FO", "RS Connect", "https://rsconnect.com.br/produtos/cabo_de_fibra_optica_asu80_6fo_bobina_3km/", 3000, "ASU80 · bobina de 3.000 m"],
   ["Cabo óptico 06 FO", "Unicaserv", "https://www.unicaserv.com.br/cabos/cabos-optico/500-metros-de-cabo-optico-cfoa-asu80-6fo-2-flex", 500, "ASU80 · lote de 500 m"],
-  ["Cabo óptico 06 FO", "Unicaserv", "https://www.unicaserv.com.br/cabos/cabos-optico/500-metros-cabo-optico-speed-star-cfoa-asu80-06fo-transcend", 500, "ASU80 · lote de 500 m"],
+  ["Cabo óptico 06 FO", "Noxcom", "https://noxcom.com.br/produto/cabo-optico-asu80-6fo-3km-cfoa-sm-asu80-s-6fo-nr/", 3000, "ASU80 · bobina de 3.000 m"],
+
   ["Cabo óptico 12 FO", "BaixadaNet Telecom", "https://baixadanet.com/produto/cabo-optico-speed-star-transcend-asu80-tubo-unico-12fo-advantage-mt", 1, "ASU80 · preço por metro"],
+  ["Cabo óptico 12 FO", "Unicaserv", "https://www.unicaserv.com.br/cabos/cabos-optico/rolo-com-250-metros-cabo-fibra-otica-auto-sustentado-asu-80m-12fo-fiberhome", 250, "ASU80 · rolo de 250 m"],
+
+  ["Cabo óptico 24 FO", "BaixadaNet Telecom", "https://baixadanet.com/produto/cabo-optico-outdoor-as80-24fo-sumec-metro", 1, "AS80 · preço por metro"],
   ["Cabo óptico 24 FO", "BaixadaNet Telecom", "https://baixadanet.com/produto/cabo-optico-outdoor-as80-24fo-ht-metro", 1, "AS80 · preço por metro"],
+  ["Cabo óptico 24 FO", "BaixadaNet Telecom", "https://baixadanet.com/produto/cabo-optico-outdoor-as80-24fo-3km-fiberhome", 3000, "AS80 · bobina de 3.000 m"],
+  ["Cabo óptico 24 FO", "Solução Cabos", "https://www.solucaocabos.com.br/cabo-fibra-optica-monomodo-as80-s-24fo-200-metros/p", 200, "AS80-S · lote de 200 m"],
+
+  ["Cabo óptico 36 FO", "BaixadaNet Telecom", "https://baixadanet.com/produto/cabo-optico-speed-star-transcend-as80-nucleo-seco-36fo", 1, "AS80 núcleo seco · preço por metro"],
   ["Cabo óptico 36 FO", "BaixadaNet Telecom", "https://baixadanet.com/produto/cabo-optico-outdoor-as80-36fo-3km-intelbras", 3000, "AS80 · bobina de 3.000 m"],
-  ["Alça pré-formada para cabo de 36 FO", "BaixadaNet Telecom", "https://baixadanet.com/produto/alca-pre-formada-cabo-optico-36fo-108mm-a-116mm-verde", 1, "Para cabos de 10,8 a 11,6 mm"],
-  ["Suporte para BAP", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/suporte-p-bap-m12-kit-10un/", 10, "M12 · pacote com 10"],
-  ["Parafuso", "Power Network Store", "https://www.powernetworkstore.com.br/redes-opticas/ferragens-e-ancoragem/parafuso-m12-x-35", 10, "M12 × 35 · pacote com 10"],
-  ["Fecho de aço 3/4″", "Power Network Store", "https://www.powernetworkstore.com.br/redes-opticas/ferragens-e-ancoragem/fecho-de-aco-para-fita-de-aco-34-100un", 100, "3/4″ · pacote com 100"],
-  ["Fita de aço 3/4″", "Power Network Store", "https://www.powernetworkstore.com.br/redes-opticas/ferragens-e-ancoragem/fita-de-aco-galvanizado-34-x-0-5cm-25m", 25, "Galvanizada 3/4″ · rolo de 25 m"],
+  ["Cabo óptico 36 FO", "Amatel", "https://amatel.com.br/produto/cabo-optico-speed-star-as80-36fo-4km-3886", 4000, "AS80 · bobina de 4.000 m"],
+
+  ["Cabo óptico 48 FO", "BaixadaNet Telecom", "https://baixadanet.com/produto/cabo-optico-outdoor-as80-48fo-sumec-metro", 1, "AS80 · preço por metro"],
+  ["Cabo óptico 48 FO", "BaixadaNet Telecom", "https://baixadanet.com/produto/cabo-optico-outdoor-asu80-48fo-3km-next", 3000, "ASU80 · bobina de 3.000 m"],
+
+  ["Cabo óptico 72 FO", "BaixadaNet Telecom", "https://baixadanet.com/produto/cabo-optico-outdoor-as80-72fo-sumec-metro", 1, "AS80 · preço por metro"],
+  ["Cabo óptico 72 FO", "BaixadaNet Telecom", "https://baixadanet.com/produto/cabo-optico-outdoor-as80-72fo-metro-intelbras", 1, "AS80 Intelbras · preço por metro"],
+
+  ["Cabo drop óptico 1 FO", "BaixadaNet Telecom", "https://baixadanet.com/produto/cabo-optico-outdoor-drop-flat-1fo-1km-2flex", 1000, "Drop flat 1 FO · bobina de 1.000 m"],
+  ["Cabo drop óptico 1 FO", "BaixadaNet Telecom", "https://baixadanet.com/produto/cabo-optico-outdoor-drop-1fo-1km-transcend", 1000, "Drop 1 FO · bobina de 1.000 m"],
+  ["Cabo drop óptico 1 FO", "RS Connect", "https://rsconnect.com.br/produtos/cabo_fibra_optica_drop_flat_1fo_ftth_1000_metros/", 1000, "Drop flat 1 FO · bobina de 1.000 m"],
+  ["Cabo drop óptico 1 FO", "Unicaserv", "https://www.unicaserv.com.br/cabos/cabos-optico/500-metros-cabo-optico-mini-drop-flat-01fo-venda-por-metro", 500, "Mini drop flat 1 FO · lote de 500 m"],
+
+  ["Cabo drop óptico 2 FO", "RS Connect", "https://rsconnect.com.br/produtos/cabo_fibra_optica_drop_flat_ftth_2fo_indooroutdoor/", 1000, "Drop flat 2 FO · bobina de 1.000 m"],
+  ["Cabo drop óptico 2 FO", "BaixadaNet Telecom", "https://baixadanet.com/produto/cabo-optico-outdoor-drop-2fo-transcend-1km", 1000, "Drop 2 FO · bobina de 1.000 m"],
+
+  ["Alça pré-formada para cabo de 06 a 12 FO", "BaixadaNet Telecom", "https://baixadanet.com/produto/alca-pre-formada-cabo-optico-12fo-64mm-a-74mm-branca", 1, "6,4 a 7,4 mm (branca · 06 a 12 FO)"],
+  ["Alça pré-formada para cabo de 06 a 12 FO", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/100-un-alca-mini-ra-2-a-12-fo-6-4-7-4-branca/", 100, "6,4 a 7,4 mm (2 a 12 FO) · pacote com 100"],
+  ["Alça pré-formada para cabo de 06 a 12 FO", "Unicaserv", "https://www.unicaserv.com.br/aaf6874-alca-pre-formada-6-40-7-40-mm", 1, "6,4 a 7,4 mm · aço galvanizado"],
+
+  ["Alça pré-formada para cabo de 24 FO", "BaixadaNet Telecom", "https://baixadanet.com/produto/alca-pre-formada-cabo-optico-24fo-94mm-a-101mm-roxa", 1, "9,4 a 10,1 mm (roxa · 24 FO)"],
+  ["Alça pré-formada para cabo de 24 FO", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/alca-preformada-94-a-101mm-purpura-kit10un/", 10, "9,4 a 10,1 mm (púrpura) · pacote com 10"],
+
+  ["Alça pré-formada para cabo de 36 FO", "BaixadaNet Telecom", "https://baixadanet.com/produto/alca-pre-formada-cabo-optico-36fo-108mm-a-116mm-verde", 1, "10,8 a 11,6 mm (verde · 36 FO)"],
+  ["Alça pré-formada para cabo de 36 FO", "Unicaserv", "https://www.unicaserv.com.br/alca-preformada-amarracao-final-cabo-cce-apl-asf-10-8-11-6mm-p-fibra-as80", 1, "10,8 a 11,6 mm · AS80"],
+
+  ["Alça pré-formada para cabo de 48 FO", "Unicaserv", "https://www.unicaserv.com.br/rede-externa/alcas-pre-formadas/alca-pre-formada-para-cabo-cce-apl-asf-12-40-a-13-50mm-laranja", 1, "12,4 a 13,5 mm (laranja · AS80 48/72 FO)"],
+  ["Alça pré-formada para cabo de 48 FO", "Unicaserv", "https://www.unicaserv.com.br/alca-preformada-amarracao-final-cabo-cce-apl-asf-10-8-11-6mm-p-fibra-as80", 1, "10,8 a 11,6 mm · AS80"],
+
+  ["Alça pré-formada para cabo de 72 FO", "BaixadaNet Telecom", "https://baixadanet.com/produto/alca-pre-formada-cabo-optico-72fo-124mm-a-135mm-laranja", 1, "12,4 a 13,5 mm (laranja · 72 FO)"],
+  ["Alça pré-formada para cabo de 72 FO", "Unicaserv", "https://www.unicaserv.com.br/rede-externa/alcas-pre-formadas/alca-pre-formada-para-cabo-cce-apl-asf-12-40-a-13-50mm-laranja", 1, "12,4 a 13,5 mm (laranja · aço galvanizado)"],
+
+  ["Alça pré-formada para drop", "BaixadaNet Telecom", "https://baixadanet.com/produto/alca-pre-formada-fio-fe-cabo-drop-100mm-160mm", 1, "Para cabo drop / fio FE"],
+  ["Alça pré-formada para drop", "RS Connect", "https://rsconnect.com.br/produtos/alca_preformada_para_drop_fio_fe_80100160_longa1/", 1, "Para cabo drop longa"],
+  ["Alça pré-formada para drop", "Unicaserv", "https://www.unicaserv.com.br/alca-pre-formada-p-cabo-drop-arame-1-3mm-a-1-5mm", 1, "Drop com mensageiro 1,3 a 1,5 mm"],
+
   ["Alça pré-formada para cordoalha", "Power Network Store", "https://www.powernetworkstore.com.br/redes-opticas/ferragens-e-ancoragem/alca-preformada-para-cordoalha-4-8mm", 100, "Cordoalha de aço 4,8 mm · pacote com 100"],
+  ["Alça pré-formada para cordoalha", "Unicaserv", "https://www.unicaserv.com.br/alca-preformada-p-cordoalha-de-aco-316-ou-4-8mm", 1, "Cordoalha de aço 3/16″ (4,8 mm)"],
+
+  ["Olhal reto M12", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/porca-olhal-m12-kit-10un/", 10, "Porca olhal M12 · pacote com 10"],
+  ["Olhal reto M12", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/porca-olhal-m12-kit-5un/", 5, "Porca olhal M12 · pacote com 5"],
+
+  ["Parafuso", "Power Network Store", "https://www.powernetworkstore.com.br/redes-opticas/ferragens-e-ancoragem/parafuso-m12-x-35", 10, "M12 × 35 · pacote com 10"],
+  ["Suporte para BAP", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/suporte-p-bap-m12-kit-10un/", 10, "M12 · pacote com 10"],
   ["Suporte dielétrico", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/10-un-suporte-dieletrico-conico-duplo-8-mm-p-bap/", 10, "Cônico duplo de 8 mm para BAP · pacote com 10"],
+
+  ["Abraçadeira BAP", "BAP e BAP", "https://bapebap.com.br/produtos/conjunto-bap-2-fp-1mm-10-unidades-completo/", 10, "Conjunto BAP 2 completo · pacote com 10"],
+  ["Abraçadeira BAP", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/20-bracadeira-bap-3/", 20, "Braçadeira BAP 3 · pacote com 20"],
   ["Abraçadeira BAP", "Next Cable", "https://loja.nextcable.com.br/abracadeira-bap-para-poste-galvanizado-a-frio", 1, "Galvanizada a frio"],
+
+  ["Anel guia AGFE", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/100-un-anel-guia-agfe/", 100, "AGFE galvanizado · pacote com 100"],
+  ["Anel guia AGFE", "Unicaserv", "https://www.unicaserv.com.br/agfe", 1, "AGFE galvanizado a fogo"],
+
+  ["Fita de aço 3/4″", "Power Network Store", "https://www.powernetworkstore.com.br/redes-opticas/ferragens-e-ancoragem/fita-de-aco-galvanizado-34-x-0-5cm-25m", 25, "Galvanizada 3/4″ · rolo de 25 m"],
+  ["Fecho de aço 3/4″", "Power Network Store", "https://www.powernetworkstore.com.br/redes-opticas/ferragens-e-ancoragem/fecho-de-aco-para-fita-de-aco-34-100un", 100, "3/4″ · pacote com 100"],
+
+  ["Plaqueta de identificação do cabo", "Unicaserv", "https://www.unicaserv.com.br/pi-plaqueta-de-identificacao-3mm-9x4cm-em-plastico-c-relevo-amarela", 1, "Plaqueta 9×4 cm amarela relevo UV"],
+  ["Plaqueta de identificação do cabo", "BaixadaNet Telecom", "https://baixadanet.com/produto/plaqueta-identificacao-fibra-optica", 1, "Plaqueta de identificação fibra óptica"],
+
+  ["Conjunto de reserva técnica para caixa de emenda", "Unicaserv", "https://www.unicaserv.com.br/suporte-reserva-tecnica-cruzeta-550mm-aba-80-chapa-18", 1, "Suporte cruzeta Optiloop 550 mm"],
+  ["Suporte de reserva técnica para poste", "Unicaserv", "https://www.unicaserv.com.br/suporte-reserva-tecnica-cruzeta-550mm-aba-80-chapa-18", 1, "Suporte cruzeta Optiloop 550 mm"],
+
+  ["Cordoalha", "Unicaserv", "https://www.unicaserv.com.br/cabos/cordoalha-de-aco-3-fios-316-4-8-mm-rolo-250-mt", 250, "Aço 3/16″ (4,8 mm) · rolo de 250 m"],
   ["Cordoalha", "Next Cable", "https://loja.nextcable.com.br/cabo-cordoalha-47mm-rolo-500-metros-ftth-fibra-optica", 500, "4,7 mm · rolo de 500 m"],
+
+  ["Cordoalha dielétrica", "RS Connect", "https://rsconnect.com.br/produtos/cordoalha_dieletrica_de_64mm_rolo_com_500_metros/", 500, "Dielétrica 6,4 mm · rolo de 500 m"],
   ["Cordoalha dielétrica", "Next Cable", "https://loja.nextcable.com.br/cordoalha-dieletrica-rolo-1000-metros-47mm-p-vao-de-50m-preto", 1000, "4,7 mm · rolo de 1.000 m"],
-  ["CEO", "Unicaserv", "https://www.unicaserv.com.br/fibras-opticas/dios-e-caixas-de-emenda/ceo-caixa-de-emenda-optica-24-fibras-aereasubterranea-2-flex", 1, "Caixa de emenda de 24 FO"],
+
+  ["Bandeja de caixa de emenda", "Loja PIVNET", "https://lojapivnet.com.br/produtos/bandeja-para-caixa-de-emenda-optica-24fo-252mm-10968-zybl6/", 1, "Bandeja CEO 24 FO"],
+  ["Bandeja de caixa de emenda", "BaixadaNet Telecom", "https://baixadanet.com/produto/bandeja-para-caixa-de-emenda-mini-ceo-ate-72fo", 1, "Bandeja para mini CEO até 72 FO"],
+
+  ["Tubete protetor de emenda", "BAP e BAP", "https://bapebap.com.br/produtos/protetor-de-fusao-tubete-60mm-2f-ftub60-100x1/", 100, "Tubete 60 mm 2Flex · pacote com 100"],
+  ["Tubete protetor de emenda", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/100-un-protetor-de-emenda-45-mm-fibra-optica/", 100, "Tubete 45 mm · pacote com 100"],
+  ["Tubete protetor de emenda", "Loja PIVNET", "https://lojapivnet.com.br/produtos/protetor-de-fusao-de-fibra-optica-tubete-60mm-2f-ftub60-2flex/", 1, "Tubete 60 mm 2Flex · avulso"],
+
+  ["Manta para CEO", "Unicaserv", "https://www.unicaserv.com.br/kit-de-derivacao-com-manta-oval-e-circular-termocontratil-ceo-kit-c-flx0003", 1, "Kit derivação manta termocontrátil CEO"],
+  ["Manta para CEO", "Unicaserv", "https://www.unicaserv.com.br/kit-de-derivacao-com-manta-ziper-termocontratil-ceo-kit-b-flx0002", 1, "Kit derivação manta oval zíper CEO"],
+
   ["CTO", "Loja PIVNET", "https://lojapivnet.com.br/produtos/caixa-de-atendimento-cto-1x16-vazia-duas-travas-e-chave-preta-bencabos/", 1, "CTO de 16 portas, vazia"],
   ["CTO", "BAP e BAP", "https://bapebap.com.br/produtos/caixa-cto-16-portas-vazia-preto/", 1, "CTO de 16 portas, vazia"],
+
+  ["CTO 1:8 (8 portas)", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/caixa-de-atendimento-optico-cto-1x8-sc-apc-completa/", 1, "CTO 1:8 completa SC/APC"],
+  ["CTO 1:8 (8 portas)", "Loja PIVNET", "https://lojapivnet.com.br/produtos/kit-1-unidade-caixa-de-atendimento-cto-1x16-com-splitter-1x8-sc-apc-bencabos/", 1, "CTO equipada com splitter 1:8 SC/APC"],
+
+  ["CTO 1:16 (16 portas)", "RS Connect", "https://rsconnect.com.br/produtos/caixa_terminacao_optica_cto_com_splitter_1x16_scapc_2_travas/", 1, "CTO equipada com splitter 1:16 SC/APC"],
+  ["CTO 1:16 (16 portas)", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/cto-16c-completa-1x16-apc-2flex/", 1, "CTO 1:16 completa SC/APC 2Flex"],
+
+  ["CEO", "Unicaserv", "https://www.unicaserv.com.br/fibras-opticas/dios-e-caixas-de-emenda/ceo-caixa-de-emenda-optica-24-fibras-aereasubterranea-2-flex", 1, "Caixa de emenda de 24 FO"],
+  ["CEO 24 FO", "Unicaserv", "https://www.unicaserv.com.br/fibras-opticas/dios-e-caixas-de-emenda/ceo-caixa-de-emenda-optica-24-fibras-aereasubterranea-2-flex", 1, "Caixa de emenda de 24 FO"],
+  ["CEO 24 FO", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/caixa-de-emenda-24-a-96-fibras-dual-fibracem/", 1, "CEO 24 a 96 FO Fibracem"],
+
+  ["CEO 48 FO", "Unicaserv", "https://www.unicaserv.com.br/fibras-opticas/dios-e-caixas-de-emenda/caixa-de-emenda-optica-48fo-termocontratil-aerea-subterranea", 1, "CEO 48 FO termocontrátil"],
+  ["CEO 72 FO", "BaixadaNet Telecom", "https://baixadanet.com/produto/caixa-outdoor-de-emenda-de-fibra-12fo-termo-mini-ceo-ate-72fo", 1, "Mini CEO até 72 FO termocontrátil"],
+  ["CEO 144 FO", "BaixadaNet Telecom", "https://baixadanet.com/produto/caixa-outdoor-de-emenda-de-fibra-144fo-svm-mecanica", 1, "CEO 144 FO vedação mecânica"],
+
+  ["Splitter 1:2 conectorizado SC/APC", "BAP e BAP", "https://bapebap.com.br/produtos/splitter-1x2-sc-apc-vetrofiber/", 1, "PLC 1:2 conectorizado SC/APC"],
+  ["Splitter 1:2 conectorizado SC/APC", "Loja PIVNET", "https://lojapivnet.com.br/produtos/splitter-optico-1x2-plc-com-conector-sc-apc-sm-bencabos/", 1, "PLC 1:2 conectorizado SC/APC"],
+
+  ["Splitter 1:4 conectorizado SC/APC", "BAP e BAP", "https://bapebap.com.br/produtos/splitter-1x4-sc-apc-vetrofiber/", 1, "PLC 1:4 conectorizado SC/APC"],
+  ["Splitter 1:4 conectorizado SC/APC", "RS Connect", "https://rsconnect.com.br/produtos/splitter_optico_1x4_scapc/", 1, "PLC 1:4 conectorizado SC/APC"],
+
+  ["Splitter 1:8 conectorizado SC/APC", "Loja PIVNET", "https://lojapivnet.com.br/produtos/splitter-optico-1x8-balanceado-com-conector-sc-apc-2f-fsplit-x8-sc-apc-2flex/", 1, "PLC 1:8 conectorizado SC/APC 2Flex"],
+  ["Splitter 1:8 conectorizado SC/APC", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/splitter-1x8-sc-apc-0-9mm-homologado-100un/", 100, "PLC 1:8 SC/APC · lote com 100"],
+
+  ["Splitter 1:16 conectorizado SC/APC", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/splitter-1x16-sc-apc-0-9mm1/", 1, "PLC 1:16 conectorizado SC/APC"],
+  ["Splitter 1:32 conectorizado SC/APC", "Loja PIVNET", "https://lojapivnet.com.br/produtos/splitter-optico-1x32-plc-com-conector-sc-apc-sm-xfs1322-intelbras/", 1, "PLC 1:32 conectorizado SC/APC Intelbras"],
+
   ["Splitter 1:2", "Loja PIVNET", "https://lojapivnet.com.br/produtos/splitter-optico-1x2-balanceado-sem-conector-2f-fsplit-x2-2flex/", 1, "Balanceado, sem conector"],
+  ["Splitter 1:2 sem conector", "Loja PIVNET", "https://lojapivnet.com.br/produtos/splitter-optico-1x2-balanceado-sem-conector-2f-fsplit-x2-2flex/", 1, "Balanceado, sem conector"],
+  ["Splitter 1:2 sem conector", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/splitter-optico-1x2-sem-conector-anatel-fibracom/", 1, "PLC 1:2 sem conector"],
+
+  ["Splitter 1:4 sem conector", "Loja PIVNET", "https://lojapivnet.com.br/produtos/splitter-optico-1x4-plc-sem-conector-sm-o-tech/", 1, "PLC 1:4 sem conector"],
+  ["Splitter 1:4 sem conector", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/splitter-1x4-desconectorizado1/", 1, "PLC 1:4 sem conector"],
+
   ["Splitter 1:8", "Loja PIVNET", "https://lojapivnet.com.br/produtos/splitter-optico-1x8-plc-sem-conector-2f-fsplit-x8-10196-1dfvj/", 1, "PLC, sem conector"],
+  ["Splitter 1:8 sem conector", "Loja PIVNET", "https://lojapivnet.com.br/produtos/splitter-optico-1x8-plc-sem-conector-2f-fsplit-x8-10196-1dfvj/", 1, "PLC 1:8 sem conector"],
+  ["Splitter 1:8 sem conector", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/splitter-optico-1x8-sem-conector-anatel-fibracom/", 1, "PLC 1:8 sem conector"],
+
   ["Splitter 1:16", "Loja PIVNET", "https://lojapivnet.com.br/produtos/splitter-optico-1x16-plc-sem-conector-o-tech/", 1, "PLC, sem conector"],
-  ["OLT GPON", "Loja PIVNET", "https://lojapivnet.com.br/produtos/olt-gpon-pon-4-portas-pon-v1600gt-v-sol1/", 1, "V-SOL V1600GT · 4 portas PON"],
-  ["ONT GPON com Wi-Fi", "Loja PIVNET", "https://lojapivnet.com.br/produtos/ont-v2804ac-z-ac1200-4-portas-giga-easymesh-v-sol/", 1, "V-SOL V2804AC-Z · AC1200"],
+  ["Splitter 1:16 sem conector", "Loja PIVNET", "https://lojapivnet.com.br/produtos/splitter-optico-1x16-plc-sem-conector-o-tech/", 1, "PLC 1:16 sem conector"],
+  ["Splitter 1:16 sem conector", "BaixadaNet Telecom", "https://baixadanet.com/produto/splitter-fibra-nua-1x16-sem-conector", 1, "PLC 1:16 fibra nua sem conector"],
+
+  ["Splitter 1:32 sem conector", "Loja PIVNET", "https://lojapivnet.com.br/produtos/splitter-optico-1x32-plc-sem-conector-xfs1320-intelbras/", 1, "PLC 1:32 sem conector Intelbras"],
+
+  ["Splitter desbalanceado 5/95 sem conector", "RS Connect", "https://rsconnect.com.br/produtos/splitter_1x2_desbalanceado_595_desconectorizado/", 1, "FBT 5/95 sem conector"],
+  ["Splitter desbalanceado 5/95 sem conector", "Loja PIVNET", "https://lojapivnet.com.br/produtos/splitter-optico-1x2-desbalanceado-05-95-plc-sem-conector/", 1, "5/95 sem conector"],
+  ["Splitter desbalanceado 5/95 sem conector", "Unicaserv", "https://www.unicaserv.com.br/fibras-opticas/splitters/divisor-optico-passivo-splitter-1x2-sconectores-desbalanceado-5-95", 1, "5/95 sem conector"],
+
+  ["Splitter desbalanceado 10/90 sem conector", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/splitter-desbalanceado-1x2-10-90-s-conec/", 1, "10/90 sem conector"],
+  ["Splitter desbalanceado 10/90 sem conector", "Loja PIVNET", "https://lojapivnet.com.br/produtos/splitter-optico-1x2-desbalanceado-10-90-plc-sem-conector/", 1, "10/90 sem conector"],
+  ["Splitter desbalanceado 10/90 sem conector", "Unicaserv", "https://www.unicaserv.com.br/fibras-opticas/splitters/divisor-optico-passivo-splitter-1x2-sconectores-desbalanceado-10-90", 1, "10/90 sem conector"],
+
+  ["Splitter desbalanceado 15/85 sem conector", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/splitter-desbalanceado-1x2-15-85-s-conec1/", 1, "15/85 sem conector"],
+  ["Splitter desbalanceado 15/85 sem conector", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/2-un-splitter-desbalanceado-1x2-15-85-s-conec1/", 2, "15/85 sem conector · pacote com 2"],
+
+  ["Splitter desbalanceado 20/80 sem conector", "RS Connect", "https://rsconnect.com.br/produtos/splitter_1x2_desbalanceado_2080_desconectorizado/", 1, "20/80 sem conector"],
+  ["Splitter desbalanceado 20/80 sem conector", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/splitter-desbalanceado-1x2-20-80-s-conec-100un/", 100, "20/80 sem conector · lote com 100"],
+
+  ["Splitter desbalanceado 30/70 sem conector", "Unicaserv", "https://www.unicaserv.com.br/fibras-opticas/splitters/divisor-optico-passivo-splitter-1x2-sconversor-desbalanceado-30-70", 1, "30/70 sem conector"],
+  ["Splitter desbalanceado 30/70 sem conector", "Loja PIVNET", "https://lojapivnet.com.br/produtos/splitter-optico-1x2-desbalanceado-30-70-plc-sem-conector/", 1, "30/70 sem conector"],
+
+  ["Splitter desbalanceado 40/60 sem conector", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/splitter-desbalanceado-1x2-40-60-s-conec1/", 1, "40/60 sem conector"],
+  ["Splitter desbalanceado 40/60 sem conector", "Loja PIVNET", "https://lojapivnet.com.br/produtos/splitter-optico-1x2-desbalanceado-40-60-plc-sem-conector/", 1, "40/60 sem conector"],
+
+  ["Splitter desbalanceado 50/50 sem conector", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/splitter-balanceado-1x2-s-conector-50-50-50un/", 50, "50/50 sem conector · pacote com 50"],
+
+  ["Splitter desbalanceado 5/95 conectorizado SC/APC", "RS Connect", "https://rsconnect.com.br/produtos/splitter_1x2_desbalanceado_595_scapc/", 1, "5/95 conectorizado SC/APC"],
+  ["Splitter desbalanceado 10/90 conectorizado SC/APC", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/splitter-1x2-sc-apc-10-90-0-9mm-conectorizado1/", 1, "10/90 conectorizado SC/APC"],
+  ["Splitter desbalanceado 10/90 conectorizado SC/APC", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/splitter-1x2-sc-apc-10-90-0-9mm-conectorizado-kit-10un/", 10, "10/90 conectorizado SC/APC · pacote com 10"],
+  ["Splitter desbalanceado 20/80 conectorizado SC/APC", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/splitter-1x2-sc-apc-20-80-0-9mm-conectorizado1/", 1, "20/80 conectorizado SC/APC"],
+  ["Splitter desbalanceado 20/80 conectorizado SC/APC", "Loja PIVNET", "https://lojapivnet.com.br/produtos/splitter-optico-1x2-fbt-desbalanceado-20-80-com-conector-2flex-18uyi/", 1, "20/80 conectorizado SC/APC 2Flex"],
+  ["Splitter desbalanceado 20/80 conectorizado SC/APC", "RS Connect", "https://rsconnect.com.br/produtos/splitter_1x2_desbalanceado_2080_scapc/", 1, "20/80 conectorizado SC/APC"],
+  ["Splitter desbalanceado 30/70 conectorizado SC/APC", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/splitter-1x2-sc-apc-30-70-0-9mm-conectorizado1/", 1, "30/70 conectorizado SC/APC"],
+  ["Splitter desbalanceado 40/60 conectorizado SC/APC", "RS Connect", "https://rsconnect.com.br/produtos/splitter_1x2_desbalanceado_4060_scapc/", 1, "40/60 conectorizado SC/APC"],
+  ["Splitter desbalanceado 50/50 conectorizado SC/APC", "RS Connect", "https://rsconnect.com.br/produtos/splitter_1x2_desbalanceado_5050_scapc/", 1, "50/50 conectorizado SC/APC"],
+  ["Splitter desbalanceado 50/50 conectorizado SC/APC", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/splitter-1x2-sc-apc-50-50-0-9mm-conectorizado-fast-wi-20un/", 20, "50/50 conectorizado SC/APC · pacote com 20"],
+
+  ["Adaptador SC/APC", "Loja PIVNET", "https://lojapivnet.com.br/produtos/acoplador-optico-sc-apc-monomodo-simplex-verde-2f-fadt-sc-apc-2flex-10245/", 1, "Simplex verde SC/APC 2Flex"],
+  ["Adaptador SC/APC", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/50-un-acoplador-optico-simplex-sc-apc1/", 50, "Simplex SC/APC · pacote com 50"],
+  ["Adaptador SC/UPC", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/acoplador-optico-simplex-sc-upc-kit-100un/", 100, "Simplex SC/UPC · pacote com 100"],
+
+  ["Pigtail SC/APC", "RS Connect", "https://rsconnect.com.br/produtos/pigtail_fibra_optica_12_fibras_scapc/", 12, "Pigtail SC/APC · conjunto com 12"],
+  ["Pigtail SC/APC", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/12-un-pigtail-cores-sm-sc-apc-1-5m/", 12, "Pigtail 1,5 m SC/APC · pacote com 12"],
+  ["Cordão óptico SC/APC", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/cordao-optico-simplex-sc-apc-sc-apc-5m1/", 1, "Simplex SC/APC-SC/APC 5 m"],
+
   ["Conector de montagem em campo SC/APC", "Loja PIVNET", "https://lojapivnet.com.br/produtos/conector-de-campo-optico-click-apc-3-posicoes-2flex-2f-fcon-sc-apc-n-14b64/", 1, "SC/APC · 2Flex"],
-  ["Cabo óptico 06 FO", "RS Connect", "https://rsconnect.com.br/produtos/cabo_de_fibra_optica_asu80_6fo_bobina_3km/", 3000, "ASU80 · bobina de 3.000 m"],
-  ["Cabo óptico 06 FO", "Noxcom", "https://noxcom.com.br/produto/cabo-optico-asu80-6fo-3km-cfoa-sm-asu80-s-6fo-nr/", 3000, "ASU80 · bobina de 3.000 m"],
-  ["Cabo óptico 24 FO", "Solução Cabos", "https://www.solucaocabos.com.br/cabo-fibra-optica-monomodo-as80-s-24fo-200-metros/p", 200, "AS80-S · lote de 200 m"],
-  ["Cabo óptico 24 FO", "Baixada Net", "https://baixadanet.lojavirtualnuvem.com.br/produtos/cabo-optico-outdoor-as80-24fo-ht-metro/", 1, "AS80 · preço por metro"],
-  ["Cabo óptico 36 FO", "Amatel", "https://amatel.com.br/produto/cabo-optico-speed-star-as80-36fo-4km-3886", 4000, "AS80 · bobina de 4.000 m"]
+  ["Conector de montagem em campo SC/UPC", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/conector-fast-rapido-fibra-optica-azul-sc-upc-kit-com-100/", 100, "Fast SC/UPC · pacote com 100"],
+
+  ["Roseta óptica", "Unicaserv", "https://www.unicaserv.com.br/fibras-opticas/ftth/roseta-pto-para-fibra-optica-ftth-2-fibras-branca", 1, "Roseta PTO 2 fibras branca"],
+  ["Roseta óptica", "RS Connect", "https://rsconnect.com.br/produtos/caixa_de_terminacao_optica_pto_2h_roseta_fibra_optica/", 1, "PTO 2 portas / roseta óptica"],
+  ["PTO de 1 ou 2 portas", "Unicaserv", "https://www.unicaserv.com.br/fibras-opticas/ftth/roseta-pto-para-fibra-optica-ftth-2-fibras-branca", 1, "PTO 2 fibras branca"],
+
+  ["DIO de 12 FO", "Unicaserv", "https://www.unicaserv.com.br/mini-dio-em-aco-com-painel-sc-12-fibras-opticas-preto", 1, "Mini DIO aço 12 FO"],
+  ["DIO de 12 FO", "BaixadaNet Telecom", "https://baixadanet.com/produto/dio-2flex-12fo-distribuidor-interno-optico-sc-apc", 1, "DIO 12 FO SC/APC 2Flex"],
+  ["DIO de 24 FO", "RS Connect", "https://rsconnect.com.br/produtos/dio_distribuidor_interno_optico_vazio_para_24_fibras1/", 1, "DIO 1U 24 FO vazio"],
+  ["DIO de 24 FO", "BAP e BAP", "https://bapebap.com.br/produtos/distribuidor-interno-optico-dio-24-fibras-1u-19-2flex-sc-apc/", 1, "DIO 1U 24 FO SC/APC 2Flex"],
+  ["DIO de 48 FO", "RS Connect", "https://rsconnect.com.br/produtos/dio_distribuidor_interno_optico_vazio_para_48_fibras1/", 1, "DIO 1U 48 FO vazio"],
+  ["DIO de 48 FO", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/dio-dgo-plus-48fo-1u-sc-apc-completo-think1/", 1, "DIO 1U 48 FO SC/APC completo"],
+
+  ["Atenuador óptico", "Unicaserv", "https://www.unicaserv.com.br/kits-de-produtos/kit-com-2-pecas-atenuador-optico-lc-upc-fixo-10-db", 2, "Fixo 10 dB · pacote com 2"],
+
+  ["OLT GPON", "Loja PIVNET", "https://lojapivnet.com.br/produtos/olt-gpon-pon-4-portas-pon-v1600gt-v-sol1/", 1, "V-SOL V1600GT · 4 portas PON"],
+  ["ONU GPON bridge", "Unicaserv", "https://www.unicaserv.com.br/onu-gpon-frete-gratis", 1, "ONU GPON Bridge/PPPoE"],
+  ["ONU GPON bridge", "RS Connect", "https://rsconnect.com.br/produtos/terminal_optico_onu_gpon_rtg110__tiany/", 1, "ONU GPON 1GE"],
+  ["ONT GPON com Wi-Fi", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/ont-gpon-wifi-ac-1200voip-2flex-5un/", 5, "ONT AC1200 2Flex · pacote com 5"],
+  ["ONT GPON com Wi-Fi", "BAP e BAP", "https://bapebap.com.br/produtos/ont-gpon-ax3000-tp-link-modelo-xx530v-v2/", 1, "ONT GPON Wi-Fi 6 AX3000"],
+  ["ONT GPON com Wi-Fi", "Loja PIVNET", "https://lojapivnet.com.br/produtos/ont-v2804ac-z-ac1200-4-portas-giga-easymesh-v-sol/", 1, "V-SOL V2804AC-Z · AC1200"],
+
+  ["Transceiver GPON para OLT", "Loja PIVNET", "https://lojapivnet.com.br/produtos/gbic-modulo-gpon-sfp-c-olt-v1600gt-v1600g1-v1600g1-b-v-sol/", 1, "SFP GPON C+ V-SOL"],
+  ["Transceiver GPON para OLT", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/gbic-gpon-c-olt1/", 1, "SFP GPON C++ OLT"],
+  ["Transceiver SFP / SFP+ de uplink", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/gbic-mult-sfp-1-25g-la-20km-2-flex1/", 1, "SFP 1,25G 20 km"],
+
+  ["Abraçadeira plástica com proteção UV", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/abracadeira-de-nylon-200x48-preta-954-ferramentas-100un-fcst1/", 100, "Nylon preta 200×4,8 mm · pacote com 100"],
+  ["Abraçadeira plástica com proteção UV", "Loja PIVNET", "https://lojapivnet.com.br/produtos/abracadeira-de-nylon-250mm-x-4-5mm-pacote-100und-preto-selfit/", 100, "Nylon preta 250×4,5 mm · pacote com 100"],
+  ["Fita isolante", "Unicaserv", "https://www.unicaserv.com.br/ferramentas/ferramentas-de-uso-geral/fita-isolante-20-metros-eda", 20, "PVC 19 mm · rolo de 20 m"],
+  ["Fita isolante", "BaixadaNet Telecom", "https://baixadanet.com/produto/fita-isolante-pvc-10mts-unidade", 10, "PVC · rolo de 10 m"],
+  ["Fita de autofusão", "Unicaserv", "https://www.unicaserv.com.br/ferramentas/ferramentas-de-uso-geral/fita-de-autofusao-25mm-x-1m-tekbond", 1, "25 mm × 1 m · Tekbond"],
+
+  ["Clivador de fibra", "Unicaserv", "https://www.unicaserv.com.br/clivador-de-precisao-cortador-de-fibra-optica-fc-6s", 1, "Clivador FC-6S"],
+  ["Clivador de fibra", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/clivador-mecanico-para-fibra-optica/", 1, "Clivador mecânico"],
+  ["Decapador de fibra", "Loja PIVNET", "https://lojapivnet.com.br/produtos/o-tech-alicate-decapador-de-fibra-optica-drop-verde/", 1, "Alicate decapador cabo drop"],
+  ["Máquina de fusão", "Loja PIVNET", "https://lojapivnet.com.br/produtos/maquina-de-fusao-de-fibra-optica-com-6-motores-vfl-opm-2flex-2f-fmf6m55-gq7c0/", 1, "Máquina de fusão 6 motores 2Flex"],
+  ["OTDR", "Loja PIVNET", "https://lojapivnet.com.br/produtos/mini-otdr-leitura-fibra-optica-medidor-de-potencia-1550nm-ukdkk/", 1, "Mini OTDR 1550 nm"],
+  ["Power meter óptico", "Unicaserv", "https://www.unicaserv.com.br/ferramentas/ferramentas-de-fibra-optica/optical-power-meter-medidor-de-potencia-de-fibra-optica-para-cctv-catv-e-ftth", 1, "Medidor de potência óptica FTTH"],
+  ["Identificador visual de falhas", "Isamig Telecom", "https://isamigtelecom.com.br/produtos/caneta-de-teste-vfl-para-fibra-optica-10mw/", 1, "Caneta laser VFL 10 mW"],
+  ["Limpador de conectores ópticos", "BAP e BAP", "https://bapebap.com.br/produtos/caneta-de-limpeza-de-fibra-optica-vetrofiber/", 1, "Caneta de limpeza 2,5 mm SC"],
+  ["Álcool isopropílico", "Loja PIVNET", "https://lojapivnet.com.br/produtos/alcool-isopropilico-transparente-998-1000ml-com-bico-aplicador-implastec/", 1, "99,8% · frasco de 1 L"]
 ]

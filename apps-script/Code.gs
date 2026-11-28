@@ -84,7 +84,7 @@ function doPost(e) {
     if(!user)return reply_({ok:false,code:'AUTH',error:'Chave inválida, revogada ou ainda não vinculada a uma pessoa ativa.'});
     requirePrivateData_();
     if(input.version!==1)throw Error('Versão incompatível.');
-    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,accessAdmin:true,reportRefresh:true,assetInventory:true,stationTransceivers:true,assetReconciliation:true,assetComparisonV2:true,assetAdjustments:true,climateOptional:true,actionPlans:true,linkCatalog:true},...(input.includeStations?{stations:stations_()}:{})});
+    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,assetsDashboard:true,accessAdmin:true,reportRefresh:true,assetInventory:true,stationTransceivers:true,assetReconciliation:true,assetComparisonV2:true,assetAdjustments:true,climateOptional:true,actionPlans:true,linkCatalog:true},...(input.includeStations?{stations:stations_()}:{})});
     if(input.action==='linkCatalogLoad'||input.action==='linkCatalogSave')return reply_(linkCatalogRequest_(input,user));
     if(input.action==='fleetLoad'||input.action==='fleetSave')return reply_(fleetRequest_(input,user));
     if(input.action==='users')return reply_(listAccess_(user));
@@ -101,6 +101,7 @@ function doPost(e) {
     if(input.action==='assetIssues')return reply_(assetIssues_(input,user));
     if(input.action==='applyAssetAdjustment')return reply_(applyAssetAdjustment_(input,user));
     if(input.action==='centralBatteryBanks')return reply_(centralBatteryBanks_(user));
+    if(input.action==='assetsDashboard')return reply_(assetsDashboard_(input,user));
     if(input.action==='centralAssetsForInspection')return reply_(centralAssetsForInspection_(input,user));
     if(input.action==='compareInspectionAssets')return reply_(compareInspectionAssets_(input,user));
     if(input.action==='applyAssetDecision')return reply_(applyAssetDecision_(input,user));

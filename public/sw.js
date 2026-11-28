@@ -2,7 +2,7 @@ const BUILD = '__BUILD_ID__';
 const BASE = new URL('./', self.location.href);
 const CACHE_PREFIX = 'voanet-google:'+BASE.pathname+':';
 const CACHE = CACHE_PREFIX+BUILD;
-const FILES = ['index.html','portal.css?v='+BUILD,'inspection-layout.css?v='+BUILD,'fttx-layout.css?v='+BUILD,'portal.js?v='+BUILD,'voanet.png','config.js?v='+BUILD,'inspection-photos.js?v='+BUILD,'google-sync.js?v='+BUILD,'google-features.js?v='+BUILD,'google-pdf.js?v='+BUILD,'google-access.js?v='+BUILD,'fttx-catalog.js?v='+BUILD,'fttx-export.js?v='+BUILD,'fttx.js?v='+BUILD,'fttx-prices.json','entra-client.js','manifest.webmanifest','icon-192.png','icon-512.png'].map(p=>new URL(p,BASE).href);
+const FILES = ['index.html','portal.css?v='+BUILD,'inspection-layout.css?v='+BUILD,'fttx-layout.css?v='+BUILD,'assets-dashboard.css?v='+BUILD,'portal.js?v='+BUILD,'voanet.png','config.js?v='+BUILD,'inspection-photos.js?v='+BUILD,'google-sync.js?v='+BUILD,'google-features.js?v='+BUILD,'google-pdf.js?v='+BUILD,'google-access.js?v='+BUILD,'fttx-catalog.js?v='+BUILD,'fttx-export.js?v='+BUILD,'fttx.js?v='+BUILD,'assets-dashboard.js?v='+BUILD,'fttx-prices.json','entra-client.js','manifest.webmanifest','icon-192.png','icon-512.png'].map(p=>new URL(p,BASE).href);
 const VENDOR_PREFIX = new URL('vendor/',BASE).pathname;
 const STATIC_IMAGES = new Set(['voanet.png','icon-192.png','icon-512.png'].map(p=>new URL(p,BASE).pathname));
 const PATHS = new Set([...FILES, 'vendor/pdf-lib-1.17.1.min.js', 'vendor/exceljs-4.4.0.min.js'].map(url=>new URL(url,BASE).pathname));

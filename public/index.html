@@ -24,7 +24,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.52 system-ui,-ap
 .v22-bat{border:1px solid #dce5ef;border-left:4px solid #4f87be;padding:11px;border-radius:9px;margin:9px 0;background:#fff}
 .v22-small{font-size:12px;color:#52657b}
 .v22-alert{border-color:#efc77b;background:#fff9ec}
-</style><link rel="stylesheet" href="./portal.css?v=__BUILD_ID__"><link rel="stylesheet" href="./inspection-layout.css?v=__BUILD_ID__"><link rel="stylesheet" href="./fttx-layout.css?v=__BUILD_ID__"><link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png?v=__BUILD_ID__"></head>
+</style><link rel="stylesheet" href="./portal.css?v=__BUILD_ID__"><link rel="stylesheet" href="./inspection-layout.css?v=__BUILD_ID__"><link rel="stylesheet" href="./fttx-layout.css?v=__BUILD_ID__"><link rel="stylesheet" href="./assets-dashboard.css?v=__BUILD_ID__"><link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png?v=__BUILD_ID__"></head>
 <body class="portal-inspections">
 <header class="portal-header">
   <div class="portal-bar">
@@ -32,6 +32,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.52 system-ui,-ap
     <nav class="portal-tabs" aria-label="Módulos da Infraestrutura">
       <a href="./" data-module="central">Visão geral</a>
       <a href="./?modulo=inspecoes" data-module="inspecoes">Inspeções POPs</a>
+      <a href="./?modulo=ativos" data-module="ativos" hidden>Ativos</a>
       <a href="./?modulo=frota" data-module="frota" hidden>Frota</a>
       <a href="./?modulo=fttx" data-module="fttx" hidden>FTTx</a>
       <a href="./?modulo=fibra" data-module="fibra" hidden>Fibra Import</a>
@@ -44,6 +45,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.52 system-ui,-ap
 <section id="portal-fleet-pane" aria-label="Frota" hidden>
   <div class="portal-module-status" id="portal-fleet-status" role="status" hidden></div>
 </section>
+<section id="portal-assets-pane" aria-label="Dashboard de Ativos" hidden></section>
 <section id="portal-fttx-pane" aria-label="Levantamento FTTx" hidden></section>
 <section id="portal-fibra-pane" aria-label="Fibra Import" hidden></section>
 <script src="./config.js?v=__BUILD_ID__"></script>
@@ -55,6 +57,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.52 system-ui,-ap
 <script src="./fttx-catalog.js?v=__BUILD_ID__"></script>
 <script src="./fttx-export.js?v=__BUILD_ID__"></script>
 <script src="./fttx.js?v=__BUILD_ID__"></script>
+<script src="./assets-dashboard.js?v=__BUILD_ID__"></script>
 <script src="./entra-client.js"></script>
 
 <script>

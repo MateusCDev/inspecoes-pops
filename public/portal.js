@@ -5,6 +5,7 @@
   const overview = document.getElementById('portal-overview');
   const fleetPane = document.getElementById('portal-fleet-pane');
   const fleetStatus = document.getElementById('portal-fleet-status');
+  const assetsPane = document.getElementById('portal-assets-pane');
   const fttxPane = document.getElementById('portal-fttx-pane');
   const fibraPane = document.getElementById('portal-fibra-pane');
   const navigation = document.querySelector('.portal-tabs');
@@ -15,6 +16,7 @@
   const fleetUrl = new URL('./frota/', currentScript);
   const modules = {
     inspecoes: ['Inspeções POPs', 'Registre vistorias, consulte relatórios e trate pendências por estação.'],
+    ativos: ['Ativos', 'Acompanhe saúde operacional, ranking de POPs críticos, séries e patrimônios.'],
     frota: ['Frota', 'Acompanhe veículos, checklists e movimentações.'],
     fttx: ['Levantamento FTTx', 'Estime materiais e custos de rede e exporte a lista para o almoxarifado.'],
     fibra: ['Fibra Import', 'Prepare arquivos KML e KMZ para importação no OZmap.']
@@ -108,12 +110,14 @@
     activeModule = module;
     const signedIn = Boolean(googleUser);
     const showOverview = module === 'central' && signedIn;
+    const showAssets = module === 'ativos' && signedIn;
     const showFleet = module === 'frota' && signedIn;
     const showFttx = module === 'fttx' && signedIn;
     const showFibra = module === 'fibra' && signedIn;
     const manager = googleUser?.role === 'GESTAO';
-    app.hidden = showOverview || showFleet || showFttx || showFibra;
+    app.hidden = showOverview || showAssets || showFleet || showFttx || showFibra;
     overview.hidden = !showOverview;
+    if (assetsPane) assetsPane.hidden = !showAssets;
     fleetPane.hidden = !showFleet;
     fttxPane.hidden = !showFttx;
     fibraPane.hidden = !showFibra;
@@ -123,13 +127,20 @@
     document.body.dataset.portalModule = app.hidden ? module : 'inspecoes';
     for (const link of navigation.querySelectorAll('[data-module]')) {
       const target = link.dataset.module;
-      link.hidden = !isGoogleMode() ? target !== 'inspecoes' : ['frota','fttx'].includes(target) && !manager;
+      link.hidden = !isGoogleMode() ? target !== 'inspecoes' : ['ativos','frota','fttx'].includes(target) && !manager;
       if (target === module) link.setAttribute('aria-current','page');
       else link.removeAttribute('aria-current');
     }
     if (showOverview) {
       if (!overview.hasChildNodes()) mountOverview();
       updateOverview();
+    }
+    if (showAssets && assetsPane) {
+      if (!manager) {
+        assetsPane.innerHTML = '<p class="portal-module-status" role="status">O Dashboard de Ativos está disponível apenas para o perfil Gestão.</p>';
+      } else if (typeof mountAssetsDashboard === 'function') {
+        mountAssetsDashboard();
+      }
     }
     if (showFleet && !manager) {
       fleetStatus.hidden = false;
@@ -210,6 +221,8 @@
         fleetFrame?.remove();
         fleetFrame = null;
         fleetStatus.hidden = true;
+        assetsPane?.replaceChildren();
+        if (typeof resetAssetsDashboard === 'function') resetAssetsDashboard();
         fttxPane.replaceChildren();
         fibraFrame?.remove();
         fibraFrame = null;

@@ -123,7 +123,7 @@ function doPost(e) {
     if(!user)return reply_({ok:false,code:'AUTH',error:'Chave inválida, revogada ou ainda não vinculada a uma pessoa ativa.'});
     requirePrivateData_();
     if(input.version!==1)throw Error('Versão incompatível.');
-    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,accessAdmin:true,reportRefresh:true,assetInventory:true,stationTransceivers:true,assetReconciliation:true,assetComparisonV2:true,assetAdjustments:true,climateOptional:true,actionPlans:true,linkCatalog:true},...(input.includeStations?{stations:stations_()}:{})});
+    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,assetsDashboard:true,accessAdmin:true,reportRefresh:true,assetInventory:true,stationTransceivers:true,assetReconciliation:true,assetComparisonV2:true,assetAdjustments:true,climateOptional:true,actionPlans:true,linkCatalog:true},...(input.includeStations?{stations:stations_()}:{})});
     if(input.action==='linkCatalogLoad'||input.action==='linkCatalogSave')return reply_(linkCatalogRequest_(input,user));
     if(input.action==='fleetLoad'||input.action==='fleetSave')return reply_(fleetRequest_(input,user));
     if(input.action==='users')return reply_(listAccess_(user));
@@ -140,6 +140,7 @@ function doPost(e) {
     if(input.action==='assetIssues')return reply_(assetIssues_(input,user));
     if(input.action==='applyAssetAdjustment')return reply_(applyAssetAdjustment_(input,user));
     if(input.action==='centralBatteryBanks')return reply_(centralBatteryBanks_(user));
+    if(input.action==='assetsDashboard')return reply_(assetsDashboard_(input,user));
     if(input.action==='centralAssetsForInspection')return reply_(centralAssetsForInspection_(input,user));
     if(input.action==='compareInspectionAssets')return reply_(compareInspectionAssets_(input,user));
     if(input.action==='applyAssetDecision')return reply_(applyAssetDecision_(input,user));
@@ -1244,6 +1245,174 @@ function centralBatteryBanks_(user){
       nextTest:get('Próxima Teste'),status:get('Status')}];
   });
   return {ok:true,banks};
+}
+
+function readAssetDisplayRows_(tab){
+  const sheet=book_(config_().SPREADSHEET_ID).getSheetByName(tab);
+  if(!sheet||sheet.getLastRow()<2)return {headers:[],rows:[]};
+  const width=sheet.getLastColumn(),last=sheet.getLastRow();
+  const display=sheet.getRange(1,1,last,width).getDisplayValues();
+  return {headers:display[0],rows:display.slice(1)};
+}
+
+function assetsDashboard_(input,user){
+  if(user.role!=='GESTAO')throw Error('Dashboard de ativos disponível para a Gestão.');
+  const version=privateValue_('DATA_VERSION')||'0';
+  const cacheKey='assets_dash_'+hash_(version);
+  const cache=CacheService.getScriptCache();
+  if(!input?.refresh){
+    const cached=cache.get(cacheKey);
+    if(cached)return JSON.parse(cached);
+  }
+  const clean=value=>String(value??'').trim();
+  const readCol=(headers,row,...names)=>{
+    for(const name of names){
+      const idx=headers.indexOf(name);
+      if(idx>=0){const v=clean(row[idx]);if(v)return v;}
+    }
+    return '';
+  };
+
+  const main=readAssetDisplayRows_('Ativos');
+  const assets=[];
+  for(const row of main.rows){
+    const station=readCol(main.headers,row,'Local');
+    const equipment=readCol(main.headers,row,'Equipamento');
+    const model=readCol(main.headers,row,'Modelo');
+    const serial=readCol(main.headers,row,'Nº Série');
+    const assetTag=readCol(main.headers,row,'Patrimônio');
+    if(!station&&!equipment&&!model&&!serial&&!assetTag)continue;
+    assets.push({
+      id:readCol(main.headers,row,'ID_Ativo'),
+      stationCode:readCol(main.headers,row,'Codigo_POP'),
+      station:station||'Sem POP',
+      category:readCol(main.headers,row,'Categoria')||'Outro',
+      equipment:equipment||readCol(main.headers,row,'Categoria')||'Equipamento',
+      maker:readCol(main.headers,row,'Fabricante'),
+      model,
+      serial,
+      assetTag,
+      status:readCol(main.headers,row,'Status')||'Sem status',
+      lastInspection:readCol(main.headers,row,'Data_Ultima_Inspecao'),
+      inspectionId:readCol(main.headers,row,'ID_Ultima_Inspecao'),
+      note:readCol(main.headers,row,'Observações')
+    });
+  }
+
+  const bat=readAssetDisplayRows_('Controle_Baterias');
+  const batteries=[];
+  for(const row of bat.rows){
+    const station=readCol(bat.headers,row,'Estação');
+    const model=readCol(bat.headers,row,'Modelo');
+    const name=readCol(bat.headers,row,'Descrição');
+    const assetTag=readCol(bat.headers,row,'Patrimônio');
+    if(!station||(!model&&!name&&!assetTag))continue;
+    batteries.push({
+      id:readCol(bat.headers,row,'ID_Ativo'),
+      stationCode:readCol(bat.headers,row,'Codigo_POP'),
+      station,
+      name,
+      tech:readCol(bat.headers,row,'Tecnologia'),
+      maker:readCol(bat.headers,row,'Fabricante'),
+      model,
+      qty:readCol(bat.headers,row,'Quantidade'),
+      assetTag,
+      year:readCol(bat.headers,row,'Ano Fabricante'),
+      installed:readCol(bat.headers,row,'Data Instalação'),
+      ageMonths:readCol(bat.headers,row,'Tempo de Uso (meses)'),
+      autonomy:readCol(bat.headers,row,'Autonomia (h)'),
+      voltage:readCol(bat.headers,row,'Tensão Nominal (V)'),
+      capacity:readCol(bat.headers,row,'Capacidade (Ah)'),
+      nextTest:readCol(bat.headers,row,'Próxima Teste','Próximo Teste'),
+      status:readCol(bat.headers,row,'Status')||'Sem status',
+      lastInspection:readCol(bat.headers,row,'Data_Ultima_Inspecao'),
+      note:readCol(bat.headers,row,'Observações')
+    });
+  }
+
+  const rect=readAssetDisplayRows_('Retificadores');
+  const rectifiers=[];
+  for(const row of rect.rows){
+    const station=readCol(rect.headers,row,'Estação');
+    const model=readCol(rect.headers,row,'Modelo');
+    const maker=readCol(rect.headers,row,'Fabricante');
+    const serial=readCol(rect.headers,row,'Nº Série');
+    if(!station||(!model&&!maker&&!serial))continue;
+    rectifiers.push({
+      id:readCol(rect.headers,row,'ID_Ativo'),
+      stationCode:readCol(rect.headers,row,'Codigo_POP'),
+      station,
+      maker,
+      model,
+      modules:readCol(rect.headers,row,'Módulos'),
+      currentA:readCol(rect.headers,row,'Corrente (A) (TOTAL)'),
+      voltageV:readCol(rect.headers,row,'Tensão (V)'),
+      ur01:readCol(rect.headers,row,'UR 01'),
+      ur02:readCol(rect.headers,row,'UR 02'),
+      ur03:readCol(rect.headers,row,'UR 03'),
+      ur04:readCol(rect.headers,row,'UR 04'),
+      lastCheck:readCol(rect.headers,row,'Data de Verficação','Data_Ultima_Inspecao'),
+      nextCheck:readCol(rect.headers,row,'Proxima Verificação','Próxima Verificação'),
+      status:readCol(rect.headers,row,'Status')||'Sem status',
+      serial,
+      assetTag:readCol(rect.headers,row,'Patrimônio'),
+      note:readCol(rect.headers,row,'Observações')
+    });
+  }
+
+  const clim=readAssetDisplayRows_('Climatização_Voanet');
+  const climate=[];
+  for(const row of clim.rows){
+    const station=readCol(clim.headers,row,'Estação');
+    const model=readCol(clim.headers,row,'Modelo');
+    const maker=readCol(clim.headers,row,'Fabricante');
+    const serial=readCol(clim.headers,row,'Nº Série');
+    if(!station||(!model&&!maker&&!serial))continue;
+    climate.push({
+      id:readCol(clim.headers,row,'ID_Ativo'),
+      stationCode:readCol(clim.headers,row,'Codigo_POP'),
+      station,
+      maker,
+      model,
+      btus:readCol(clim.headers,row,'BTUs'),
+      type:readCol(clim.headers,row,'Tipo'),
+      serial,
+      assetTag:readCol(clim.headers,row,'Patrimônio'),
+      gas:readCol(clim.headers,row,'Tipo de Gás'),
+      gasCharge:readCol(clim.headers,row,'Carga Gás'),
+      installed:readCol(clim.headers,row,'Data Instalação'),
+      currentA:readCol(clim.headers,row,'Última Medição Corrente'),
+      tempC:readCol(clim.headers,row,'Última Medição Temperatura'),
+      nextMaint:readCol(clim.headers,row,'Próxima Manutenção'),
+      status:readCol(clim.headers,row,'Status')||'Sem status',
+      lastInspection:readCol(clim.headers,row,'Data_Ultima_Inspecao'),
+      note:readCol(clim.headers,row,'Observações')
+    });
+  }
+
+  let recentEvents=[];
+  try{
+    const audit=book_(config_().ACCESS_SPREADSHEET_ID).getSheetByName(ASSET_AUDIT);
+    if(audit&&audit.getLastRow()>1){
+      const totalRows=audit.getLastRow()-1;
+      const take=Math.min(totalRows,40);
+      const startRow=audit.getLastRow()-take+1;
+      const rows=audit.getRange(startRow,1,take,8).getDisplayValues().reverse();
+      recentEvents=rows.filter(r=>r[0]).map(r=>({
+        at:clean(r[1]),inspectionId:clean(r[2]),stationCode:clean(r[3]),
+        tab:clean(r[4]),assetId:clean(r[5]),action:clean(r[6]),detail:clean(r[7])
+      }));
+    }
+  }catch(_){}
+
+  const result={
+    ok:true,
+    assets,batteries,rectifiers,climate,recentEvents,
+    refreshedAt:new Date().toISOString()
+  };
+  const serialized=JSON.stringify(result);
+  if(serialized.length<90000)cache.put(cacheKey,serialized,60);
+  return result;
 }
 
 function stationTransceivers_(input,user){

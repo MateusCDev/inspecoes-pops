@@ -653,6 +653,182 @@ function assetsDashboard_(input,user){
   return result;
 }
 
+function stationInventory_(input,user){
+  if(!['GESTAO','OPERACAO'].includes(user.role))throw Error('Consulta indisponível para este perfil.');
+  const code=String(input.stationCode??'').trim();
+  const station=stations_().find(item=>item.code===code&&!item.inactive&&!item.duplicate);
+  if(!station)throw Error('Selecione um POP ativo do cadastro.');
+  const clean=value=>String(value??'').trim();
+  const readCol=(headers,row,...names)=>{
+    for(const name of names){
+      const idx=headers.indexOf(name);
+      if(idx>=0){const v=clean(row[idx]);if(v)return v;}
+    }
+    return '';
+  };
+  const stationRecord={codigoPop:code,nome:station.name};
+  const filterTab=(tab)=>{
+    const {headers,rows}=readAssetDisplayRows_(tab);
+    if(!headers.length)return {headers,rows:[]};
+    const cfg=ASSET_TABS[tab];
+    return {headers,rows:rows.filter(row=>sameAssetStation_(row,headers,stationRecord,cfg))};
+  };
+
+  const main=filterTab('Ativos');
+  const equipment=[];
+  for(const row of main.rows){
+    const equip=readCol(main.headers,row,'Equipamento');
+    const cat=readCol(main.headers,row,'Categoria');
+    const normEquip=normalizeAsset_(equip||cat);
+    if(/^TRANSCEIVER\b/.test(normEquip)||normEquip==='BATERIA'||normEquip==='AR-CONDICIONADO'||normEquip==='SISTEMA RETIFICADOR'||normEquip==='RETIFICADORA')continue;
+    const status=readCol(main.headers,row,'Status');
+    if(normalizeAsset_(status)==='INATIVO')continue;
+    const modelo=readCol(main.headers,row,'Modelo'),serie=readCol(main.headers,row,'Nº Série'),patrimonio=readCol(main.headers,row,'Patrimônio');
+    if(!modelo&&!serie&&!patrimonio)continue;
+    equipment.push({
+      centralId:readCol(main.headers,row,'ID_Ativo'),
+      tipo:equip||cat||'Equipamento',
+      fabricante:readCol(main.headers,row,'Fabricante'),
+      modelo,serie,patrimonio,
+      estado:status||'Operacional',
+      observacao:readCol(main.headers,row,'Observações')
+    });
+  }
+
+  const clim=filterTab('Climatização_Voanet');
+  const climatizadores=clim.rows.map(row=>({
+    centralId:readCol(clim.headers,row,'ID_Ativo'),
+    marca:readCol(clim.headers,row,'Fabricante'),
+    modelo:readCol(clim.headers,row,'Modelo'),
+    capacidade:readCol(clim.headers,row,'BTUs'),
+    tipo:readCol(clim.headers,row,'Tipo'),
+    serie:readCol(clim.headers,row,'Nº Série'),
+    gas:readCol(clim.headers,row,'Tipo de Gás'),
+    cargaGas:readCol(clim.headers,row,'Carga Gás'),
+    instalacao:readCol(clim.headers,row,'Data Instalação')
+  })).filter(c=>c.marca||c.modelo||c.serie);
+
+  const rect=filterTab('Retificadores');
+  const retificadoras=rect.rows.map(row=>({
+    centralId:readCol(rect.headers,row,'ID_Ativo'),
+    fabricante:readCol(rect.headers,row,'Fabricante'),
+    modelo:readCol(rect.headers,row,'Modelo'),
+    urInstaladas:readCol(rect.headers,row,'Módulos'),
+    capacidadeCC:readCol(rect.headers,row,'Corrente (A) (TOTAL)'),
+    tensao:readCol(rect.headers,row,'Tensão (V)'),
+    serie:readCol(rect.headers,row,'Nº Série'),
+    patrimonio:readCol(rect.headers,row,'Patrimônio'),
+    observacao:readCol(rect.headers,row,'Observações')
+  })).filter(r=>r.fabricante||r.modelo||r.serie);
+
+  const bat=filterTab('Controle_Baterias');
+  const bancos=bat.rows.map(row=>({
+    centralId:readCol(bat.headers,row,'ID_Ativo'),
+    identificacao:readCol(bat.headers,row,'Descrição')||readCol(bat.headers,row,'Modelo')||'Banco de baterias',
+    tecnologia:readCol(bat.headers,row,'Tecnologia'),
+    fabricante:readCol(bat.headers,row,'Fabricante'),
+    modelo:readCol(bat.headers,row,'Modelo'),
+    quantidade:Number(readCol(bat.headers,row,'Quantidade'))||0,
+    autonomiaHoras:readCol(bat.headers,row,'Autonomia (h)'),
+    tensao:readCol(bat.headers,row,'Tensão Nominal (V)'),
+    capacidade:readCol(bat.headers,row,'Capacidade (Ah)'),
+    patrimonio:readCol(bat.headers,row,'Patrimônio'),
+    observacao:readCol(bat.headers,row,'Observações')
+  })).filter(b=>b.modelo||b.fabricante||b.patrimonio);
+
+  return {ok:true,stationCode:code,stationName:station.name,equipment,climatizadores,retificadoras,bancos};
+}
+
+function buildWeeklySummaryReport_(){
+  const systemUser={role:'GESTAO',email:'sistema@voanet'};
+  const dash=assetsDashboard_({refresh:true},systemUser);
+  const insp=dashboard_({},systemUser);
+  const allStations=stations_().filter(s=>!s.inactive&&!s.duplicate);
+  const latestMap=new Map();
+  for(const item of insp.summary?.latest||[]){
+    latestMap.set(String(item.stationCode||''),item);
+  }
+  const todayIso=Utilities.formatDate(new Date(),'America/Sao_Paulo','yyyy-MM-dd');
+  const dayDiff=(iso)=>{
+    if(!/^\d{4}-\d{2}-\d{2}/.test(String(iso||'')))return null;
+    return Math.round((Date.parse(String(iso).slice(0,10)+'T12:00:00Z')-Date.parse(todayIso+'T12:00:00Z'))/86400000);
+  };
+  const overdue=[],dueSoon=[],neverInspected=[];
+  for(const st of allStations){
+    const last=latestMap.get(st.code);
+    if(!last){neverInspected.push(st);continue;}
+    const diff=dayDiff(last.due);
+    if(diff!==null&&diff<0)overdue.push({station:st.name,code:st.code,days:Math.abs(diff),due:last.due});
+    else if(diff!==null&&diff<=7)dueSoon.push({station:st.name,code:st.code,days:diff,due:last.due});
+  }
+  overdue.sort((a,b)=>b.days-a.days);
+  const norm=v=>normalizeAsset_(v);
+  const critAssets=dash.assets.filter(a=>norm(a.status).includes('CRITIC')||norm(a.status).includes('SUBSTITU'));
+  const warnAssets=dash.assets.filter(a=>norm(a.status).includes('ATENC')||norm(a.status).includes('OBSERV'));
+  const batAlerts=dash.batteries.filter(b=>{
+    const age=Number(String(b.ageMonths||'').replace(',','.'));
+    const isLitio=/LITIO|LIFEPO4/.test(norm(b.tech));
+    return norm(b.status).includes('CRITIC')||norm(b.status).includes('ATENC')||(Number.isFinite(age)&&age>=(isLitio?96:36));
+  });
+  const climAlerts=dash.climate.filter(c=>{
+    const t=Number(String(c.tempC||'').replace(/[^\d,.-]/g,'').replace(',','.'));
+    return norm(c.status).includes('CRITIC')||(Number.isFinite(t)&&t>26);
+  });
+  const escHtml=s=>String(s??'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+  const subject=`[VOANET Infra] Resumo semanal: ${overdue.length} POP(s) vencido(s), ${critAssets.length} ativo(s) crítico(s)`;
+  const html=`<div style="font-family:Arial,sans-serif;color:#192332;max-width:680px;margin:0 auto">
+    <div style="background:#1e283a;color:#fff;padding:18px 22px;border-radius:10px 10px 0 0">
+      <h2 style="margin:0;font-size:20px">VOANET · Resumo Semanal de Infraestrutura</h2>
+      <p style="margin:4px 0 0;color:#cfd8e6;font-size:13px">Gerado em ${escHtml(todayIso)} · Base consolidada de inspeções e ativos</p>
+    </div>
+    <div style="border:1px solid #dfe5ec;border-top:none;padding:18px 22px;border-radius:0 0 10px 10px">
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+        <tr>
+          <td style="padding:10px;background:#fde8eb;border-radius:6px;text-align:center"><strong style="font-size:22px;color:#b9142a">${overdue.length}</strong><div style="font-size:12px">POPs vencidos</div></td>
+          <td style="width:8px"></td>
+          <td style="padding:10px;background:#fff4df;border-radius:6px;text-align:center"><strong style="font-size:22px;color:#9c5700">${dueSoon.length}</strong><div style="font-size:12px">Vencem em 7d</div></td>
+          <td style="width:8px"></td>
+          <td style="padding:10px;background:#fde8eb;border-radius:6px;text-align:center"><strong style="font-size:22px;color:#b9142a">${critAssets.length}</strong><div style="font-size:12px">Ativos críticos</div></td>
+          <td style="width:8px"></td>
+          <td style="padding:10px;background:#e8f1fd;border-radius:6px;text-align:center"><strong style="font-size:22px;color:#154e94">${batAlerts.length+climAlerts.length}</strong><div style="font-size:12px">Alertas bat./clima</div></td>
+        </tr>
+      </table>
+      ${overdue.length?`<h3 style="color:#b9142a;margin:14px 0 6px">POPs com vistoria vencida (${overdue.length})</h3><ul>${overdue.slice(0,15).map(o=>`<li><strong>${escHtml(o.station)}</strong> (${escHtml(o.code)}) — vencida há ${o.days} dia(s)</li>`).join('')}</ul>`:'<p style="color:#126a3a"><strong>Nenhum POP com vistoria vencida.</strong></p>'}
+      ${neverInspected.length?`<p style="font-size:13px;color:#566478"><strong>${neverInspected.length} POP(s)</strong> ainda sem vistoria registrada: ${escHtml(neverInspected.slice(0,8).map(s=>s.name).join(', '))}${neverInspected.length>8?'…':''}</p>`:''}
+      ${critAssets.length?`<h3 style="color:#b9142a;margin:14px 0 6px">Ativos em estado Crítico (${critAssets.length})</h3><ul>${critAssets.slice(0,15).map(a=>`<li><strong>${escHtml(a.station)}</strong> · ${escHtml(a.equipment)} ${escHtml(a.model)} ${a.serial?'(Série: '+escHtml(a.serial)+')':''}</li>`).join('')}</ul>`:''}
+      <p style="font-size:13px;color:#566478;margin-top:16px">Total no parque: <strong>${dash.assets.length} ativos</strong> (${warnAssets.length} em atenção) · <strong>${dash.batteries.length} bancos de bateria</strong> (${batAlerts.length} em alerta) · <strong>${dash.climate.length} climatizadores</strong> (${climAlerts.length} em alerta).</p>
+    </div>
+  </div>`;
+  return {subject,html,stats:{overdue:overdue.length,dueSoon:dueSoon.length,neverInspected:neverInspected.length,critAssets:critAssets.length,warnAssets:warnAssets.length,batAlerts:batAlerts.length,climAlerts:climAlerts.length}};
+}
+
+function sendWeeklySummary_(){
+  beginRequest_();
+  requirePrivateData_();
+  const recipients=accessUsers_().filter(u=>u.active&&u.role==='GESTAO').map(u=>u.email);
+  if(!recipients.length)return {ok:false,sent:0,error:'Nenhum gestor ativo cadastrado.'};
+  const report=buildWeeklySummaryReport_();
+  MailApp.sendEmail({
+    to:recipients.join(','),
+    subject:report.subject,
+    htmlBody:report.html,
+    body:'Resumo semanal VOANET Infraestrutura: '+report.subject
+  });
+  return {ok:true,sent:recipients.length,recipients,stats:report.stats};
+}
+
+function sendWeeklySummaryRequest_(input,user){
+  if(user.role!=='GESTAO')throw Error('Envio do resumo semanal disponível apenas para a Gestão.');
+  return sendWeeklySummary_();
+}
+
+function installWeeklySummaryTrigger_(){
+  const fn='enviarResumoSemanalPOPs';
+  if(!ScriptApp.getProjectTriggers().some(t=>t.getHandlerFunction()===fn)){
+    ScriptApp.newTrigger(fn).timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(8).create();
+  }
+}
+
 function stationTransceivers_(input,user){
   if(!['GESTAO','OPERACAO'].includes(user.role))throw Error('Consulta indisponível para este perfil.');
   const code=String(input.stationCode??'').trim();

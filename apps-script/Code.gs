@@ -42,8 +42,8 @@ function setup() {
   accessUsers_();
   const sheet = sheet_();
   DriveApp.getFolderById(config_().PDF_FOLDER_ID).getName();
-  ensureUploadSecret_();prepareAssetSheets_();installQueueTrigger_();
-  console.log('Aba preparada: ' + sheet.getName() + ' · fila automática instalada.');
+  ensureUploadSecret_();prepareAssetSheets_();installQueueTrigger_();installWeeklySummaryTrigger_();
+  console.log('Aba preparada: ' + sheet.getName() + ' · fila automática e resumo semanal instalados.');
 }
 function text_(value) {
   if (value === null || value === undefined) return '';
@@ -84,13 +84,14 @@ function doPost(e) {
     if(!user)return reply_({ok:false,code:'AUTH',error:'Chave inválida, revogada ou ainda não vinculada a uma pessoa ativa.'});
     requirePrivateData_();
     if(input.version!==1)throw Error('Versão incompatível.');
-    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,assetsDashboard:true,accessAdmin:true,reportRefresh:true,assetInventory:true,stationTransceivers:true,assetReconciliation:true,assetComparisonV2:true,assetAdjustments:true,climateOptional:true,actionPlans:true,linkCatalog:true},...(input.includeStations?{stations:stations_()}:{})});
+    if(input.action==='session')return reply_({ok:true,user,capabilities:{apiVersion:2,stagedPhotos:true,summary:true,assetsSync:true,assetsDashboard:true,stationInventory:true,weeklySummary:true,accessAdmin:true,reportRefresh:true,assetInventory:true,stationTransceivers:true,assetReconciliation:true,assetComparisonV2:true,assetAdjustments:true,climateOptional:true,actionPlans:true,linkCatalog:true},...(input.includeStations?{stations:stations_()}:{})});
     if(input.action==='linkCatalogLoad'||input.action==='linkCatalogSave')return reply_(linkCatalogRequest_(input,user));
     if(input.action==='fleetLoad'||input.action==='fleetSave')return reply_(fleetRequest_(input,user));
     if(input.action==='users')return reply_(listAccess_(user));
     if(input.action==='manageOperator')return reply_(manageOperator_(input,user));
     if(input.action==='stations')return reply_({ok:true,stations:stations_()});
     if(input.action==='stationTransceivers')return reply_(stationTransceivers_(input,user));
+    if(input.action==='stationInventory')return reply_(stationInventory_(input,user));
     if(input.action==='list')return reply_(listInspections_(input,user));
     if(input.action==='dashboard')return reply_(dashboard_(input,user));
     if(input.action==='inspectionActionPlan')return reply_(inspectionActionPlan_(input,user));
@@ -102,6 +103,7 @@ function doPost(e) {
     if(input.action==='applyAssetAdjustment')return reply_(applyAssetAdjustment_(input,user));
     if(input.action==='centralBatteryBanks')return reply_(centralBatteryBanks_(user));
     if(input.action==='assetsDashboard')return reply_(assetsDashboard_(input,user));
+    if(input.action==='sendWeeklySummary')return reply_(sendWeeklySummaryRequest_(input,user));
     if(input.action==='centralAssetsForInspection')return reply_(centralAssetsForInspection_(input,user));
     if(input.action==='compareInspectionAssets')return reply_(compareInspectionAssets_(input,user));
     if(input.action==='applyAssetDecision')return reply_(applyAssetDecision_(input,user));

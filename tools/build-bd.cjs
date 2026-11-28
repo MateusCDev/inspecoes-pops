@@ -24,7 +24,7 @@ ${read('assets.gs')}
 ${read('access-admin.gs')}
 ${read('fleet.gs')}
 ${read('link-catalog.gs')}
-return { setup, setupFleet, createOperatorKey, doPost, processQueue };
+return { setup, setupFleet, createOperatorKey, doPost, processQueue, sendWeeklySummary: sendWeeklySummary_, installWeeklySummaryTrigger: installWeeklySummaryTrigger_ };
 })();
 
 function prepararInspecoesPOPs() {
@@ -41,6 +41,14 @@ function criarChaveInspecoesPOPs() {
 
 function processarFilaInspecoesPOPs() {
   return BdInspecoesPOPs.processQueue();
+}
+
+function enviarResumoSemanalPOPs() {
+  return BdInspecoesPOPs.sendWeeklySummary();
+}
+
+function instalarResumoSemanalPOPs() {
+  return BdInspecoesPOPs.installWeeklySummaryTrigger();
 }
 
 function receberInspecoesPOPs(e) {

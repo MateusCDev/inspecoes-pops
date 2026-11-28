@@ -63,6 +63,7 @@
           <button class="btn tiny" type="button" data-action="googleRefresh" id="overview-update">Atualizar dados</button>
         </div>
         <div id="overview-stats" class="overview-stats"></div>
+        ${manager ? '<div id="overview-sla" class="overview-sla"></div>' : ''}
         <div class="overview-recent">
           <div class="overview-section-heading">
             <h3>${manager ? 'Inspeções recebidas' : 'Meus envios'}</h3>
@@ -95,6 +96,42 @@
     stats.innerHTML = metrics.map(([label,value,link])=>`<div><strong>${esc(value ?? '—')}</strong><span>${label}</span>
       ${link ? '<a class="overview-history-link" href="./?modulo=inspecoes&visao=envios" data-module="inspecoes" data-inspection-view="envios">Ver envios</a>' : ''}
       </div>`).join('');
+    const slaBox = document.getElementById('overview-sla');
+    if (slaBox && manager) {
+      const activeStations = (typeof googleStations !== 'undefined' ? googleStations : []).filter(s => !s.inactive && !s.duplicate);
+      const upcoming = typeof googleUpcomingInspections === 'function' ? googleUpcomingInspections(googleCentralItems) : [];
+      const byCode = new Map(upcoming.map(item => [String(item.stationCode || ''), item]));
+      const overdue = [], dueSoon = [], never = [], current = [];
+      for (const st of activeStations) {
+        const last = byCode.get(st.code);
+        if (!last) { never.push(st); continue; }
+        const days = typeof daysUntil === 'function' ? daysUntil(last.due) : null;
+        if (days !== null && days < 0) overdue.push({ ...st, due: last.due, elapsed: Math.abs(days) });
+        else if (days !== null && days <= 7) dueSoon.push({ ...st, due: last.due, days });
+        else current.push({ ...st, due: last.due, days });
+      }
+      overdue.sort((a, b) => b.elapsed - a.elapsed);
+      dueSoon.sort((a, b) => a.days - b.days);
+      const urgent = [
+        ...overdue.slice(0, 4).map(x => ({ name: x.name, code: x.code, cls: 'overdue', badge: `Vencida há ${x.elapsed}d` })),
+        ...dueSoon.slice(0, 2).map(x => ({ name: x.name, code: x.code, cls: 'soon', badge: x.days === 0 ? 'Vence hoje' : `Vence em ${x.days}d` })),
+        ...never.slice(0, 2).map(x => ({ name: x.name, code: x.code, cls: 'never', badge: 'Sem vistoria' }))
+      ].slice(0, 6);
+      slaBox.innerHTML = activeStations.length ? `<div class="overview-sla-head">
+          <h3>Radar de SLA por POP</h3>
+          <a class="overview-history-link" href="./?modulo=inspecoes&visao=cronograma" data-module="inspecoes" data-inspection-view="cronograma">Abrir cronograma →</a>
+        </div>
+        <div class="overview-sla-grid">
+          <div class="sla-pill sla-overdue"><strong>${overdue.length}</strong><span>Vencidos</span></div>
+          <div class="sla-pill sla-soon"><strong>${dueSoon.length}</strong><span>Até 7 dias</span></div>
+          <div class="sla-pill sla-never"><strong>${never.length}</strong><span>Sem vistoria</span></div>
+          <div class="sla-pill sla-ok"><strong>${current.length}</strong><span>Em dia</span></div>
+        </div>
+        ${urgent.length ? `<ul class="overview-sla-list">${urgent.map(u => `<li>
+          <span><strong>${esc(u.name)}</strong> <small class="muted">${esc(u.code)}</small></span>
+          <span class="sla-tag sla-tag-${u.cls}">${esc(u.badge)}</span>
+        </li>`).join('')}</ul>` : '<p class="small muted">Todos os POPs cadastrados estão em dia.</p>'}` : '';
+    }
     const rows = googleCentralItems.slice(0,3);
     recent.innerHTML = `<p class="small muted overview-source" role="status">${esc(googleCentralStatus())}</p>
       ${rows.length ? `<ul class="overview-recent-list">${rows.map(item=>`<li>
@@ -183,6 +220,8 @@
     const target = new URL(location.href).searchParams.get('visao');
     if (target === 'historico' && (view !== 'googleCentral' || googleCentralSection !== 'history')) {
       openGoogleCentral('history');
+    } else if (target === 'cronograma' && (view !== 'googleCentral' || googleCentralSection !== 'schedule')) {
+      openGoogleCentral('schedule');
     } else if (target === 'envios') {
       if (view !== 'home') navigate('home');
       document.getElementById('sync-section')?.scrollIntoView();
@@ -213,6 +252,22 @@
   });
   window.addEventListener('popstate',applyLocation);
   signOut.addEventListener('click',googleLogout);
+  const themeBtn = document.getElementById('portal-theme-toggle');
+  function syncThemeButton() {
+    if (!themeBtn) return;
+    const isDark = document.documentElement?.dataset?.theme === 'dark';
+    themeBtn.textContent = isDark ? '☀ Claro' : '☾ Escuro';
+    themeBtn.setAttribute?.('aria-pressed', String(isDark));
+  }
+  if (themeBtn) {
+    syncThemeButton();
+    themeBtn.addEventListener?.('click', () => {
+      const next = document.documentElement?.dataset?.theme === 'dark' ? 'light' : 'dark';
+      if (document.documentElement?.dataset) document.documentElement.dataset.theme = next;
+      try { localStorage.setItem('voanet_theme', next); } catch (_) {}
+      syncThemeButton();
+    });
+  }
 
   window.VOANET_PORTAL = Object.freeze({
     updateOverview,

@@ -502,7 +502,9 @@ function renderAssetsDashboard() {
         <p>Parque consolidado das inspeções POPs · Atualizado em ${esc(refreshed)}${assetDashState.error ? ' · ' + esc(assetDashState.error) : ''}</p>
       </div>
       <div class="ad-header-actions">
+        <button type="button" class="btn tiny" data-ad-export-pdf>Baixar PDF Executivo</button>
         <button type="button" class="btn tiny" data-ad-export-csv>Exportar CSV</button>
+        <button type="button" class="btn tiny" data-ad-send-summary>Enviar resumo por e-mail</button>
         <button type="button" class="btn primary tiny" data-ad-refresh ${assetDashState.loading ? 'disabled' : ''}>${assetDashState.loading ? 'Atualizando…' : 'Atualizar base'}</button>
       </div>
     </header>
@@ -697,10 +699,146 @@ document.addEventListener('change', event => {
   renderAssetsDashboard();
 });
 
-document.addEventListener('click', event => {
+async function buildAssetsExecutivePdf(metrics, filters, refreshedAt) {
+  const { PDFDocument, StandardFonts, rgb } = await loadGooglePdfLibrary();
+  const doc = await PDFDocument.create();
+  const regular = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const chars = new Set(regular.getCharacterSet());
+  const red = rgb(.72, .08, .16), ink = rgb(.10, .15, .22), muted = rgb(.35, .42, .50), tint = rgb(.95, .96, .98), lineCol = rgb(.85, .89, .93);
+  let page = doc.addPage([595.28, 841.89]);
+  let y = 785;
+  const sanitize = v => [...String(v ?? '').normalize('NFC').replace(/\s+/g, ' ').trim()].map(c => chars.has(c.codePointAt(0)) ? c : '-').join('') || '—';
+  const draw = (val, x, yy, size = 10, font = regular, color = ink, maxW = 500) => {
+    let clean = sanitize(val);
+    if (font.widthOfTextAtSize(clean, size) > maxW) {
+      while (clean && font.widthOfTextAtSize(clean + '…', size) > maxW) clean = clean.slice(0, -1);
+      clean = clean.trimEnd() + '…';
+    }
+    page.drawText(clean, { x, y: yy, size, font, color });
+  };
+  const ensureSpace = needed => {
+    if (y - needed < 56) {
+      page = doc.addPage([595.28, 841.89]);
+      y = 790;
+    }
+  };
+  try {
+    const res = await fetch('./voanet.png');
+    const logo = await doc.embedPng(await res.arrayBuffer());
+    page.drawImage(logo, { x: 44, y: 774, width: 112, height: 112 * logo.height / logo.width });
+  } catch (_) { draw('VOANET', 44, 782, 16, bold, red); }
+  draw('Relatório Executivo — Parque de Ativos POPs', 172, 790, 15, bold, ink, 380);
+  const activeFilterNote = [filters.station && 'POP: ' + filters.station, filters.category && 'Cat.: ' + filters.category, filters.status && 'Status: ' + filters.status, filters.search && 'Busca: ' + filters.search].filter(Boolean).join(' · ') || 'Base completa (sem filtros)';
+  draw('Gerado em ' + new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date()) + ' · ' + activeFilterNote, 172, 773, 8.5, regular, muted, 380);
+  page.drawLine({ start: { x: 44, y: 760 }, end: { x: 551, y: 760 }, thickness: .8, color: lineCol });
+  y = 740;
+
+  const kpis = [
+    ['Total de ativos', String(metrics.totalBase), metrics.stationCount + ' POP(s)'],
+    ['Operacionais', String(metrics.statusCounts.Operacional), metrics.healthPct + '% de saúde'],
+    ['Em atenção', String(metrics.statusCounts['Atenção']), 'Monitoramento'],
+    ['Críticos', String(metrics.statusCounts['Crítico']), 'Ação prioritária'],
+    ['Sem vistoria >90d', String(metrics.staleCount), 'Desatualizados'],
+    ['Alertas infra', String(metrics.infraAlertCount), metrics.batteryAlerts + 'b · ' + metrics.rectifierAlerts + 'r · ' + metrics.climateAlerts + 'c']
+  ];
+  kpis.forEach(([lbl, val, sub], i) => {
+    const col = i % 3, row = Math.floor(i / 3);
+    const x = 44 + col * 172, yy = y - row * 56;
+    page.drawRectangle({ x, y: yy - 42, width: 162, height: 48, color: tint });
+    draw(lbl, x + 10, yy - 8, 8, bold, muted, 142);
+    draw(val, x + 10, yy - 26, 16, bold, i === 3 ? red : ink, 142);
+    draw(sub, x + 10, yy - 38, 7.5, regular, muted, 142);
+  });
+  y -= 126;
+
+  draw('Ranking de POPs por Criticidade (Top 10)', 44, y, 12, bold, ink);
+  y -= 18;
+  for (const r of metrics.popRanking.slice(0, 10)) {
+    ensureSpace(16);
+    draw(r.station, 44, y, 9.5, bold, ink, 250);
+    draw(`Críticos: ${r.crit}  ·  Atenção: ${r.warn}  ·  Operacionais: ${r.ok}  ·  Total: ${r.total}`, 300, y, 8.5, regular, r.crit > 0 ? red : muted, 250);
+    y -= 15;
+  }
+
+  const criticalList = metrics.filteredAssets.filter(a => a.statusNorm === 'Crítico' || a.statusNorm === 'Atenção');
+  y -= 10;
+  ensureSpace(36);
+  draw(`Ativos em Estado Crítico ou Atenção (${criticalList.length})`, 44, y, 12, bold, red);
+  y -= 18;
+  if (!criticalList.length) {
+    draw('Nenhum ativo crítico ou em atenção no filtro atual.', 44, y, 9.5, regular, muted);
+    y -= 16;
+  } else {
+    for (const a of criticalList.slice(0, 40)) {
+      ensureSpace(16);
+      draw(`${a.station} · ${a.equipment} ${a.model || ''}`, 44, y, 8.8, bold, ink, 270);
+      draw(`Série: ${a.serial || '—'} · Pat.: ${a.assetTag || '—'}`, 320, y, 8.2, regular, muted, 160);
+      draw(a.statusNorm, 488, y, 8.5, bold, a.statusNorm === 'Crítico' ? red : ink, 65);
+      y -= 14;
+    }
+  }
+
+  const alerts = [
+    ...metrics.batteries.filter(b => b.alert).map(b => `[Bateria] ${b.station} · ${b.model || b.name} (${b.tech || '—'}, ${b.ageMonths || '—'}m, aut. ${b.autonomy || '—'}h)`),
+    ...metrics.rectifiers.filter(r => r.alert).map(r => `[Retificadora] ${r.station} · ${r.maker} ${r.model} (próx. ${r.nextCheck || '—'})`),
+    ...metrics.climate.filter(c => c.alert).map(c => `[Clima] ${c.station} · ${c.maker} ${c.model} (${c.tempC ? c.tempC + ' °C' : c.statusNorm})`)
+  ];
+  if (alerts.length) {
+    y -= 10;
+    ensureSpace(32);
+    draw(`Alertas de Energia e Climatização (${alerts.length})`, 44, y, 12, bold, ink);
+    y -= 18;
+    for (const line of alerts.slice(0, 30)) {
+      ensureSpace(14);
+      draw(line, 44, y, 8.5, regular, ink, 505);
+      y -= 13;
+    }
+  }
+  return doc.save();
+}
+
+document.addEventListener('click', async event => {
   if (!adIsPaneActive()) return;
   const target = event.target;
   if (target.closest('[data-ad-refresh]')) { loadAssetsDashboard(true); return; }
+  const pdfBtn = target.closest('[data-ad-export-pdf]');
+  if (pdfBtn) {
+    if (pdfBtn.disabled) return;
+    pdfBtn.disabled = true;
+    const prevText = pdfBtn.textContent;
+    pdfBtn.textContent = 'Gerando PDF…';
+    try {
+      const metrics = computeAssetDashboardMetrics(assetDashState.data || {}, assetDashState);
+      const bytes = await buildAssetsExecutivePdf(metrics, assetDashState, assetDashState.data?.refreshedAt);
+      const date = new Intl.DateTimeFormat('sv-SE').format(new Date());
+      download(bytes, `VOANET-Ativos-Executivo-${date}.pdf`, 'application/pdf');
+    } catch (err) {
+      alert('Não foi possível gerar o PDF: ' + err.message);
+    } finally {
+      pdfBtn.disabled = false;
+      pdfBtn.textContent = prevText;
+    }
+    return;
+  }
+  const summaryBtn = target.closest('[data-ad-send-summary]');
+  if (summaryBtn) {
+    if (summaryBtn.disabled) return;
+    if (!confirm('Enviar agora o resumo executivo de POPs vencidos e ativos críticos por e-mail para todos os gestores ativos?')) return;
+    summaryBtn.disabled = true;
+    const prevText = summaryBtn.textContent;
+    summaryBtn.textContent = 'Enviando…';
+    try {
+      const res = await googleRpc('sendWeeklySummary', {});
+      alert(`Resumo enviado com sucesso para ${res.sent} gestor(es) (${res.stats?.overdue || 0} POP(s) vencido(s), ${res.stats?.critAssets || 0} ativo(s) crítico(s)).`);
+    } catch (err) {
+      alert('Falha ao enviar resumo: ' + err.message);
+    } finally {
+      summaryBtn.disabled = false;
+      summaryBtn.textContent = prevText;
+    }
+    return;
+  }
   if (target.closest('[data-ad-export-csv]')) {
     const metrics = computeAssetDashboardMetrics(assetDashState.data || {}, assetDashState);
     const csv = adBuildCsv(assetDashState.tab, metrics);

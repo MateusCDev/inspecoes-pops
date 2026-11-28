@@ -312,8 +312,28 @@ function googleHistoryItems(items){
   });
 }
 
-function googleHistoryCard(item,manager){
+function googleHistoryTrend(item,items){
+  const key=String(item.stationCode||item.station||'').trim().toUpperCase();
+  if(!key)return null;
+  const currentStamp=String(item.date||'')+'|'+String(item.updated||'');
+  let prev=null,prevStamp='';
+  for(const other of items||[]){
+    if(other.id===item.id)continue;
+    const otherKey=String(other.stationCode||other.station||'').trim().toUpperCase();
+    if(otherKey!==key)continue;
+    const stamp=String(other.date||'')+'|'+String(other.updated||'');
+    if(stamp<currentStamp&&stamp>prevStamp){prev=other;prevStamp=stamp;}
+  }
+  if(!prev)return null;
+  const delta=(Number(item.nc)||0)-(Number(prev.nc)||0);
+  if(delta<0)return {cls:'down',label:`↓ ${delta} NC`};
+  if(delta>0)return {cls:'up',label:`↑ +${delta} NC`};
+  return {cls:'same',label:'= Estável'};
+}
+
+function googleHistoryCard(item,manager,allItems){
   const id=esc(item.id),pending=Number(item.assets?.pending)||0;
+  const trend=googleHistoryTrend(item,allItems);
   return `<article class="history-record">
     <header class="history-record-title">
       <div><h3>${esc(item.station||'Estação sem nome')}</h3><p>${esc(fmt(item.date))}</p></div>
@@ -322,7 +342,7 @@ function googleHistoryCard(item,manager){
     <dl class="history-record-facts">
       <div><dt>Técnico</dt><dd>${esc(item.technician||'—')}</dd>${item.owner?`<dd class="small muted">${esc(item.owner)}</dd>`:''}</div>
       <div><dt>Criticidade</dt><dd>${esc(item.criticality||'—')}</dd></div>
-      <div><dt>Não conformidades</dt><dd>${Number(item.nc)||0}</dd></div>
+      <div><dt>Não conformidades</dt><dd>${Number(item.nc)||0}${trend?` <span class="history-trend history-trend-${trend.cls}">${esc(trend.label)}</span>`:''}</dd></div>
       <div><dt>Próxima inspeção</dt><dd>${esc(fmt(item.due))}</dd></div>
     </dl>
     <footer class="history-record-actions">
@@ -346,7 +366,7 @@ function googleHistoryResults(items,manager){
     ? `${filtered.length} de ${items.length} registros carregados correspondem aos filtros.`
     : `Exibindo ${items.length} de ${googleSummary?.total??items.length} registros.`;
   return `<p id="history-result-count" role="status" class="small muted">${status}</p>${filtered.length
-    ? filtered.map(item=>googleHistoryCard(item,manager)).join('')
+    ? filtered.map(item=>googleHistoryCard(item,manager,items)).join('')
     : `<div class="empty"><strong>${googleCentralBusy?'Consultando as inspeções…':
       items.length?'Nenhuma inspeção corresponde aos filtros.':'Nenhuma inspeção recebida nesta consulta.'}</strong></div>`}`;
 }
@@ -644,12 +664,111 @@ document.addEventListener('input',event=>{
   if(feedback)feedback.textContent=transceiverReferenceDifferences(record,{...item,[field.inv13Field]:event.target.value});
 });
 
+let googleStationInventoryState=null;
+function applyStationInventoryToRecord(record,payload){
+  if(!record||!payload)return 0;
+  if(typeof inv13==='function')inv13(record);
+  record.inventory=Array.isArray(record.inventory)?record.inventory:[];
+  record.equipamentos=record.equipamentos||{climatizadores:[],retificadoras:[],dios:[]};
+  record.equipamentos.climatizadores=Array.isArray(record.equipamentos.climatizadores)?record.equipamentos.climatizadores:[];
+  record.equipamentos.retificadoras=Array.isArray(record.equipamentos.retificadoras)?record.equipamentos.retificadoras:[];
+  record.invBatteryBanks=Array.isArray(record.invBatteryBanks)?record.invBatteryBanks:[];
+  let added=0;
+  const uid=prefix=>prefix+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,6);
+  const hasMatch=(list,cand)=>list.some(x=>(cand.centralId&&x.centralId===cand.centralId)
+    ||(cand.serie&&x.serie&&String(x.serie).trim().toUpperCase()===String(cand.serie).trim().toUpperCase())
+    ||(cand.patrimonio&&x.patrimonio&&String(x.patrimonio).trim().toUpperCase()===String(cand.patrimonio).trim().toUpperCase()));
+
+  for(const item of payload.equipment||[]){
+    if(hasMatch(record.inventory,item))continue;
+    record.inventory.push({
+      id:uid('EQ'),centralId:item.centralId||'',tipo:item.tipo||'Equipamento',
+      marca:item.fabricante||'',fabricante:item.fabricante||'',modelo:item.modelo||'',
+      quantidade:1,serie:item.serie||'',patrimonio:item.patrimonio||'',
+      estado:item.estado||'Operacional',confirmacao:'Pré-carregado da base',observacao:item.observacao||''
+    });
+    added++;
+  }
+  for(const item of payload.climatizadores||[]){
+    if(hasMatch(record.equipamentos.climatizadores,item))continue;
+    record.equipamentos.climatizadores.push({
+      id:uid('CL'),centralId:item.centralId||'',marca:item.marca||'',modelo:item.modelo||'',
+      capacidade:item.capacidade||'',tipo:item.tipo||'',serie:item.serie||'',
+      gas:item.gas||'',cargaGas:item.cargaGas||'',instalacao:item.instalacao||''
+    });
+    added++;
+  }
+  for(const item of payload.retificadoras||[]){
+    if(hasMatch(record.equipamentos.retificadoras,item))continue;
+    record.equipamentos.retificadoras.push({
+      id:uid('RT'),centralId:item.centralId||'',fabricante:item.fabricante||'',modelo:item.modelo||'',
+      urInstaladas:item.urInstaladas||'',capacidadeCC:item.capacidadeCC||'',tensao:item.tensao||'',
+      serie:item.serie||'',patrimonio:item.patrimonio||'',observacao:item.observacao||''
+    });
+    added++;
+  }
+  for(const item of payload.bancos||[]){
+    if(hasMatch(record.invBatteryBanks,item))continue;
+    record.invBatteryBanks.push({
+      id:uid('BK'),centralId:item.centralId||'',identificacao:item.identificacao||'Banco de baterias',
+      tensao:item.tensao||'',capacidade:item.capacidade||'',autonomiaHoras:item.autonomiaHoras||'',
+      observacao:item.observacao||'',cadastroCompleto:false,baterias:[]
+    });
+    added++;
+  }
+  return added;
+}
+
+async function loadStationInventory(record,{manual=false}={}){
+  if(!isGoogleMode()||!googleUser||!googleCapabilities.stationInventory||!googleStation(record))return;
+  const session=googleSession,stationCode=record.codigoPop;
+  googleStationInventoryState={session,stationCode,loading:true,message:'Consultando inventário central do POP…'};
+  if(manual&&view==='inventario')render();
+  try{
+    const payload=await googleRpc('stationInventory',{stationCode});
+    if(session!==googleSession||cur()!==record||record.codigoPop!==stationCode)return;
+    const added=applyStationInventoryToRecord(record,payload);
+    const totalFound=(payload.equipment?.length||0)+(payload.climatizadores?.length||0)+(payload.retificadoras?.length||0)+(payload.bancos?.length||0);
+    googleStationInventoryState={
+      session,stationCode,loading:false,
+      message:added>0
+        ? `${added} ativo(s) pré-carregado(s) da base central do POP. Confira as etiquetas e atualize as medições.`
+        : totalFound>0
+          ? 'Os ativos cadastrados neste POP já estão nesta vistoria.'
+          : 'Nenhum ativo prévio cadastrado para este POP na base central.'
+    };
+    if(added>0)change();
+    if(view==='inventario'||manual)render();
+  }catch(error){
+    if(session!==googleSession)return;
+    googleStationInventoryState={session,stationCode,loading:false,message:'Não foi possível consultar a base do POP: '+error.message};
+    if(view==='inventario'||manual)render();
+  }
+}
+
+function renderStationInventoryImport(record){
+  if(!isGoogleMode()||!googleUser||!googleCapabilities.stationInventory||!googleStation(record))return '';
+  const st=googleStationInventoryState?.stationCode===record.codigoPop?googleStationInventoryState:null;
+  return `<button type="button" class="btn tiny" data-load-station-inventory ${st?.loading?'disabled':''}>${st?.loading?'Carregando base…':'⬇ Importar inventário da base do POP'}</button>${st?.message?`<p class="small muted" style="width:100%;margin:.35rem 0 0" role="status">${esc(st.message)}</p>`:''}`;
+}
+
+document.addEventListener('click',event=>{
+  if(!event.target.closest('[data-load-station-inventory]'))return;
+  const r=cur();
+  if(r)loadStationInventory(r,{manual:true});
+});
+
 document.addEventListener('change',e=>{
   if(e.target.dataset.googleStation!==undefined&&googleUser){
     const r=cur(),station=googleStations.find(s=>s.code===e.target.value&&!s.duplicate&&!s.inactive);if(!r)return;
     const previous=googleStation(r);
     if(station?.city&&(!String(r.municipio??'').trim()||r.municipio===previous?.city))r.municipio=station.city;
     r.codigoPop=station?.code||'';r.nome=station?.name||r.nome;r.popCriticality=station?.criticality||'';
-    r.schedulePeriod=station?.days||'';r.scheduleBaseDate=r.data;r.scheduleDueDate=station?.days?addLocalDays(r.data,station.days):'';change();loadStationTransceivers(r,{refresh:true});render();
+    r.schedulePeriod=station?.days||'';r.scheduleBaseDate=r.data;r.scheduleDueDate=station?.days?addLocalDays(r.data,station.days):'';
+    change();
+    loadStationTransceivers(r,{refresh:true});
+    const emptyInv=!(r.inventory?.length)&&!(r.equipamentos?.climatizadores?.length)&&!(r.equipamentos?.retificadoras?.length)&&!(r.invBatteryBanks?.length);
+    if(station&&emptyInv)loadStationInventory(r,{manual:false});
+    render();
   }
 });

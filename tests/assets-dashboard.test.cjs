@@ -120,3 +120,89 @@ test('dashboard de ativos calcula saúde, ranking de POPs críticos, alertas de 
   assert.ok(csv.startsWith('\uFEFF'));
   assert.ok(csv.includes('"\'=SUM(1,2)"'));
 });
+
+test('stationInventory carrega ativos do POP para Operação/Gestão e resumo semanal envia apenas para Gestão', () => {
+  const { ctx } = loadBackendDash();
+  const sentEmails = [];
+  ctx.stations_ = () => [
+    { code: 'POP-01', name: 'POP Curralinho', criticality: 'Alta', days: 45, inactive: false, duplicate: false },
+    { code: 'POP-02', name: 'POP Centro', criticality: 'Média', days: 90, inactive: false, duplicate: false }
+  ];
+  ctx.beginRequest_ = () => {};
+  ctx.requirePrivateData_ = () => {};
+  ctx.accessUsers_ = () => [
+    { email: 'gestor@voanet.com.br', role: 'GESTAO', active: true },
+    { email: 'op@voanet.com.br', role: 'OPERACAO', active: true }
+  ];
+  ctx.dashboard_ = () => ({
+    summary: {
+      latest: [
+        { stationCode: 'POP-01', station: 'POP Curralinho', due: '2026-10-01' }
+      ]
+    }
+  });
+  ctx.Utilities = { formatDate: () => '2026-11-28' };
+  ctx.MailApp = { sendEmail: opts => sentEmails.push(opts) };
+
+  const inv = ctx.stationInventory_({ stationCode: 'POP-01' }, { role: 'OPERACAO', email: 'op@voanet.com.br' });
+  assert.equal(inv.ok, true);
+  assert.equal(inv.equipment.length, 1);
+  assert.equal(inv.equipment[0].modelo, 'MA5800-X7');
+  assert.equal(inv.retificadoras.length, 1);
+  assert.equal(inv.bancos.length, 1);
+  assert.equal(inv.climatizadores.length, 0);
+
+  assert.throws(() => ctx.sendWeeklySummaryRequest_({}, { role: 'OPERACAO', email: 'op@voanet.com.br' }), /Gestão/);
+  const sent = ctx.sendWeeklySummaryRequest_({}, { role: 'GESTAO', email: 'gestor@voanet.com.br' });
+  assert.equal(sent.ok, true);
+  assert.equal(sent.sent, 1);
+  assert.equal(sentEmails[0].to, 'gestor@voanet.com.br');
+  assert.equal(sent.stats.overdue, 1);
+  assert.equal(sent.stats.neverInspected, 1);
+  assert.equal(sent.stats.critAssets, 1);
+});
+
+test('applyStationInventoryToRecord mescla sem duplicar e googleHistoryTrend calcula evolução de NCs', () => {
+  const ctx = vm.createContext({
+    document: { addEventListener() {}, getElementById() { return null; } },
+    window: { addEventListener() {} },
+    localStorage: { getItem() { return null; }, setItem() {}, removeItem() {} },
+    esc: s => String(s ?? ''),
+    fmt: s => String(s ?? ''),
+    button: () => '',
+    isGoogleMode: () => true,
+    cur: () => null,
+    view: 'home'
+  });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../public/google-sync.js'), 'utf8'), ctx);
+
+  const rec = {
+    inventory: [{ id: 'EQ-1', centralId: 'AS-1', serie: '0012345', modelo: 'MA5800-X7' }],
+    equipamentos: { climatizadores: [], retificadoras: [], dios: [] },
+    invBatteryBanks: []
+  };
+  const added = ctx.applyStationInventoryToRecord(rec, {
+    equipment: [
+      { centralId: 'AS-1', tipo: 'OLT', fabricante: 'Huawei', modelo: 'MA5800-X7', serie: '0012345' },
+      { centralId: 'AS-9', tipo: 'Switch', fabricante: 'Datacom', modelo: 'DM4370', serie: 'SN-SW-9' }
+    ],
+    climatizadores: [{ centralId: 'AS-C1', marca: 'Elgin', modelo: 'Eco 30k', serie: 'SN-AC-1' }],
+    retificadoras: [{ centralId: 'AS-R1', fabricante: 'Delta', modelo: 'ESR-48', serie: 'SN-RET-1' }],
+    bancos: [{ centralId: 'AS-B1', identificacao: 'Banco 01', tensao: '48', capacidade: '150' }]
+  });
+  assert.equal(added, 4);
+  assert.equal(rec.inventory.length, 2);
+  assert.equal(rec.equipamentos.climatizadores.length, 1);
+  assert.equal(rec.equipamentos.retificadoras.length, 1);
+  assert.equal(rec.invBatteryBanks.length, 1);
+
+  const history = [
+    { id: 'INSP-3', stationCode: 'POP-01', date: '2026-11-20', updated: '2026-11-20T12:00:00Z', nc: 1 },
+    { id: 'INSP-2', stationCode: 'POP-01', date: '2026-10-01', updated: '2026-10-01T12:00:00Z', nc: 4 },
+    { id: 'INSP-1', stationCode: 'POP-01', date: '2026-08-15', updated: '2026-08-15T12:00:00Z', nc: 4 }
+  ];
+  assert.equal(ctx.googleHistoryTrend(history[0], history).cls, 'down');
+  assert.equal(ctx.googleHistoryTrend(history[0], history).label, '↓ -3 NC');
+  assert.equal(ctx.googleHistoryTrend(history[1], history).cls, 'same');
+  assert.equal(ctx.googleHistoryTrend(history[2], history), null);
+});

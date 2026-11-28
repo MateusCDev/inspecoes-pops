@@ -137,3 +137,121 @@ test('suporta todos os splitters conectorizados, sem conector, desbalanceados, C
   assert.ok(ceoMismatch.alerts.some(msg=>/soma das CEOs por capacidade/.test(msg)));
   assert.equal(ctx.fttxEstimatedSleeves({cables:{12:{cto:2,ceo:1}},split8:1,splitUnb10:1}),9+3+12+4);
 });
+
+test('calcula orçamento óptico GPON/XGS-PON, cascata desbalanceada e aviso não bloqueante',()=>{
+  const ctx=model();
+  const okBudget=ctx.calculateOpticalBudget({
+    optClass:'gpon_c',optDistanceKm:3,optSplit1:'1:8',optSplit2:'1:16',
+    optSplices:6,optConnectors:4,optMargin:3
+  });
+  assert.equal(okBudget.active,true);
+  assert.equal(okBudget.fiberLossDb,1.05);
+  assert.equal(okBudget.split1Db,10.5);
+  assert.equal(okBudget.split2Db,13.8);
+  assert.equal(okBudget.passiveDb,2.6);
+  assert.equal(okBudget.rawLossDb,27.95);
+  assert.equal(okBudget.totalLossDb,30.95);
+  assert.equal(okBudget.headroomDb,1.05);
+  assert.equal(okBudget.rxPowerDbm,-24.95);
+  assert.equal(okBudget.status,'ok');
+
+  const cascadeBudget=ctx.calculateOpticalBudget({
+    optClass:'gpon_cpp',optDistanceKm:2,optSplit1:'10/90',optSplit2:'1:8',
+    optCascadeCount:3,optCascadeRatio:'10/90',optSplices:4,optConnectors:4,optMargin:3
+  });
+  assert.equal(cascadeBudget.cascadeDb,2.1);
+  assert.equal(cascadeBudget.status,'ok');
+
+  const failResult=ctx.calculateFttx({
+    cables:{12:{meters:4000,cto:2}},poles:80,ctoPoles:2,
+    optClass:'gpon_b',optSplit1:'1:8',optSplit2:'1:16',optSplices:8,optConnectors:4,optMargin:3
+  });
+  assert.equal(failResult.optical.status,'fail');
+  assert.equal(failResult.alerts.length,0);
+  assert.ok(failResult.warnings.some(w=>/Orçamento óptico acima do limite/.test(w.text)));
+});
+
+test('dimensiona portas PON, valida vão médio, fecho de poste guia e contingência em ferragens',()=>{
+  const ctx=model();
+  const base=ctx.calculateFttx({
+    cables:{12:{meters:1200,cto:6}},poles:24,asPoles:18,ctoPoles:6,guidePoles:6,
+    cto16:6,ponRatio:'64',includeGuideBuckle:true,contingencyPct:10,
+    splitConn8:2,bolt:20,sleeve:50
+  });
+  const qty=name=>base.groups.flatMap(g=>g.items).find(i=>i[0]===name)?.[2];
+  assert.equal(base.ctoPorts,96);
+  assert.equal(base.ponRatio,64);
+  assert.equal(base.ponPortsNeeded,2);
+  assert.equal(base.avgSpan,50);
+  assert.equal(base.warnings.length,0);
+  // Ferragens e consumíveis recebem +10%, enquanto cabo, CTO e splitter mantêm quantidade exata
+  assert.equal(qty('Cabo óptico 12 FO'),1200+6*22+100);
+  assert.equal(qty('CTO 1:16 (16 portas)'),6);
+  assert.equal(qty('Splitter 1:8 conectorizado SC/APC'),2);
+  assert.equal(qty('Parafuso'),22);
+  assert.equal(qty('Tubete protetor de emenda'),55);
+  assert.equal(qty('Fecho de aço 3/4″ para postes sem CTO e sem BAP'),7);
+
+  const highDensity=ctx.calculateFttx({cables:{12:{meters:1000,cto:6}},poles:20,ctoPoles:6,cto16:6,ponRatio:'128'});
+  assert.equal(highDensity.ponPortsNeeded,1);
+
+  const longSpan=ctx.calculateFttx({cables:{12:{meters:900}},poles:10});
+  assert.equal(longSpan.avgSpan,90);
+  assert.ok(longSpan.warnings.some(w=>/supera 80 m/.test(w.text)));
+
+  const shortSpan=ctx.calculateFttx({cables:{12:{meters:100}},poles:10});
+  assert.equal(shortSpan.avgSpan,10);
+  assert.ok(shortSpan.warnings.some(w=>/abaixo de 15 m/.test(w.text)));
+});
+
+test('estima ferragens pelo trajeto e converte quantidades para embalagens de almoxarifado',()=>{
+  const ctx=model();
+  const patch=ctx.fttxEstimateHardware({
+    poles:30,asPoles:25,dielectricGroups:4,
+    cables:{12:{meters:800,cto:3,endCto:1},24:{meters:500,ceo:2}}
+  });
+  assert.deepEqual({...patch},{
+    bolt:25,bapSupport:25,extraEyelets:8,
+    loopSmall:2*3+1+2,
+    loop24:2*2+2
+  });
+
+  assert.equal(ctx.fttxPackSummary('Cabo óptico 12 FO',2500),'≈ 2 bobinas de 2.000 m');
+  assert.equal(ctx.fttxPackSummary('Fita de aço 3/4″',25),'≈ 1 rolo de 25 m');
+  assert.equal(ctx.fttxPackSummary('Fita de aço 3/4″ para postes sem CTO e sem BAP',26),'≈ 2 rolos de 25 m');
+  assert.equal(ctx.fttxPackSummary('Fecho de aço 3/4″ para postes sem CTO e sem BAP',10),'≈ 1 pacote de 100 un');
+  assert.equal(ctx.fttxPackSummary('Tubete protetor de emenda',150),'≈ 2 pacotes de 100 un');
+  assert.equal(ctx.fttxPackSummary('CTO 1:16 (16 portas)',4),'');
+});
+
+test('importa KML com cabos por bitola, postes, CTOs comuns/ponta, CEO e CEP',()=>{
+  const ctx=model();
+  const kml=`<?xml version="1.0" encoding="UTF-8"?>
+  <kml><Document>
+    <Folder><name>Cabos 24 FO Backbone</name>
+      <Placemark><name>Trecho Principal</name><LineString><coordinates>-46.633308,-23.550520,0 -46.633308,-23.559513,0</coordinates></LineString></Placemark>
+    </Folder>
+    <Folder><name>Distribuição</name>
+      <Placemark><name>Cabo 12FO Rua A</name><LineString><coordinates>-46.633308,-23.550520,0 -46.638200,-23.550520,0</coordinates></LineString></Placemark>
+    </Folder>
+    <Folder><name>Postes</name>
+      <Placemark><name>P-01</name><Point><coordinates>-46.6333,-23.5505,0</coordinates></Point></Placemark>
+      <Placemark><name>P-02</name><Point><coordinates>-46.6333,-23.5510,0</coordinates></Point></Placemark>
+    </Folder>
+    <Folder><name>Caixas</name>
+      <Placemark><name>CTO-01</name><Point><coordinates>-46.6333,-23.5515,0</coordinates></Point></Placemark>
+      <Placemark><name>CTO-02 Ponta</name><Point><coordinates>-46.6333,-23.5520,0</coordinates></Point></Placemark>
+      <Placemark><name>CEO-01 48FO</name><Point><coordinates>-46.6333,-23.5525,0</coordinates></Point></Placemark>
+      <Placemark><name>CEP-01</name><Point><coordinates>-46.6333,-23.5530,0</coordinates></Point></Placemark>
+    </Folder>
+  </Document></kml>`;
+  const parsed=ctx.parseFttxKml(kml);
+  assert.equal(parsed.lineCount,2);
+  assert.ok(parsed.cables[24]>990&&parsed.cables[24]<1010);
+  assert.ok(parsed.cables[12]>490&&parsed.cables[12]<510);
+  assert.equal(parsed.poles,2);
+  assert.equal(parsed.cto,1);
+  assert.equal(parsed.endCto,1);
+  assert.equal(parsed.ceo,1);
+  assert.equal(parsed.cep,1);
+});

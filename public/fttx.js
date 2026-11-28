@@ -65,6 +65,55 @@ const FTTX_BOX_FIELDS=[
   ['sleeve','Tubetes protetores de emenda','Conte os protetores das emendas previstas (ou use o atalho de estimativa).'],
   ['blanket','Mantas para CEO','Some as mantas previstas para as caixas de emenda.']
 ];
+
+const FTTX_OPTICAL_CLASSES={
+  gpon_b:{label:'GPON B+ (28 dB)',budgetDb:28,txMinDbm:1.5,rxSensDbm:-28},
+  gpon_c:{label:'GPON C+ (32 dB)',budgetDb:32,txMinDbm:3.0,rxSensDbm:-30},
+  gpon_cpp:{label:'GPON C++ (35 dB)',budgetDb:35,txMinDbm:6.0,rxSensDbm:-32},
+  xgs_n1:{label:'XGS-PON N1 (29 dB)',budgetDb:29,txMinDbm:2.0,rxSensDbm:-28},
+  xgs_n2:{label:'XGS-PON N2 (31 dB)',budgetDb:31,txMinDbm:4.0,rxSensDbm:-28}
+};
+const FTTX_OPTICAL_SPLITS=[
+  ['none','Nenhum (0 dB)',0],
+  ['1:2','Balanceado 1:2 (3,7 dB)',3.7],
+  ['1:4','Balanceado 1:4 (7,3 dB)',7.3],
+  ['1:8','Balanceado 1:8 (10,5 dB)',10.5],
+  ['1:16','Balanceado 1:16 (13,8 dB)',13.8],
+  ['1:32','Balanceado 1:32 (17,2 dB)',17.2],
+  ['1:64','Balanceado 1:64 (20,5 dB)',20.5],
+  ['5/95','Desbalanceado 5/95 · saída 5% (14,0 dB)',14.0],
+  ['10/90','Desbalanceado 10/90 · saída 10% (10,8 dB)',10.8],
+  ['15/85','Desbalanceado 15/85 · saída 15% (8,9 dB)',8.9],
+  ['20/80','Desbalanceado 20/80 · saída 20% (7,6 dB)',7.6],
+  ['30/70','Desbalanceado 30/70 · saída 30% (5,8 dB)',5.8],
+  ['40/60','Desbalanceado 40/60 · saída 40% (4,5 dB)',4.5],
+  ['50/50','Desbalanceado 50/50 (3,7 dB)',3.7]
+];
+const FTTX_CASCADE_THRU_DB={
+  '5/95':0.45,'10/90':0.70,'15/85':0.95,'20/80':1.25,'30/70':1.90,'40/60':2.65,'50/50':3.70
+};
+const FTTX_CONTINGENCY_ITEMS=new Set([
+  'Olhal reto M12','Parafuso','Suporte para BAP','Suporte dielétrico',
+  'Alça pré-formada para cabo de 06 a 12 FO','Alça pré-formada para cabo de 24 FO',
+  'Alça pré-formada para cabo de 36 FO','Alça pré-formada para cabo de 48 FO',
+  'Alça pré-formada para cabo de 72 FO','Alça pré-formada para cordoalha',
+  'Plaqueta de identificação do cabo','Plaqueta de CTO','Plaqueta de caixa de emenda',
+  'Anel guia AGFE','Anel guia AGFE para postes sem CTO e sem BAP',
+  'Fita de aço 3/4″','Fita de aço 3/4″ para postes sem CTO e sem BAP',
+  'Fecho de aço 3/4″','Fecho de aço 3/4″ para postes sem CTO e sem BAP',
+  'Abraçadeira BAP','Tubete protetor de emenda',
+  'Manta para CEO','Adaptador SC/APC'
+]);
+const FTTX_PACK_RULES=[
+  [/^Cabo óptico /,2000,'bobina','bobinas','2.000 m'],
+  [/^Fita de aço 3\/4″/,25,'rolo','rolos','25 m'],
+  [/^Fecho de aço 3\/4″/,100,'pacote','pacotes','100 un'],
+  [/^(?:Parafuso|Suporte para BAP|Suporte dielétrico)$/,10,'pacote','pacotes','10 un'],
+  [/^Alça pré-formada para cordoalha$/,100,'pacote','pacotes','100 un'],
+  [/^Cordoalha$/,500,'rolo','rolos','500 m'],
+  [/^Tubete protetor de emenda$/,100,'pacote','pacotes','100 un']
+];
+
 const fttxQuantityFormat=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2});
 const fttxCurrency=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
 const fttxUnitPrice=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:4});
@@ -77,6 +126,55 @@ function fttxQuantity(value,decimal=false){
   return decimal?Math.round((number+Number.EPSILON)*100)/100:Math.floor(number);
 }
 
+function fttxPackSummary(name,quantity){
+  if(!Number.isFinite(quantity)||quantity<=0)return '';
+  for(const [pattern,size,singular,plural,sizeLabel] of FTTX_PACK_RULES){
+    if(pattern.test(name)){
+      const packs=Math.ceil(quantity/size);
+      return `≈ ${packs} ${packs===1?singular:plural} de ${sizeLabel}`;
+    }
+  }
+  return '';
+}
+
+function fttxApplyContingency(name,unit,qty,pct){
+  if(!pct||qty<=0||!FTTX_CONTINGENCY_ITEMS.has(name))return qty;
+  if(unit==='un')return Math.ceil(Math.round(qty*(100+pct))/100);
+  return Math.round((qty*(100+pct))/10+Number.EPSILON)/10;
+}
+
+function calculateOpticalBudget(draft,routeTotal=0){
+  const classKey=Object.hasOwn(FTTX_OPTICAL_CLASSES,draft.optClass)?draft.optClass:'gpon_c';
+  const cls=FTTX_OPTICAL_CLASSES[classKey];
+  const split1Key=draft.optSplit1||'none';
+  const split2Key=draft.optSplit2||'none';
+  const cascadeCount=fttxQuantity(draft.optCascadeCount);
+  const cascadeRatio=Object.hasOwn(FTTX_CASCADE_THRU_DB,draft.optCascadeRatio)?draft.optCascadeRatio:'10/90';
+  const customKm=fttxQuantity(draft.optDistanceKm,true);
+  const active=split1Key!=='none'||split2Key!=='none'||cascadeCount>0||customKm>0;
+  const distanceKm=customKm>0?customKm:Math.round((routeTotal/1000)*100)/100;
+  const splitLoss=key=>FTTX_OPTICAL_SPLITS.find(([id])=>id===key)?.[2]??0;
+  const splices=draft.optSplices===''||draft.optSplices===undefined?6:fttxQuantity(draft.optSplices);
+  const connectors=draft.optConnectors===''||draft.optConnectors===undefined?4:fttxQuantity(draft.optConnectors);
+  const marginDb=draft.optMargin===''||draft.optMargin===undefined?3:fttxQuantity(draft.optMargin,true);
+  const fiberLossDb=Math.round(distanceKm*0.35*100)/100;
+  const split1Db=splitLoss(split1Key);
+  const split2Db=splitLoss(split2Key);
+  const cascadeDb=Math.round(cascadeCount*(FTTX_CASCADE_THRU_DB[cascadeRatio]||0)*100)/100;
+  const passiveDb=Math.round((splices*0.1+connectors*0.5)*100)/100;
+  const rawLossDb=Math.round((fiberLossDb+split1Db+split2Db+cascadeDb+passiveDb)*100)/100;
+  const totalLossDb=Math.round((rawLossDb+marginDb)*100)/100;
+  const rxPowerDbm=Math.round((cls.txMinDbm-rawLossDb)*100)/100;
+  const headroomDb=Math.round((cls.budgetDb-totalLossDb)*100)/100;
+  const status=headroomDb>=1?'ok':headroomDb>=0?'warn':'fail';
+  const statusLabel=status==='ok'?'Aprovado':status==='warn'?'No limite':'Acima do limite';
+  return {
+    active,classKey,classLabel:cls.label,budgetDb:cls.budgetDb,distanceKm,
+    fiberLossDb,split1Db,split2Db,cascadeDb,passiveDb,marginDb,
+    rawLossDb,totalLossDb,rxPowerDbm,headroomDb,status,statusLabel
+  };
+}
+
 function fttxEstimatedSleeves(draft){
   const get=field=>fttxQuantity(draft[field]);
   const ceoTotal=FTTX_FIBERS.reduce((sum,fibers)=>sum+fttxQuantity(draft.cables?.[fibers]?.ceo),0);
@@ -86,6 +184,32 @@ function fttxEstimatedSleeves(draft){
     .reduce((sum,[field,,splices])=>sum+get(field)*splices,0);
   const conventionalCto=Math.max(0,ctoTotal-preCto);
   return bareSplitSplices+12*ceoTotal+2*conventionalCto;
+}
+
+function fttxEstimateHardware(draft){
+  const get=field=>fttxQuantity(draft[field]);
+  const asPoles=get('asPoles')||get('poles');
+  const dielectricGroups=get('dielectricGroups');
+  const patch={};
+  if(asPoles>0){
+    patch.bolt=asPoles;
+    patch.bapSupport=asPoles;
+  }
+  if(dielectricGroups>0)patch.extraEyelets=2*dielectricGroups;
+  const loopMap={6:'loopSmall',12:'loopSmall',24:'loop24',36:'loop36',48:'loop48',72:'loop72'};
+  const loops={loopSmall:0,loop24:0,loop36:0,loop48:0,loop72:0};
+  for(const fibers of FTTX_FIBERS){
+    const row=draft.cables?.[fibers]||{};
+    const meters=fttxQuantity(row.meters,true),cto=fttxQuantity(row.cto),endCto=fttxQuantity(row.endCto),ceo=fttxQuantity(row.ceo);
+    if(meters>0||cto>0||endCto>0||ceo>0){
+      const anchors=2*cto+endCto+2*ceo+(meters>0?2:0);
+      loops[loopMap[fibers]]+=anchors;
+    }
+  }
+  for(const [field,val] of Object.entries(loops)){
+    if(val>0)patch[field]=val;
+  }
+  return patch;
 }
 
 function calculateFttx(draft){
@@ -105,6 +229,8 @@ function calculateFttx(draft){
   });
   const get=(field,decimal)=>fttxQuantity(draft[field],decimal);
   const cep=get('cep'),guidePoles=get('guidePoles'),poles=get('poles'),ctoPoles=get('ctoPoles'),asPoles=get('asPoles');
+  const contingencyPct=[5,10].includes(Number(draft.contingencyPct))?Number(draft.contingencyPct):0;
+  const includeGuideBuckle=draft.includeGuideBuckle===true||draft.includeGuideBuckle==='true';
 
   const ctoBreakdown=FTTX_CTO_MODELS.map(([field,label,ports,pre])=>({field,label,ports,pre,qty:get(field)}));
   const ctoTypedTotal=ctoBreakdown.reduce((sum,entry)=>sum+entry.qty,0);
@@ -137,6 +263,7 @@ function calculateFttx(draft){
     ...FTTX_SPLITTERS_UNBALANCED_BARE.map(([field,label])=>[label,'un',get(field)])
   ];
 
+  const guideBuckles=includeGuideBuckle?guidePoles:0;
   const groups=[
     {title:'Lançamento',items:[
       ...cables.map(c=>['Cabo óptico '+String(c.fibers).padStart(2,'0')+' FO','m',c.total]),
@@ -152,6 +279,7 @@ function calculateFttx(draft){
       ['Plaqueta de identificação do cabo','un',poles],
       ['Anel guia AGFE para postes sem CTO e sem BAP','un',2*guidePoles],
       ['Fita de aço 3/4″ para postes sem CTO e sem BAP','m',1.5*guidePoles],
+      ['Fecho de aço 3/4″ para postes sem CTO e sem BAP','un',guideBuckles],
       ['Abraçadeira BAP','un',asPoles]
     ]},
     {title:'Montagem de CTO',items:[
@@ -170,9 +298,15 @@ function calculateFttx(draft){
       ['Tubete protetor de emenda','un',get('sleeve')],['Manta para CEO','un',get('blanket')]
     ]},
     ...FTTX_CATALOG.map(([title,items])=>({title,items:items.map(([name,unit])=>[name,unit,getExtra(name,unit)])}))
-  ].map(group=>({...group,items:group.items.filter(item=>item[2]>0)}));
+  ].map(group=>({
+    ...group,
+    items:group.items
+      .map(([name,unit,qty])=>[name,unit,fttxApplyContingency(name,unit,qty,contingencyPct)])
+      .filter(item=>item[2]>0)
+  }));
   function getExtra(name,unit){return fttxQuantity(draft.extras?.[name],unit!=='un');}
   const issues=[];
+  const warnings=[];
   if(Math.max(asPoles,ctoPoles,guidePoles)>poles||guidePoles+Math.max(asPoles,ctoPoles)>poles){
     issues.push({step:1,text:'Confira os totais. Os postes com CTO, cabo AS ou guia precisam caber no total de postes do trajeto.'});
   }
@@ -190,11 +324,161 @@ function calculateFttx(draft){
   if(get('dielectricGroups')&&poles<3){
     issues.push({step:1,text:'Confira os suportes dielétricos. Cada grupo informado precisa de pelo menos três postes no trajeto.'});
   }
+  const avgSpan=routeTotal>0&&poles>0?Math.round((routeTotal/poles)*10)/10:null;
+  if(avgSpan!==null&&avgSpan>80){
+    warnings.push({step:1,text:`Vão médio de ${fttxQuantityFormat.format(avgSpan)} m supera 80 m (padrão AS80/ASU80). Confira a contagem de postes ou especifique cabo AS120/AS200.`});
+  }else if(avgSpan!==null&&avgSpan<15){
+    warnings.push({step:1,text:`Vão médio de ${fttxQuantityFormat.format(avgSpan)} m está abaixo de 15 m. Confira a metragem lançada e o número de postes.`});
+  }
+  const optical=calculateOpticalBudget(draft,routeTotal);
+  if(optical.active&&optical.status==='fail'){
+    warnings.push({step:3,text:`Orçamento óptico acima do limite (${optical.totalLossDb.toFixed(2)} dB > ${optical.budgetDb} dB em ${optical.classLabel}). Revise splitters ou classe SFP.`});
+  }
+  const ponRatio=String(draft.ponRatio)==='128'?128:64;
+  const ponPortsNeeded=ctoPorts>0?Math.ceil(ctoPorts/ponRatio):0;
   return {
-    cables,groups,ctoTotal,ceoTotal,ctoPorts,
+    cables,groups,ctoTotal,ceoTotal,ctoPorts,ponRatio,ponPortsNeeded,avgSpan,optical,contingencyPct,
     cableTotal:fttxQuantity(cableTotal,true),reserveTotal,routeTotal:fttxQuantity(routeTotal,true),
-    issues,alerts:issues.map(issue=>issue.text)
+    issues,warnings,alerts:issues.map(issue=>issue.text)
   };
+}
+
+// ===== KML / KMZ Parser (OZmap / Google Earth) =====
+function fttxHaversineMeters(lat1,lon1,lat2,lon2){
+  const toRad=d=>d*Math.PI/180,R=6371000;
+  const dLat=toRad(lat2-lat1),dLon=toRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.min(1,Math.sqrt(a)));
+}
+
+function fttxLineLengthMeters(coordsText){
+  const pts=String(coordsText||'').trim().split(/\s+/).map(token=>{
+    const [lon,lat]=token.split(',').map(Number);
+    return Number.isFinite(lat)&&Number.isFinite(lon)?[lat,lon]:null;
+  }).filter(Boolean);
+  let total=0;
+  for(let i=1;i<pts.length;i++)total+=fttxHaversineMeters(pts[i-1][0],pts[i-1][1],pts[i][0],pts[i][1]);
+  return total;
+}
+
+function fttxDetectFiberGauge(text){
+  const normalized=String(text||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+  const match=normalized.match(/\b0?(6|12|24|36|48|72)\s*(?:FO|F\b|FIBRAS?)\b/);
+  return match?Number(match[1]):12;
+}
+
+function parseFttxKml(kmlText){
+  const source=String(kmlText||'');
+  const cables={};
+  let cto=0,endCto=0,ceo=0,cep=0,poles=0,ignoredPoints=0,lineCount=0;
+  const stripTags=s=>String(s||'').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,'$1').replace(/<[^>]+>/g,'').trim();
+  const folderStack=[];
+  const tokenRe=/<Folder\b[^>]*>|<\/Folder>|<Placemark\b[^>]*>[\s\S]*?<\/Placemark>|<name\b[^>]*>[\s\S]*?<\/name>/gi;
+  let m;
+  while((m=tokenRe.exec(source))!==null){
+    const tok=m[0];
+    if(/^<Folder\b/i.test(tok)){folderStack.push('');continue;}
+    if(/^<\/Folder>/i.test(tok)){folderStack.pop();continue;}
+    if(/^<name\b/i.test(tok)){
+      if(folderStack.length&&!folderStack[folderStack.length-1])folderStack[folderStack.length-1]=stripTags(tok);
+      continue;
+    }
+    const pmNameMatch=tok.match(/<name\b[^>]*>([\s\S]*?)<\/name>/i);
+    const pmDescMatch=tok.match(/<description\b[^>]*>([\s\S]*?)<\/description>/i);
+    const name=pmNameMatch?stripTags(pmNameMatch[1]):'';
+    const desc=pmDescMatch?stripTags(pmDescMatch[1]):'';
+    const context=[...folderStack,name,desc].filter(Boolean).join(' ');
+    const norm=context.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+
+    const lineMatches=[...tok.matchAll(/<LineString\b[^>]*>[\s\S]*?<coordinates\b[^>]*>([\s\S]*?)<\/coordinates>[\s\S]*?<\/LineString>/gi)];
+    if(lineMatches.length){
+      const gauge=fttxDetectFiberGauge(context);
+      let meters=0;
+      for(const lm of lineMatches)meters+=fttxLineLengthMeters(lm[1]);
+      if(meters>0){
+        cables[gauge]=(cables[gauge]||0)+meters;
+        lineCount++;
+      }
+      continue;
+    }
+    if(/<Point\b/i.test(tok)){
+      if(/\bcto\b|caixa\s+de\s+atendimento/.test(norm)){
+        if(/\bponta\b|\bfinal\b|\bterminal\b/.test(norm))endCto++;
+        else cto++;
+      }else if(/\bceo\b|caixa\s+de\s+emenda/.test(norm)){
+        ceo++;
+      }else if(/\bcep\b/.test(norm)){
+        cep++;
+      }else if(/\bpostes?\b|\bpoles?\b/.test(norm)||/^p[-_ ]?\d+$/i.test(name.trim())){
+        poles++;
+      }else{
+        ignoredPoints++;
+      }
+    }
+  }
+  const roundedCables={};
+  for(const [gauge,meters] of Object.entries(cables))roundedCables[gauge]=Math.round(meters*100)/100;
+  return {cables:roundedCables,cto,endCto,ceo,cep,poles,lineCount,ignoredPoints};
+}
+
+async function extractKmlFromKmz(buffer){
+  const bytes=new Uint8Array(buffer);
+  const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  let offset=0;
+  while(offset+30<=bytes.length){
+    if(view.getUint32(offset,true)!==0x04034b50)break;
+    const method=view.getUint16(offset+8,true);
+    const compSize=view.getUint32(offset+18,true);
+    const nameLen=view.getUint16(offset+26,true);
+    const extraLen=view.getUint16(offset+28,true);
+    const name=new TextDecoder().decode(bytes.subarray(offset+30,offset+30+nameLen));
+    const dataStart=offset+30+nameLen+extraLen;
+    let dataEnd=dataStart+compSize;
+    if(compSize===0&&(view.getUint16(offset+6,true)&8)){
+      // Data descriptor fallback: find next local/central header signature
+      let scan=dataStart;
+      while(scan+4<=bytes.length&&view.getUint32(scan,true)!==0x04034b50&&view.getUint32(scan,true)!==0x02014b50&&view.getUint32(scan,true)!==0x08074b50)scan++;
+      dataEnd=scan;
+    }
+    if(/\.kml$/i.test(name)){
+      const slice=bytes.subarray(dataStart,dataEnd);
+      if(method===0)return new TextDecoder('utf-8').decode(slice);
+      if(method===8&&typeof DecompressionStream==='function'){
+        const stream=new Blob([slice]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+        return await new Response(stream).text();
+      }
+      throw Error('Formato KMZ comprimido não suportado neste navegador. Exporte como KML.');
+    }
+    offset=dataEnd;
+  }
+  throw Error('Nenhum arquivo .kml encontrado dentro do KMZ.');
+}
+
+// ===== Saved Scenarios (Multiple Projects) =====
+function fttxScenariosKey(){
+  return 'voanet_fttx_scenarios_'+encodeURIComponent(googleUser?.email||'local');
+}
+function loadFttxScenarios(){
+  try{
+    const list=JSON.parse(localStorage.getItem(fttxScenariosKey())||'[]');
+    return Array.isArray(list)?list:[];
+  }catch(_){return [];}
+}
+function saveFttxScenarios(list){
+  try{localStorage.setItem(fttxScenariosKey(),JSON.stringify(list.slice(0,25)));}catch(_){}
+}
+function renderFttxScenarios(){
+  const list=loadFttxScenarios();
+  if(!list.length)return '<p class="small muted">Nenhum cenário salvo ainda. Salve este projeto para comparar alternativas (ex.: CTO 1:16 vs. 1:8).</p>';
+  return `<ul class="fttx-scenario-list">${list.map(item=>`<li>
+    <div><strong>${esc(item.name)}</strong>
+    <div class="small muted">${fttxQuantityFormat.format(item.cableTotal||0)} m cabo${item.ctoPorts?` · ${item.ctoPorts} portas`:''}${item.subtotal!=null?` · ${fttxCurrency.format(item.subtotal)}`:''}${item.costPerPort!=null?` (${fttxCurrency.format(item.costPerPort)}/porta)`:''}</div></div>
+    <div class="btnrow">
+      <button type="button" class="btn tiny primary" data-fttx-scenario-load="${esc(item.id)}">Abrir</button>
+      <button type="button" class="btn tiny" data-fttx-scenario-dup="${esc(item.id)}">Duplicar</button>
+      <button type="button" class="btn tiny danger" data-fttx-scenario-del="${esc(item.id)}">Excluir</button>
+    </div>
+  </li>`).join('')}</ul>`;
 }
 
 function loadFttxDraft(){
@@ -281,11 +565,12 @@ function fttxPriceTable(groups){
     if(quote.cents===null)missing++;
     else cents+=quote.cents;
     const {reference}=quote;
+    const pack=fttxPackSummary(name,qty);
     const source=reference&&/^https:\/\//.test(reference.url)
       ? `<a href="${esc(reference.url)}" target="_blank" rel="noopener noreferrer">${esc(reference.store)}</a>
         <div class="small muted">${esc(reference.details||'')} · ${esc(fmt(reference.checkedOn))}</div>`
       : `<span>${esc(quote.source)}</span>`;
-    return `<tr role="row"><th role="rowheader" scope="row">${esc(name)}</th><td role="cell">${fttxCellLabel('Quantidade')}${fttxQuantityFormat.format(qty)} ${unit}</td>
+    return `<tr role="row"><th role="rowheader" scope="row">${esc(name)}</th><td role="cell">${fttxCellLabel('Quantidade')}${fttxQuantityFormat.format(qty)} ${unit}${pack?`<span class="fttx-pack-note">${esc(pack)}</span>`:''}</td>
       <td role="cell">${fttxCellLabel('Preço unitário')}<input type="number" min="0" step="0.0001" inputmode="decimal" class="fttx-price-input"
         aria-label="Preço unitário de ${esc(name)}" data-fttx-price="${esc(name)}"
         value="${esc(fttxDraft.prices?.[name]??'')}" placeholder="${quote.unit===null?'—':fttxUnitPrice.format(quote.unit)}"></td>
@@ -326,12 +611,22 @@ function currentFttxStep(){
 function fttxOverview(result){
   const {items,missing,subtotal}=fttxCostRows(result.groups);
   const meters=value=>fttxQuantityFormat.format(value)+' m';
+  const costPerPort=result.ctoPorts>0&&subtotal!==null?subtotal/result.ctoPorts:null;
   return `<dl class="fttx-overview">
-    <div><dt>Trajeto</dt><dd>${meters(result.routeTotal)}</dd>${result.ctoPorts>0?`<small>${fttxQuantityFormat.format(result.ctoPorts)} portas CTO</small>`:''}</div>
-    <div><dt>Cabo com reserva</dt><dd>${meters(result.cableTotal)}</dd></div>
+    <div><dt>Trajeto</dt><dd>${meters(result.routeTotal)}</dd>${result.avgSpan!==null?`<small>Vão médio: ${fttxQuantityFormat.format(result.avgSpan)} m</small>`:''}</div>
+    <div><dt>Cabo com reserva</dt><dd>${meters(result.cableTotal)}</dd>${result.ctoPorts>0?`<small>${fttxQuantityFormat.format(result.ctoPorts)} portas · ${result.ponPortsNeeded} PON (1:${result.ponRatio})</small>`:''}</div>
     <div><dt>Estimativa de materiais</dt><dd>${subtotal===null?'—':fttxCurrency.format(subtotal)}</dd>
-    ${items.length&&missing?`<small>${missing} de ${items.length} linhas sem preço</small>`:''}</div>
+    ${costPerPort!==null?`<small>${fttxCurrency.format(costPerPort)} / porta CTO</small>`:items.length&&missing?`<small>${missing} de ${items.length} linhas sem preço</small>`:''}</div>
   </dl>`;
+}
+
+function renderOpticalResult(optical){
+  if(!optical.active)return '<p class="small muted">Selecione os splitters do pior enlace (CTO mais distante) para validar a potência óptica GPON / XGS-PON.</p>';
+  return `<div class="fttx-optical-result fttx-optical-${optical.status}">
+    <strong>${esc(optical.statusLabel)} · ${esc(optical.classLabel)}</strong>
+    <div>Atenuação total (c/ margem de ${fttxQuantityFormat.format(optical.marginDb)} dB): <strong>${optical.totalLossDb.toFixed(2)} dB</strong> de ${optical.budgetDb} dB · Folga: <strong>${optical.headroomDb>=0?'+':''}${optical.headroomDb.toFixed(2)} dB</strong></div>
+    <div>Potência estimada na CTO de ponta: <strong>${optical.rxPowerDbm.toFixed(2)} dBm</strong> · Fibra (${fttxQuantityFormat.format(optical.distanceKm)} km): ${optical.fiberLossDb.toFixed(2)} dB · Splitters: ${(optical.split1Db+optical.split2Db+optical.cascadeDb).toFixed(2)} dB · Fusões/conectores: ${optical.passiveDb.toFixed(2)} dB</div>
+  </div>`;
 }
 
 function updateFttxOverview(result){
@@ -340,17 +635,27 @@ function updateFttxOverview(result){
   const portsBadge=document.getElementById('fttx-cto-ports-badge');
   if(portsBadge){
     portsBadge.hidden=result.ctoPorts<=0;
-    portsBadge.textContent=`Capacidade planejada: ${fttxQuantityFormat.format(result.ctoPorts)} portas de atendimento`;
+    portsBadge.textContent=`Capacidade: ${fttxQuantityFormat.format(result.ctoPorts)} portas · ${result.ponPortsNeeded} porta(s) PON (1:${result.ponRatio})`;
   }
+  const optBox=document.getElementById('fttx-optical-output');
+  if(optBox)optBox.innerHTML=renderOpticalResult(result.optical);
 }
 
 function fttxIssues(result,step){
   const issues=step===4?result.issues:result.issues.filter(issue=>issue.step===step);
-  if(!issues.length)return '';
-  return `<div class="fttx-alert"><strong>${step===4?'Ajuste os campos indicados para exportar':'Confira nesta etapa'}</strong>
-    <ul>${issues.map(({text,step:target})=>`<li>${text}
-    ${step===4?`<button type="button" class="btn tiny" data-fttx-step="${target}">Revisar ${FTTX_STEPS[target-1][0]}</button>`:''}
-    </li>`).join('')}</ul></div>`;
+  const warnings=step===4?result.warnings:result.warnings.filter(w=>w.step===step);
+  let html='';
+  if(issues.length){
+    html+=`<div class="fttx-alert"><strong>${step===4?'Ajuste os campos indicados para exportar':'Confira nesta etapa'}</strong>
+      <ul>${issues.map(({text,step:target})=>`<li>${text}
+      ${step===4?`<button type="button" class="btn tiny" data-fttx-step="${target}">Revisar ${FTTX_STEPS[target-1][0]}</button>`:''}
+      </li>`).join('')}</ul></div>`;
+  }
+  if(warnings.length){
+    html+=`<div class="fttx-warning-box"><strong>Avisos de engenharia (não bloqueiam exportação)</strong>
+      <ul>${warnings.map(({text})=>`<li>${esc(text)}</li>`).join('')}</ul></div>`;
+  }
+  return html;
 }
 
 function fttxExtrasListHtml(){
@@ -372,6 +677,8 @@ function updateFttxResults(){
   });
   const extrasNode=document.getElementById('fttx-extras-list');
   if(extrasNode)extrasNode.innerHTML=fttxExtrasListHtml();
+  const scenariosNode=document.getElementById('fttx-scenarios-list');
+  if(scenariosNode)scenariosNode.innerHTML=renderFttxScenarios();
   if(currentFttxStep()!==4)return;
   const target=document.getElementById('fttx-results');
   if(!target)return;
@@ -452,12 +759,14 @@ function fttxCellLabel(label){
   return `<span class="fttx-cell-label" aria-hidden="true">${label}</span>`;
 }
 
-function fttxResults({cables,groups}){
+function fttxResults(result){
+  const {cables,groups,optical}=result;
   const f=value=>fttxQuantityFormat.format(value);
   const shown=cables.filter(c=>c.total>0);
   const {items}=fttxCostRows(groups);
   const money=value=>value===null?'—':fttxCurrency.format(value);
-  return `<div id="fttx-cost-summary" class="fttx-cost-summary">${fttxCostSummary(groups)}</div>
+  return `<div id="fttx-cost-summary" class="fttx-cost-summary">${fttxCostSummary(result)}</div>
+  ${optical.active?`<section class="fttx-reservation"><h3>Validação óptica</h3>${renderOpticalResult(optical)}</section>`:''}
   ${shown.length?`<section class="fttx-reservation"><h3>Reserva por bitola</h3><div class="table-scroll fttx-review-table"><table class="data-table fttx-reserve-table" role="table" aria-label="Reserva por bitola">
     <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Bitola</th><th role="columnheader" scope="col">CTOs</th><th role="columnheader" scope="col">CEOs</th><th role="columnheader" scope="col">A cada 500 m</th><th role="columnheader" scope="col">Reserva</th><th role="columnheader" scope="col">Cabo total</th></tr></thead>
     <tbody role="rowgroup">${shown.map(c=>`<tr role="row"><th role="rowheader" scope="row">${String(c.fibers).padStart(2,'0')} FO</th>
@@ -472,10 +781,13 @@ function fttxResults({cables,groups}){
       <span>Subtotal estimado <strong>${money(subtotal)}</strong></span></div>
       <div class="table-scroll fttx-review-table"><table class="data-table fttx-budget-table" role="table" aria-label="${esc(group.title)}">
       <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Material</th><th role="columnheader" scope="col">Quantidade</th><th role="columnheader" scope="col">Preço unitário</th><th role="columnheader" scope="col">Subtotal</th></tr></thead>
-      <tbody role="rowgroup">${rows.map(({name,unit,quantity,price,subtotal})=>`<tr role="row"><th role="rowheader" scope="row">${esc(name)}</th>
-        <td role="cell">${fttxCellLabel('Quantidade')}<strong>${f(quantity)} ${unit}</strong></td>
+      <tbody role="rowgroup">${rows.map(({name,unit,quantity,price,subtotal})=>{
+        const pack=fttxPackSummary(name,quantity);
+        return `<tr role="row"><th role="rowheader" scope="row">${esc(name)}</th>
+        <td role="cell">${fttxCellLabel('Quantidade')}<strong>${f(quantity)} ${unit}</strong>${pack?`<span class="fttx-pack-note">${esc(pack)}</span>`:''}</td>
         <td role="cell">${fttxCellLabel('Preço unitário')}${price===null?'—':fttxUnitPrice.format(price)}</td>
-        <td role="cell">${fttxCellLabel('Subtotal')}${money(subtotal)}</td></tr>`).join('')}</tbody>
+        <td role="cell">${fttxCellLabel('Subtotal')}${money(subtotal)}</td></tr>`;
+      }).join('')}</tbody>
       </table></div></section>`;
   }).join(''):'<p class="muted">Preencha os dados do projeto para gerar a lista de materiais.</p>'}
   ${fttxPriceTable(groups)}`;
@@ -487,10 +799,15 @@ function renderFttx(){
   const issues=number=>`<div data-fttx-issues="${number}" role="status">${fttxIssues(result,number)}</div>`;
   const hasUnbalanced=[...FTTX_SPLITTERS_UNBALANCED_CONN,...FTTX_SPLITTERS_UNBALANCED_BARE].some(([field])=>fttxQuantity(fttxDraft[field])>0);
   const hasCeoModels=FTTX_CEO_MODELS.some(([field])=>fttxQuantity(fttxDraft[field])>0);
+  const splitOptions=selected=>FTTX_OPTICAL_SPLITS.map(([id,label])=>`<option value="${id}" ${(selected||'none')===id?'selected':''}>${label}</option>`).join('');
   return `<main class="shell fttx-shell">
     <header class="fttx-page-heading"><div><h1>Levantamento FTTx</h1>
-      <p>Calcule a metragem, especifique CTOs, CEOs e splitters e prepare o levantamento para o almoxarifado.</p></div>
-      <div class="btnrow"><button type="button" class="btn tiny danger" data-fttx-reset>Limpar levantamento</button>${isGoogleMode()?'':button('home','Voltar à Gestão','tiny')}</div></header>
+      <p>Calcule metragem, orçamento óptico, portas PON, CTOs, CEOs e splitters para o almoxarifado.</p></div>
+      <div class="btnrow">
+        <button type="button" class="btn tiny primary" data-fttx-scenario-save>Salvar cenário</button>
+        <button type="button" class="btn tiny danger" data-fttx-reset>Limpar levantamento</button>
+        ${isGoogleMode()?'':button('home','Voltar à Gestão','tiny')}
+      </div></header>
     <div id="fttx-overview">${fttxOverview(result)}</div>
     <div class="fttx-workspace">
       <aside class="fttx-wizard" aria-label="Progresso do levantamento">
@@ -508,18 +825,38 @@ function renderFttx(){
         <section ${panel(1)} aria-labelledby="fttx-project-heading">
           ${fttxStep(1,'fttx-project-heading','Lançamento de cabo e postes')}
           ${issues(1)}
-          <p class="fttx-panel-description">Use as quantidades previstas no mapa ou no projeto. Deixe em branco as que ainda precisa confirmar.</p>
+          <p class="fttx-panel-description">Use as quantidades previstas no mapa ou importe um KML/KMZ do OZmap ou Google Earth.</p>
           <label class="fttx-field fttx-project"><span>Nome do projeto</span><input maxlength="100" data-fttx-field="name" placeholder="Ex.: Expansão Curralinho" value="${esc(fttxDraft.name??'')}"></label>
+          <details class="fttx-options">
+            <summary>Importar traçado KML / KMZ (OZmap ou Google Earth)</summary>
+            <p class="small muted">Lê o arquivo localmente no navegador para estimar metragem por bitola, postes, CTOs e CEOs. Você pode revisar tudo depois.</p>
+            <div class="fttx-quick-bar">
+              <input id="fttx-kml-file" type="file" accept=".kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz">
+            </div>
+            <p id="fttx-kml-status" class="small muted" role="status"></p>
+          </details>
+          <details class="fttx-options">
+            <summary>Projetos e cenários salvos (${loadFttxScenarios().length})</summary>
+            <div id="fttx-scenarios-list">${renderFttxScenarios()}</div>
+          </details>
           <h3>Cabo por número de fibras (FO)</h3>
-          <p class="small muted">Informe a metragem por bitola. O sistema calcula a reserva.</p>
+          <p class="small muted">Informe a metragem por bitola. O sistema calcula a reserva e valida o vão médio (padrão AS80/ASU80 até 80 m).</p>
           ${fttxCableInputs(['meters'])}
           <h3>Postes e abraçadeiras</h3>
           <div class="fttx-fields">${FTTX_ROUTE_FIELDS.map(([field,label,help])=>fttxInput(field,label,help)).join('')}</div>
-          <button type="button" class="btn tiny fttx-suggestion" data-fttx-suggestion="asPoles">Usar todos os postes para cabo AS</button>
-          <p class="small muted">Use esse atalho se o cabo AS passar em todos os postes do trecho. Você pode ajustar a quantidade depois.</p>
+          <div class="fttx-quick-bar">
+            <button type="button" class="btn tiny fttx-suggestion" data-fttx-suggestion="asPoles">Usar todos os postes para cabo AS</button>
+          </div>
           <details class="fttx-options" ${FTTX_ROUTE_DETAILS.some(([key])=>fttxQuantity(fttxDraft[key])>0)?'open':''}>
             <summary>Detalhar ferragens e ancoragem</summary>
-            <p class="small muted">Preencha os itens que já consegue estimar pelo traçado. Deixe os demais para a conferência de campo.</p>
+            <p class="small muted">Preencha os itens que já consegue estimar pelo traçado ou use o atalho para pré-preencher ferragens de ancoragem.</p>
+            <div class="fttx-quick-bar">
+              <button type="button" class="btn tiny" data-fttx-estimate-hardware>Estimar ferragens pelo trajeto</button>
+            </div>
+            <label class="fttx-checkbox-inline">
+              <input type="checkbox" data-fttx-checkbox="includeGuideBuckle" ${fttxDraft.includeGuideBuckle===true||fttxDraft.includeGuideBuckle==='true'?'checked':''}>
+              Incluir 1 fecho de aço 3/4″ por poste sem CTO e sem BAP (para prender a fita de 1,5 m)
+            </label>
             <div class="fttx-fields">${FTTX_ROUTE_DETAILS.map(([field,label,help])=>fttxInput(field,label,help)).join('')}</div>
           </details>
           ${fttxStepActions(1)}
@@ -532,13 +869,13 @@ function renderFttx(){
           <div class="fttx-fields">${fttxInput('ctoPoles','Postes com CTO','Conte os postes distintos. Se duas caixas estiverem no mesmo poste, conte apenas um poste.')}</div>
           <button type="button" class="btn tiny fttx-suggestion" data-fttx-suggestion="ctoPoles">Estimar uma CTO por poste</button>
           <div class="fttx-subsection">
-            <h3>Capacidade e modelo das CTOs</h3>
-            <p class="small muted">Opcional: especifique quantas CTOs serão 1:8, 1:16, 1:24 ou pré-conectorizadas. A soma deve igualar o total de CTOs informadas acima.</p>
+            <h3>Capacidade, fornecimento e dimensionamento PON</h3>
+            <p class="small muted">Especifique quantas CTOs serão 1:8, 1:16, 1:24 ou pré-conectorizadas. A soma deve igualar o total de CTOs informadas acima.</p>
             <div class="fttx-quick-bar">
               <button type="button" class="btn tiny" data-fttx-cto-fill="cto8">Todas 1:8</button>
               <button type="button" class="btn tiny" data-fttx-cto-fill="cto16">Todas 1:16</button>
               <button type="button" class="btn tiny" data-fttx-cto-fill="ctoPre16">Todas pré-conectorizada 1:16</button>
-              <span id="fttx-cto-ports-badge" class="fttx-ports-pill" ${result.ctoPorts>0?'':'hidden'}>Capacidade planejada: ${fttxQuantityFormat.format(result.ctoPorts)} portas de atendimento</span>
+              <span id="fttx-cto-ports-badge" class="fttx-ports-pill" ${result.ctoPorts>0?'':'hidden'}>Capacidade: ${fttxQuantityFormat.format(result.ctoPorts)} portas · ${result.ponPortsNeeded} porta(s) PON (1:${result.ponRatio})</span>
             </div>
             <div class="fttx-fields">
               ${FTTX_CTO_MODELS.map(([field,label])=>fttxInput(field,label)).join('')}
@@ -548,7 +885,15 @@ function renderFttx(){
                   <option value="montada" ${fttxDraft.ctoAssembly!=='vazia'?'selected':''}>CTO já montada / equipada</option>
                   <option value="vazia" ${fttxDraft.ctoAssembly==='vazia'?'selected':''}>CTO vazia (incluir splitter SC/APC e adaptadores)</option>
                 </select>
-                <small>No modo vazia, CTO 1:8 e 1:16 somam automaticamente splitter conectorizado SC/APC e adaptadores SC/APC. Para CTO 1:24 vazia, informe os splitters desejados na etapa 3.</small>
+                <small>No modo vazia, CTO 1:8 e 1:16 somam automaticamente splitter conectorizado SC/APC e adaptadores SC/APC.</small>
+              </div>
+              <div class="fttx-field">
+                <label for="fttx-ponRatio">Razão máxima por porta PON (OLT)</label>
+                <select id="fttx-ponRatio" data-fttx-field="ponRatio">
+                  <option value="64" ${String(fttxDraft.ponRatio)!=='128'?'selected':''}>1:64 (padrão GPON)</option>
+                  <option value="128" ${String(fttxDraft.ponRatio)==='128'?'selected':''}>1:128 (alta densidade)</option>
+                </select>
+                <small>Usado para estimar quantas portas PON da OLT o projeto exige.</small>
               </div>
             </div>
           </div>
@@ -585,6 +930,31 @@ function renderFttx(){
               <div class="fttx-fields">${FTTX_SPLITTERS_UNBALANCED_BARE.map(([field,label])=>fttxInput(field,label)).join('')}</div>
             </details>
           </div>
+          <details class="fttx-options" ${result.optical.active?'open':''}>
+            <summary>Calculadora de Orçamento Óptico (GPON / XGS-PON)</summary>
+            <p class="small muted">Valide a atenuação total até a CTO mais distante (pior caso em 1310 nm: 0,35 dB/km + 0,10 dB/fusão + 0,50 dB/conector).</p>
+            <div class="fttx-fields">
+              <div class="fttx-field">
+                <label for="fttx-optClass">Classe SFP / OLT</label>
+                <select id="fttx-optClass" data-fttx-field="optClass">
+                  ${Object.entries(FTTX_OPTICAL_CLASSES).map(([id,c])=>`<option value="${id}" ${(fttxDraft.optClass||'gpon_c')===id?'selected':''}>${c.label}</option>`).join('')}
+                </select>
+              </div>
+              ${fttxInput('optDistanceKm','Distância OLT → CTO ponta (km)','Em branco usa o trajeto informado ('+fttxQuantityFormat.format(result.routeTotal/1000)+' km).',true)}
+              <div class="fttx-field"><label for="fttx-optSplit1">Splitter 1º nível (CEO / DIO)</label><select id="fttx-optSplit1" data-fttx-field="optSplit1">${splitOptions(fttxDraft.optSplit1)}</select></div>
+              <div class="fttx-field"><label for="fttx-optSplit2">Splitter 2º nível (CTO)</label><select id="fttx-optSplit2" data-fttx-field="optSplit2">${splitOptions(fttxDraft.optSplit2)}</select></div>
+              ${fttxInput('optCascadeCount','Passantes desbalanceados antes da ponta','Para rede em cascata (0 em rede balanceada).')}
+              <div class="fttx-field"><label for="fttx-optCascadeRatio">Razão dos passantes em cascata</label>
+                <select id="fttx-optCascadeRatio" data-fttx-field="optCascadeRatio">
+                  ${FTTX_UNBALANCED_RATIOS.map(r=>`<option value="${r}" ${(fttxDraft.optCascadeRatio||'10/90')===r?'selected':''}>${r} (${FTTX_CASCADE_THRU_DB[r].toFixed(2).replace('.',',')} dB/passante)</option>`).join('')}
+                </select>
+              </div>
+              ${fttxInput('optSplices','Fusões no pior enlace','Padrão: 6 fusões (0,10 dB cada).')}
+              ${fttxInput('optConnectors','Pares de conectores SC/APC','Padrão: 4 pares (0,50 dB cada).')}
+              ${fttxInput('optMargin','Margem de segurança (dB)','Padrão: 3,0 dB para envelhecimento/reparos.',true)}
+            </div>
+            <div id="fttx-optical-output">${renderOpticalResult(result.optical)}</div>
+          </details>
           <details class="fttx-options" ${FTTX_BOX_FIELDS.slice(1).some(([key])=>fttxQuantity(fttxDraft[key],true)>0)?'open':''}>
             <summary>Detalhar bandejas, cordoalha, tubetes e mantas</summary>
             <div class="fttx-quick-bar">
@@ -596,11 +966,20 @@ function renderFttx(){
         </section>
         <section ${panel(4)} aria-labelledby="fttx-list-heading">
           ${fttxStep(4,'fttx-list-heading','Lista para o almoxarifado')}
-          <p class="fttx-panel-description">Revise as quantidades por etapa e ajuste os preços para baixar o levantamento preliminar.</p>
+          <p class="fttx-panel-description">Revise quantidades, embalagens de compra e preços para baixar o levantamento preliminar.</p>
           <div class="fttx-export-bar">
             <div class="btnrow" aria-label="Exportar materiais">${[['pdf','Baixar PDF','primary'],['xlsx','Baixar Excel',''],['csv','Baixar CSV','']]
               .map(([format,label,style])=>`<button type="button" class="btn ${style}" data-fttx-export="${format}"
               ${result.alerts.length||!result.groups.some(group=>group.items.length)?'disabled':''}>${label}</button>`).join('')}</div>
+            <div class="fttx-quick-bar">
+              <label class="fttx-field"><span>Margem de contingência (ferragens e consumíveis)</span>
+                <select data-fttx-field="contingencyPct">
+                  <option value="0" ${!result.contingencyPct?'selected':''}>0% (quantidade exata)</option>
+                  <option value="5" ${result.contingencyPct===5?'selected':''}>+5% de reserva</option>
+                  <option value="10" ${result.contingencyPct===10?'selected':''}>+10% de reserva</option>
+                </select>
+              </label>
+            </div>
             <p id="fttx-export-status" class="small muted fttx-export-status" role="status"></p>
           </div>
           ${issues(4)}
@@ -662,10 +1041,16 @@ function fttxCostRows(groups){
   return {items,missing,subtotal:items.length===missing?null:cents/100};
 }
 
-function fttxCostSummary(groups){
+function fttxCostSummary(result){
+  const groups=Array.isArray(result)?result:result.groups;
   const {items,missing,subtotal}=fttxCostRows(groups);
   if(!items.length)return '';
-  return `<div><h3>Estimativa de materiais</h3><strong>${subtotal===null?'Sem preços informados':fttxCurrency.format(subtotal)}</strong></div>
+  const ctoPorts=Array.isArray(result)?0:result.ctoPorts;
+  const ponPorts=Array.isArray(result)?0:result.ponPortsNeeded;
+  const ponRatio=Array.isArray(result)?64:result.ponRatio;
+  const costPerPort=ctoPorts>0&&subtotal!==null?subtotal/ctoPorts:null;
+  return `<div><h3>Estimativa de materiais</h3><strong>${subtotal===null?'Sem preços informados':fttxCurrency.format(subtotal)}</strong>
+    ${costPerPort!==null?`<div class="small muted">${fttxCurrency.format(costPerPort)} por porta CTO · ${ctoPorts} portas · ${ponPorts} porta(s) PON (1:${ponRatio})</div>`:''}</div>
     <button type="button" class="btn tiny" data-fttx-jump="fttx-prices-editor">Ajustar preços em R$</button>
     <p>${missing?`${missing} de ${items.length} linhas sem preço. O subtotal cobre os itens com valor informado. `:''}Mão de obra e frete ficam fora da estimativa.</p>`;
 }
@@ -684,7 +1069,8 @@ function buildFttxCsv(report){
 
 let fttxExportRequest;
 async function exportFttx(format){
-  const {groups,alerts,routeTotal,reserveTotal,cableTotal,ctoPorts}=calculateFttx(fttxDraft);
+  const result=calculateFttx(fttxDraft);
+  const {groups,alerts,routeTotal,reserveTotal,cableTotal,ctoPorts,ponPortsNeeded,ponRatio,optical}=result;
   const costs=fttxCostRows(groups);
   if(alerts.length||!costs.items.length||fttxExportRequest?.session===googleSession)return;
   const status=document.getElementById('fttx-export-status');
@@ -692,7 +1078,8 @@ async function exportFttx(format){
   fttxExportRequest=request;
   const project=fttxDraft.name?.trim()||'Projeto FTTx';
   const date=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo'}).format();
-  const report={...costs,project,date,routeTotal,reserveTotal,cableTotal,ctoPorts};
+  const costPerPort=ctoPorts>0&&costs.subtotal!==null?costs.subtotal/ctoPorts:null;
+  const report={...costs,project,date,routeTotal,reserveTotal,cableTotal,ctoPorts,ponPortsNeeded,ponRatio,costPerPort,optical};
   const filename=project.replace(/[<>:"/\\|?*\x00-\x1f\x7f]/g,' ').trim()||'Projeto FTTx';
   const exports={
     pdf:[buildFttxPdf,'application/pdf'],
@@ -713,15 +1100,67 @@ async function exportFttx(format){
   }
 }
 
+function rerenderFttxPane(){
+  const pane=isGoogleMode()?document.getElementById('portal-fttx-pane'):document.getElementById('app');
+  if(pane)pane.innerHTML=renderFttx();
+}
+
 document.addEventListener('click',event=>{
   const exportButton=event.target.closest('[data-fttx-export]');
   if(exportButton&&fttxActive())exportFttx(exportButton.dataset.fttxExport);
 });
 
 document.addEventListener('input',saveFttx);
-document.addEventListener('change',event=>{
-  if(event.target.matches('select[data-fttx-field]'))saveFttx(event);
+document.addEventListener('change',async event=>{
+  if(!fttxActive())return;
+  const target=event.target;
+  if(target.matches('select[data-fttx-field]')){saveFttx(event);return;}
+  if(target.dataset.fttxCheckbox){
+    fttxDraft[target.dataset.fttxCheckbox]=target.checked;
+    persistFttx();
+    updateFttxResults();
+    return;
+  }
+  if(target.id==='fttx-kml-file'&&target.files?.length){
+    const file=target.files[0],status=document.getElementById('fttx-kml-status');
+    try{
+      if(status)status.textContent='Lendo '+file.name+'…';
+      const kmlText=/\.kmz$/i.test(file.name)?await extractKmlFromKmz(await file.arrayBuffer()):await file.text();
+      const parsed=parseFttxKml(kmlText);
+      const gauges=Object.keys(parsed.cables).map(Number);
+      if(!gauges.length&&!parsed.cto&&!parsed.endCto&&!parsed.ceo&&!parsed.poles){
+        throw Error('Nenhum trecho de cabo ou ponto reconhecido no arquivo.');
+      }
+      fttxDraft.cables??={};
+      let dominant=12,maxMeters=-1;
+      for(const g of gauges){
+        fttxDraft.cables[g]??={};
+        fttxDraft.cables[g].meters=String(parsed.cables[g]);
+        if(parsed.cables[g]>maxMeters){maxMeters=parsed.cables[g];dominant=g;}
+      }
+      fttxDraft.cables[dominant]??={};
+      if(parsed.cto)fttxDraft.cables[dominant].cto=String(parsed.cto);
+      if(parsed.endCto)fttxDraft.cables[dominant].endCto=String(parsed.endCto);
+      if(parsed.ceo)fttxDraft.cables[dominant].ceo=String(parsed.ceo);
+      if(parsed.cep)fttxDraft.cep=String(parsed.cep);
+      if(parsed.poles)fttxDraft.poles=String(parsed.poles);
+      if(parsed.cto+parsed.endCto>0&&(!parsed.poles||parsed.poles>=parsed.cto+parsed.endCto)){
+        fttxDraft.ctoPoles=String(parsed.cto+parsed.endCto);
+      }
+      if(!fttxDraft.name)fttxDraft.name=file.name.replace(/\.(kml|kmz)$/i,'').slice(0,100);
+      persistFttx();
+      rerenderFttxPane();
+      const postStatus=document.getElementById('fttx-kml-status');
+      const totalM=Object.values(parsed.cables).reduce((a,b)=>a+b,0);
+      if(postStatus){
+        postStatus.textContent=`Importado de ${file.name}: ${fttxQuantityFormat.format(totalM)} m de cabo, ${parsed.poles} poste(s), ${parsed.cto+parsed.endCto} CTO(s), ${parsed.ceo} CEO(s). Confira e ajuste os campos.`;
+      }
+    }catch(error){
+      if(status)status.textContent='Não foi possível importar: '+error.message;
+    }finally{target.value='';}
+  }
 });
+
 document.addEventListener('click',event=>{
   if(!fttxActive())return;
   const step=event.target.closest('[data-fttx-step]');
@@ -731,8 +1170,68 @@ document.addEventListener('click',event=>{
     if(!confirm('Limpar todos os campos deste levantamento FTTx para iniciar um novo projeto?'))return;
     fttxDraft={step:1};
     persistFttx();
-    const pane=isGoogleMode()?document.getElementById('portal-fttx-pane'):document.getElementById('app');
-    if(pane)pane.innerHTML=renderFttx();
+    rerenderFttxPane();
+    return;
+  }
+  const saveScenario=event.target.closest('[data-fttx-scenario-save]');
+  if(saveScenario){
+    const name=String(fttxDraft.name||'').trim()||prompt('Nome do cenário para salvar:','Projeto FTTx');
+    if(!name)return;
+    fttxDraft.name=name.trim();
+    const res=calculateFttx(fttxDraft),costs=fttxCostRows(res.groups);
+    const list=loadFttxScenarios();
+    const id='SCN-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,6);
+    list.unshift({
+      id,name:fttxDraft.name,savedAt:new Date().toISOString(),
+      draft:JSON.parse(JSON.stringify(fttxDraft)),
+      routeTotal:res.routeTotal,cableTotal:res.cableTotal,ctoPorts:res.ctoPorts,
+      subtotal:costs.subtotal,costPerPort:res.ctoPorts>0&&costs.subtotal!==null?costs.subtotal/res.ctoPorts:null
+    });
+    saveFttxScenarios(list);
+    persistFttx();
+    rerenderFttxPane();
+    return;
+  }
+  const loadScenario=event.target.closest('[data-fttx-scenario-load]');
+  if(loadScenario){
+    const found=loadFttxScenarios().find(x=>x.id===loadScenario.dataset.fttxScenarioLoad);
+    if(!found)return;
+    fttxDraft=JSON.parse(JSON.stringify(found.draft||{}));
+    persistFttx();
+    rerenderFttxPane();
+    return;
+  }
+  const dupScenario=event.target.closest('[data-fttx-scenario-dup]');
+  if(dupScenario){
+    const list=loadFttxScenarios(),found=list.find(x=>x.id===dupScenario.dataset.fttxScenarioDup);
+    if(!found)return;
+    const copy=JSON.parse(JSON.stringify(found));
+    copy.id='SCN-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,6);
+    copy.name=(found.name+' (cópia)').slice(0,100);
+    if(copy.draft)copy.draft.name=copy.name;
+    copy.savedAt=new Date().toISOString();
+    list.unshift(copy);
+    saveFttxScenarios(list);
+    rerenderFttxPane();
+    return;
+  }
+  const delScenario=event.target.closest('[data-fttx-scenario-del]');
+  if(delScenario){
+    if(!confirm('Excluir este cenário salvo?'))return;
+    saveFttxScenarios(loadFttxScenarios().filter(x=>x.id!==delScenario.dataset.fttxScenarioDel));
+    rerenderFttxPane();
+    return;
+  }
+  const estHw=event.target.closest('[data-fttx-estimate-hardware]');
+  if(estHw){
+    const patch=fttxEstimateHardware(fttxDraft);
+    for(const [field,val] of Object.entries(patch)){
+      fttxDraft[field]=String(val);
+      const input=document.getElementById('fttx-'+field);
+      if(input)input.value=String(val);
+    }
+    persistFttx();
+    updateFttxResults();
     return;
   }
   const removeExtra=event.target.closest('[data-fttx-remove-extra]');

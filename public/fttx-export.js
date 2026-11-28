@@ -66,7 +66,17 @@ async function buildFttxWorkbook(report) {
   summary.addRow(['Cabo lançado (m)', report.routeTotal]);
   summary.addRow(['Reserva técnica (m)', report.reserveTotal]);
   summary.addRow(['Cabo total (m)', report.cableTotal]);
-  if (report.ctoPorts > 0) summary.addRow(['Portas de atendimento (CTO)', report.ctoPorts]);
+  if (report.ctoPorts > 0) {
+    summary.addRow(['Portas de atendimento (CTO)', report.ctoPorts]);
+    if (report.ponPortsNeeded > 0) summary.addRow([`Portas PON estimadas (1:${report.ponRatio || 64})`, report.ponPortsNeeded]);
+    if (report.costPerPort !== null && report.costPerPort !== undefined) {
+      const cpp = summary.addRow(['Custo estimado por porta CTO', report.costPerPort]);
+      cpp.getCell(2).numFmt = money;
+    }
+  }
+  if (report.optical?.active) {
+    summary.addRow(['Orçamento óptico (' + report.optical.classLabel + ')', `${report.optical.totalLossDb.toFixed(2)} dB / ${report.optical.budgetDb} dB (${report.optical.statusLabel})`]);
+  }
   summary.addRow(['Linhas de material', report.items.length]);
   const last = materials.rowCount;
   summary.addRow(['Linhas sem preço', {formula:`COUNTBLANK(Materiais!F2:F${last})`, result:report.missing}]);
@@ -164,9 +174,15 @@ async function buildFttxPdf(report) {
         draw(label,x,y-17,{size:8,color:muted});
         draw(value,x,y-34,{size:13,font:bold});
       });
-      draw(report.subtotal===null?'Subtotal estimado indisponível':'Subtotal estimado '+fttxCurrency.format(report.subtotal),
-        left+12,y-52,{size:10,font:bold,color:red});
-      draw(report.missing+' de '+report.items.length+' linhas sem preço',right-12,y-52,{size:9,color:muted,alignRight:true});
+      const subLabel = report.subtotal===null
+        ? 'Subtotal estimado indisponível'
+        : 'Subtotal estimado '+fttxCurrency.format(report.subtotal)
+          + (report.costPerPort!==null&&report.costPerPort!==undefined?'  ('+fttxCurrency.format(report.costPerPort)+'/porta)':'');
+      draw(subLabel, left+12, y-52, {size:10,font:bold,color:red});
+      const rightSummary = (report.ponPortsNeeded>0?report.ponPortsNeeded+' PON · ':'')
+        + (report.optical?.active?report.optical.totalLossDb.toFixed(1)+' dB ('+report.optical.statusLabel+') · ':'')
+        + report.missing+' s/ preço';
+      draw(rightSummary, right-12, y-52, {size:8.5,color:muted,alignRight:true});
       y -= 81;
       for (const line of wrap(FTTX_COST_NOTE,right-left,8.5)) {
         draw(line,left,y,{size:8.5,color:muted});

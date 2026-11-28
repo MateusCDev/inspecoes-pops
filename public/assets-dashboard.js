@@ -21,6 +21,7 @@ let assetDashState = {
   maker: '',
   staleOnly: false,
   infraAlertsOnly: false,
+  qualityFilter: '',
   sortBy: 'station',
   sortDir: 'asc',
   pageSize: 50
@@ -104,11 +105,28 @@ function computeAssetDashboardMetrics(data, filters = {}, nowMs = Date.now()) {
 
   const q = adNorm(filters.search || '');
   const matchSearch = parts => !q || adNorm(parts.filter(Boolean).join(' ')).includes(q);
+  const validIdToken = v => {
+    const n = adNorm(v);
+    return Boolean(n && !/^(N\/?A|SEM SERIE|SEM PATRIMONIO|NAO IDENTIFICAD[OA]|-+)$/.test(n));
+  };
+
+  // Detect duplicate serials across the full inventory for governance
+  const serialFreq = new Map();
+  for (const item of rawAssets) {
+    if (validIdToken(item.serial)) {
+      const key = adNorm(item.serial);
+      serialFreq.set(key, (serialFreq.get(key) || 0) + 1);
+    }
+  }
+  const duplicateSerials = new Set([...serialFreq.entries()].filter(([, n]) => n > 1).map(([k]) => k));
 
   const normalizedAssets = rawAssets.map((item, idx) => {
     const statusNorm = adNormalizeStatus(item.status);
     const stale = adIsStale(item.lastInspection, nowMs);
-    return { ...item, _idx: idx, statusNorm, stale };
+    const hasSerial = validIdToken(item.serial);
+    const hasTag = validIdToken(item.assetTag);
+    const duplicateSerial = hasSerial && duplicateSerials.has(adNorm(item.serial));
+    return { ...item, _idx: idx, statusNorm, stale, hasSerial, hasTag, duplicateSerial };
   });
 
   // Base scope for cross-filtering charts (respects search, station, category, maker, staleOnly)
@@ -121,7 +139,13 @@ function computeAssetDashboardMetrics(data, filters = {}, nowMs = Date.now()) {
   };
 
   const baseAssets = normalizedAssets.filter(matchesCommon);
-  const filteredAssets = baseAssets.filter(item => !filters.status || item.statusNorm === filters.status);
+  const filteredAssets = baseAssets.filter(item => {
+    if (filters.status && item.statusNorm !== filters.status) return false;
+    if (filters.qualityFilter === 'missingId' && (item.hasSerial || item.hasTag)) return false;
+    if (filters.qualityFilter === 'duplicateSerial' && !item.duplicateSerial) return false;
+    if (filters.qualityFilter === 'unrated' && item.statusNorm !== 'Sem status') return false;
+    return true;
+  });
 
   const filterAux = (list, fieldsFn) => list.filter(item => {
     if (filters.station && item.station !== filters.station) return false;
@@ -140,26 +164,74 @@ function computeAssetDashboardMetrics(data, filters = {}, nowMs = Date.now()) {
   const byCategory = new Map();
   const byStation = new Map();
   let staleCount = 0;
+  let missingSerial = 0, missingAssetTag = 0, missingBoth = 0, duplicateSerialCount = 0, wellDocumented = 0;
+
+  const ensureStation = (name, code = '') => {
+    const key = name || 'Sem POP';
+    if (!byStation.has(key)) {
+      byStation.set(key, {
+        station: key, stationCode: code, total: 0, crit: 0, warn: 0, ok: 0,
+        batteries: 0, rectifiers: 0, climate: 0, alerts: 0, lastInspection: '', lastMs: 0
+      });
+    }
+    const entry = byStation.get(key);
+    if (code && !entry.stationCode) entry.stationCode = code;
+    return entry;
+  };
 
   for (const item of baseAssets) {
     statusCounts[item.statusNorm] = (statusCounts[item.statusNorm] || 0) + 1;
     if (item.stale) staleCount++;
+    if (!item.hasSerial) missingSerial++;
+    if (!item.hasTag) missingAssetTag++;
+    if (!item.hasSerial && !item.hasTag) missingBoth++;
+    if (item.duplicateSerial) duplicateSerialCount++;
+    if ((item.hasSerial || item.hasTag) && item.statusNorm !== 'Sem status') wellDocumented++;
     byCategory.set(item.category, (byCategory.get(item.category) || 0) + 1);
-    const st = byStation.get(item.station) || { station: item.station, total: 0, crit: 0, warn: 0, ok: 0 };
+    const st = ensureStation(item.station, item.stationCode);
     st.total++;
     if (item.statusNorm === 'Crítico') st.crit++;
     else if (item.statusNorm === 'Atenção') st.warn++;
     else if (item.statusNorm === 'Operacional') st.ok++;
-    byStation.set(item.station, st);
+    const ms = adParseDateMs(item.lastInspection);
+    if (ms && ms > st.lastMs) { st.lastMs = ms; st.lastInspection = item.lastInspection; }
+  }
+  for (const b of batteries) {
+    const st = ensureStation(b.station, b.stationCode);
+    st.batteries++;
+    if (b.alert) st.alerts++;
+  }
+  for (const r of rectifiers) {
+    const st = ensureStation(r.station, r.stationCode);
+    st.rectifiers++;
+    if (r.alert) st.alerts++;
+  }
+  for (const c of climate) {
+    const st = ensureStation(c.station, c.stationCode);
+    st.climate++;
+    if (c.alert) st.alerts++;
   }
 
   const totalBase = baseAssets.length;
   const rated = statusCounts.Operacional + statusCounts['Atenção'] + statusCounts['Crítico'];
   const healthPct = rated > 0 ? Math.round((statusCounts.Operacional / rated) * 100) : 0;
+  const quality = {
+    missingSerial,
+    missingAssetTag,
+    missingBoth,
+    duplicateSerialCount,
+    unratedCount: statusCounts['Sem status'] || 0,
+    qualityPct: totalBase > 0 ? Math.round((wellDocumented / totalBase) * 100) : 100
+  };
 
-  const popRanking = [...byStation.values()]
-    .sort((a, b) => (b.crit * 4 + b.warn * 2) - (a.crit * 4 + a.warn * 2) || b.total - a.total || a.station.localeCompare(b.station, 'pt-BR'))
-    .slice(0, 10);
+  const popMatrix = [...byStation.values()]
+    .map(st => {
+      const stRated = st.ok + st.warn + st.crit;
+      return { ...st, healthPct: stRated > 0 ? Math.round((st.ok / stRated) * 100) : null };
+    })
+    .sort((a, b) => (b.crit * 4 + b.warn * 2 + b.alerts * 2) - (a.crit * 4 + a.warn * 2 + a.alerts * 2) || b.total - a.total || a.station.localeCompare(b.station, 'pt-BR'));
+
+  const popRanking = popMatrix.filter(st => st.total > 0).slice(0, 10);
 
   const categoryRanking = [...byCategory.entries()]
     .map(([category, count]) => ({ category, count }))
@@ -206,8 +278,10 @@ function computeAssetDashboardMetrics(data, filters = {}, nowMs = Date.now()) {
     healthPct,
     staleCount,
     stationCount: byStation.size,
+    popMatrix,
     popRanking,
     categoryRanking,
+    quality,
     batteryAlerts,
     rectifierAlerts,
     climateAlerts,
@@ -313,7 +387,10 @@ function adBuildCsv(tab, metrics) {
     return '"' + safe.replaceAll('"', '""') + '"';
   };
   let headers, rows;
-  if (tab === 'batteries') {
+  if (tab === 'pops') {
+    headers = ['POP / Estação', 'Código POP', 'Total Ativos', 'Saúde (%)', 'Críticos', 'Atenção', 'Operacionais', 'Baterias', 'Retificadoras', 'Climatizadores', 'Alertas Infra', 'Última Inspeção'];
+    rows = metrics.popMatrix.map(p => [p.station, p.stationCode, p.total, p.healthPct ?? '', p.crit, p.warn, p.ok, p.batteries, p.rectifiers, p.climate, p.alerts, p.lastInspection]);
+  } else if (tab === 'batteries') {
     headers = ['Estação', 'Descrição', 'Tecnologia', 'Fabricante', 'Modelo', 'Qtd', 'Tensão (V)', 'Capacidade (Ah)', 'Autonomia (h)', 'Instalação', 'Tempo de uso (meses)', 'Status', 'Patrimônio', 'Observações'];
     rows = metrics.batteries.map(b => [b.station, b.name, b.tech, b.maker, b.model, b.qty, b.voltage, b.capacity, b.autonomy, b.installed, b.ageMonths, b.statusNorm, b.assetTag, b.note]);
   } else if (tab === 'rectifiers') {
@@ -335,6 +412,23 @@ function adRenderTableSection(metrics) {
     const arrow = sortBy === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
     return `<th><button type="button" class="ad-sort" data-ad-sort="${col}">${label}${arrow}</button></th>`;
   };
+
+  if (tab === 'pops') {
+    if (!metrics.popMatrix.length) return '<div class="ad-empty">Nenhum POP encontrado com os filtros aplicados.</div>';
+    return `<div class="ad-table-scroll"><table class="ad-table">
+      <thead><tr><th>POP / Estação</th><th>Ativos</th><th>Saúde (%)</th><th>Críticos</th><th>Atenção</th><th>Bat. / Ret. / Clima</th><th>Alertas Infra</th><th>Últ. Inspeção</th></tr></thead>
+      <tbody>${metrics.popMatrix.map(p => `<tr class="ad-clickable" data-ad-pop-jump="${esc(p.station)}" title="Clique para filtrar este POP">
+        <td><strong>${esc(p.station)}</strong>${p.stationCode ? `<div class="small muted ad-mono">${esc(p.stationCode)}</div>` : ''}</td>
+        <td><strong>${p.total}</strong></td>
+        <td>${p.healthPct !== null ? `<div class="ad-health-mini"><strong>${p.healthPct}%</strong><div class="ad-bar-track"><span class="ad-bar-fill ${p.healthPct >= 85 ? 'ad-fill-ok' : p.healthPct >= 60 ? 'ad-fill-warn' : 'ad-fill-crit'}" style="width:${p.healthPct}%"></span></div></div>` : '—'}</td>
+        <td>${p.crit ? `<span class="ad-pill ad-pill-crit">${p.crit}</span>` : '0'}</td>
+        <td>${p.warn ? `<span class="ad-pill ad-pill-warn">${p.warn}</span>` : '0'}</td>
+        <td class="small">${p.batteries} bat · ${p.rectifiers} ret · ${p.climate} clima</td>
+        <td>${p.alerts ? `<span class="ad-pill ad-pill-warn">${p.alerts}</span>` : '<span class="ad-pill ad-pill-ok">0</span>'}</td>
+        <td class="small">${esc(p.lastInspection || '—')}</td>
+      </tr>`).join('')}</tbody></table></div>
+      <div class="ad-footer-bar"><span>Exibindo <strong>${metrics.popMatrix.length}</strong> estação(ões). Clique em um POP para filtrar o inventário dele.</span></div>`;
+  }
 
   if (tab === 'batteries') {
     const list = infraAlertsOnly ? metrics.batteries.filter(b => b.alert) : metrics.batteries;
@@ -455,6 +549,9 @@ function adRenderChips() {
   if (assetDashState.maker) chips.push(['maker', `Fabricante: ${assetDashState.maker}`]);
   if (assetDashState.staleOnly) chips.push(['staleOnly', 'Sem vistoria (> 90 dias)']);
   if (assetDashState.infraAlertsOnly) chips.push(['infraAlertsOnly', 'Somente alertas de infra']);
+  if (assetDashState.qualityFilter === 'missingId') chips.push(['qualityFilter', 'Sem série e sem patrimônio']);
+  if (assetDashState.qualityFilter === 'duplicateSerial') chips.push(['qualityFilter', 'Séries duplicadas']);
+  if (assetDashState.qualityFilter === 'unrated') chips.push(['qualityFilter', 'Status não informado']);
   if (!chips.length) return '';
   return `<div class="ad-chips">${chips.map(([k, label]) =>
     `<button type="button" class="ad-chip" data-ad-clear-filter="${k}">${esc(label)} ×</button>`
@@ -502,7 +599,9 @@ function renderAssetsDashboard() {
         <p>Parque consolidado das inspeções POPs · Atualizado em ${esc(refreshed)}${assetDashState.error ? ' · ' + esc(assetDashState.error) : ''}</p>
       </div>
       <div class="ad-header-actions">
+        <button type="button" class="btn tiny" data-ad-copy-link>Copiar link</button>
         <button type="button" class="btn tiny" data-ad-export-pdf>Baixar PDF Executivo</button>
+        <button type="button" class="btn tiny" data-ad-export-xlsx>Baixar Excel</button>
         <button type="button" class="btn tiny" data-ad-export-csv>Exportar CSV</button>
         <button type="button" class="btn tiny" data-ad-send-summary>Enviar resumo por e-mail</button>
         <button type="button" class="btn primary tiny" data-ad-refresh ${assetDashState.loading ? 'disabled' : ''}>${assetDashState.loading ? 'Atualizando…' : 'Atualizar base'}</button>
@@ -567,6 +666,12 @@ function renderAssetsDashboard() {
         <button type="button" class="btn tiny" data-ad-clear-all>Limpar</button>
       </div>
       ${adRenderChips()}
+      <div class="ad-quality-bar" aria-label="Qualidade e governança do cadastro">
+        <span class="ad-quality-score">Qualidade do cadastro: <strong>${metrics.quality.qualityPct}%</strong></span>
+        <button type="button" class="ad-quality-btn ${assetDashState.qualityFilter === 'missingId' ? 'is-active' : ''}" data-ad-quality="missingId">Sem série e patrimônio: <strong>${metrics.quality.missingBoth}</strong></button>
+        <button type="button" class="ad-quality-btn ${assetDashState.qualityFilter === 'duplicateSerial' ? 'is-active' : ''}" data-ad-quality="duplicateSerial">Séries duplicadas: <strong>${metrics.quality.duplicateSerialCount}</strong></button>
+        <button type="button" class="ad-quality-btn ${assetDashState.qualityFilter === 'unrated' ? 'is-active' : ''}" data-ad-quality="unrated">Sem status: <strong>${metrics.quality.unratedCount}</strong></button>
+      </div>
     </section>
 
     <section class="ad-charts" aria-label="Gráficos interativos">
@@ -587,6 +692,7 @@ function renderAssetsDashboard() {
     <section class="ad-table-card" aria-label="Listagem detalhada de ativos">
       <div class="ad-tabs" role="tablist">
         <button type="button" class="ad-tab" role="tab" aria-selected="${assetDashState.tab === 'assets'}" data-ad-tab="assets">Inventário Geral <span class="ad-tab-count">${metrics.filteredAssets.length}</span></button>
+        <button type="button" class="ad-tab" role="tab" aria-selected="${assetDashState.tab === 'pops'}" data-ad-tab="pops">Por POP <span class="ad-tab-count">${metrics.popMatrix.length}</span></button>
         <button type="button" class="ad-tab" role="tab" aria-selected="${assetDashState.tab === 'batteries'}" data-ad-tab="batteries">Baterias <span class="ad-tab-count">${metrics.batteries.length}</span></button>
         <button type="button" class="ad-tab" role="tab" aria-selected="${assetDashState.tab === 'rectifiers'}" data-ad-tab="rectifiers">Retificadoras <span class="ad-tab-count">${metrics.rectifiers.length}</span></button>
         <button type="button" class="ad-tab" role="tab" aria-selected="${assetDashState.tab === 'climate'}" data-ad-tab="climate">Climatização <span class="ad-tab-count">${metrics.climate.length}</span></button>
@@ -655,7 +761,105 @@ async function loadAssetsDashboard(forceRefresh = false) {
   }
 }
 
+function adApplyUrlFilters() {
+  try {
+    const params = new URL(location.href).searchParams;
+    if (params.get('modulo') !== 'ativos') return;
+    if (params.has('pop')) assetDashState.station = params.get('pop') || '';
+    if (params.has('cat')) assetDashState.category = params.get('cat') || '';
+    if (params.has('status')) assetDashState.status = params.get('status') || '';
+    if (params.has('fab')) assetDashState.maker = params.get('fab') || '';
+    if (params.has('q')) assetDashState.search = params.get('q') || '';
+    const aba = params.get('aba');
+    if (['assets', 'pops', 'batteries', 'rectifiers', 'climate', 'events'].includes(aba)) assetDashState.tab = aba;
+  } catch (_) {}
+}
+
+function adBuildShareUrl(state, baseHref = (typeof location !== 'undefined' ? location.href : 'https://example.test/')) {
+  const url = new URL(baseHref);
+  url.search = '';
+  url.hash = '';
+  url.searchParams.set('modulo', 'ativos');
+  if (state.station) url.searchParams.set('pop', state.station);
+  if (state.category) url.searchParams.set('cat', state.category);
+  if (state.status) url.searchParams.set('status', state.status);
+  if (state.maker) url.searchParams.set('fab', state.maker);
+  if (state.search) url.searchParams.set('q', state.search);
+  if (state.tab && state.tab !== 'assets') url.searchParams.set('aba', state.tab);
+  return url.href;
+}
+
+async function buildAssetsWorkbook(metrics, filters) {
+  const loader = typeof loadFttxExcelLibrary === 'function'
+    ? loadFttxExcelLibrary
+    : () => new Promise((resolve, reject) => {
+        if (window.ExcelJS) return resolve(window.ExcelJS);
+        const s = document.createElement('script');
+        s.src = './vendor/exceljs-4.4.0.min.js';
+        s.onload = () => resolve(window.ExcelJS);
+        s.onerror = () => reject(Error('Não foi possível carregar o exportador Excel.'));
+        document.head.append(s);
+      });
+  const { Workbook } = await loader();
+  const book = new Workbook();
+  book.creator = 'VOANET · Infraestrutura';
+  const safeCell = v => {
+    const s = String(v ?? '');
+    return /^[\s]*[=+\-@]/.test(s) ? "'" + s : s;
+  };
+  const styleHead = row => {
+    row.height = 24;
+    row.eachCell(cell => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB9142A' } };
+      cell.alignment = { vertical: 'middle' };
+    });
+  };
+
+  const sResumo = book.addWorksheet('Resumo');
+  sResumo.addRow(['Indicador', 'Valor', 'Detalhe']);
+  styleHead(sResumo.getRow(1));
+  sResumo.addRow(['Total de ativos', metrics.totalBase, `${metrics.stationCount} POP(s)`]);
+  sResumo.addRow(['Operacionais', metrics.statusCounts.Operacional, `${metrics.healthPct}% de saúde`]);
+  sResumo.addRow(['Em atenção', metrics.statusCounts['Atenção'], 'Monitoramento']);
+  sResumo.addRow(['Críticos', metrics.statusCounts['Crítico'], 'Ação prioritária']);
+  sResumo.addRow(['Sem vistoria > 90 dias', metrics.staleCount, 'Inventário desatualizado']);
+  sResumo.addRow(['Alertas energia/clima', metrics.infraAlertCount, `${metrics.batteryAlerts} bat · ${metrics.rectifierAlerts} ret · ${metrics.climateAlerts} clima`]);
+  sResumo.addRow(['Qualidade cadastral', `${metrics.quality.qualityPct}%`, `${metrics.quality.missingBoth} sem ID · ${metrics.quality.duplicateSerialCount} séries duplicadas`]);
+  sResumo.addRow([]);
+  const mHead = sResumo.addRow(['POP / Estação', 'Código', 'Ativos', 'Saúde (%)', 'Críticos', 'Atenção', 'Baterias', 'Retificadoras', 'Clima', 'Alertas Infra', 'Últ. Inspeção']);
+  styleHead(mHead);
+  for (const p of metrics.popMatrix) {
+    sResumo.addRow([safeCell(p.station), safeCell(p.stationCode), p.total, p.healthPct ?? '—', p.crit, p.warn, p.batteries, p.rectifiers, p.climate, p.alerts, safeCell(p.lastInspection)]);
+  }
+  sResumo.columns.forEach(c => { c.width = 20; });
+
+  const addSheet = (title, headers, rows) => {
+    const ws = book.addWorksheet(title, { views: [{ state: 'frozen', ySplit: 1 }] });
+    ws.addRow(headers);
+    styleHead(ws.getRow(1));
+    for (const r of rows) ws.addRow(r.map(safeCell));
+    ws.columns.forEach(c => { c.width = 18; });
+  };
+
+  addSheet('Ativos',
+    ['POP / Local', 'Código POP', 'Categoria', 'Equipamento', 'Fabricante', 'Modelo', 'Nº Série', 'Patrimônio', 'Status', 'Última inspeção', 'Observações'],
+    metrics.filteredAssets.map(a => [a.station, a.stationCode, a.category, a.equipment, a.maker, a.model, a.serial, a.assetTag, a.statusNorm, a.lastInspection, a.note]));
+  addSheet('Baterias',
+    ['Estação', 'Descrição', 'Tecnologia', 'Fabricante', 'Modelo', 'Qtd', 'Tensão (V)', 'Cap. (Ah)', 'Autonomia (h)', 'Uso (meses)', 'Status', 'Patrimônio'],
+    metrics.batteries.map(b => [b.station, b.name, b.tech, b.maker, b.model, b.qty, b.voltage, b.capacity, b.autonomy, b.ageMonths, b.statusNorm, b.assetTag]));
+  addSheet('Retificadoras',
+    ['Estação', 'Fabricante', 'Modelo', 'Módulos', 'Corrente (A)', 'Tensão (V)', 'UR01', 'UR02', 'UR03', 'UR04', 'Últ. Verif.', 'Próx. Verif.', 'Status'],
+    metrics.rectifiers.map(r => [r.station, r.maker, r.model, r.modules, r.currentA, r.voltageV, r.ur01, r.ur02, r.ur03, r.ur04, r.lastCheck, r.nextCheck, r.statusNorm]));
+  addSheet('Climatização',
+    ['Estação', 'Fabricante', 'Modelo', 'BTUs', 'Tipo', 'Gás', 'Corrente (A)', 'Temp. (°C)', 'Próx. Manutenção', 'Status', 'Nº Série'],
+    metrics.climate.map(c => [c.station, c.maker, c.model, c.btus, c.type, c.gas, c.currentA, c.tempC, c.nextMaint, c.statusNorm, c.serial]));
+
+  return book.xlsx.writeBuffer();
+}
+
 function mountAssetsDashboard() {
+  adApplyUrlFilters();
   if (!assetDashState.loaded && !assetDashState.loading) {
     loadAssetsDashboard(false);
   } else {
@@ -667,7 +871,7 @@ function resetAssetsDashboard() {
   assetDashState = {
     loading: false, loaded: false, error: '', data: null,
     tab: 'assets', search: '', station: '', category: '', status: '', maker: '',
-    staleOnly: false, infraAlertsOnly: false, sortBy: 'station', sortDir: 'asc', pageSize: 50
+    staleOnly: false, infraAlertsOnly: false, qualityFilter: '', sortBy: 'station', sortDir: 'asc', pageSize: 50
   };
 }
 
@@ -802,6 +1006,56 @@ document.addEventListener('click', async event => {
   if (!adIsPaneActive()) return;
   const target = event.target;
   if (target.closest('[data-ad-refresh]')) { loadAssetsDashboard(true); return; }
+  const copyBtn = target.closest('[data-ad-copy-link]');
+  if (copyBtn) {
+    const shareUrl = adBuildShareUrl(assetDashState);
+    try { history.replaceState(null, '', shareUrl); } catch (_) {}
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      const old = copyBtn.textContent;
+      copyBtn.textContent = 'Link copiado!';
+      setTimeout(() => { if (copyBtn.isConnected) copyBtn.textContent = old; }, 2200);
+    } catch (_) {
+      prompt('Copie o link filtrado do Dashboard de Ativos:', shareUrl);
+    }
+    return;
+  }
+  const xlsxBtn = target.closest('[data-ad-export-xlsx]');
+  if (xlsxBtn) {
+    if (xlsxBtn.disabled) return;
+    xlsxBtn.disabled = true;
+    const old = xlsxBtn.textContent;
+    xlsxBtn.textContent = 'Gerando Excel…';
+    try {
+      const metrics = computeAssetDashboardMetrics(assetDashState.data || {}, assetDashState);
+      const buffer = await buildAssetsWorkbook(metrics, assetDashState);
+      const date = new Intl.DateTimeFormat('sv-SE').format(new Date());
+      download(buffer, `VOANET-Ativos-${date}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    } catch (err) {
+      alert('Não foi possível gerar o Excel: ' + err.message);
+    } finally {
+      xlsxBtn.disabled = false;
+      xlsxBtn.textContent = old;
+    }
+    return;
+  }
+  const qBtn = target.closest('[data-ad-quality]');
+  if (qBtn) {
+    const mode = qBtn.dataset.adQuality;
+    assetDashState.qualityFilter = assetDashState.qualityFilter === mode ? '' : mode;
+    assetDashState.tab = 'assets';
+    assetDashState.pageSize = 50;
+    renderAssetsDashboard();
+    return;
+  }
+  const popJump = target.closest('[data-ad-pop-jump]');
+  if (popJump) {
+    assetDashState.station = popJump.dataset.adPopJump;
+    assetDashState.tab = 'assets';
+    assetDashState.pageSize = 50;
+    renderAssetsDashboard();
+    return;
+  }
   const pdfBtn = target.closest('[data-ad-export-pdf]');
   if (pdfBtn) {
     if (pdfBtn.disabled) return;
@@ -900,7 +1154,7 @@ document.addEventListener('click', async event => {
   if (target.closest('[data-ad-clear-all]')) {
     assetDashState.search = ''; assetDashState.station = ''; assetDashState.category = '';
     assetDashState.status = ''; assetDashState.maker = '';
-    assetDashState.staleOnly = false; assetDashState.infraAlertsOnly = false;
+    assetDashState.staleOnly = false; assetDashState.infraAlertsOnly = false; assetDashState.qualityFilter = '';
     assetDashState.pageSize = 50;
     renderAssetsDashboard();
     return;

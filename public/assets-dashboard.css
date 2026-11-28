@@ -504,6 +504,44 @@
   color: var(--portal-muted);
 }
 
+/* Barra de Governança & Qualidade Cadastral + mini barra de saúde */
+.ad-quality-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .45rem .6rem;
+  padding-top: .6rem;
+  border-top: 1px solid var(--portal-line);
+  font-size: .8rem;
+}
+.ad-quality-score {
+  font-weight: 650;
+  color: var(--portal-ink);
+  margin-right: .25rem;
+}
+.ad-quality-btn {
+  padding: .24rem .6rem;
+  border-radius: 999px;
+  border: 1px solid var(--portal-line);
+  background: var(--portal-bg);
+  color: var(--portal-ink);
+  font-size: .78rem;
+  cursor: pointer;
+}
+.ad-quality-btn:hover { border-color: #9aa9be; }
+.ad-quality-btn.is-active {
+  background: var(--portal-red-soft);
+  border-color: var(--portal-red);
+  color: var(--portal-red-dark);
+  font-weight: 700;
+}
+.ad-health-mini {
+  display: grid;
+  gap: .2rem;
+  min-width: 82px;
+}
+.ad-health-mini strong { font-size: .8rem; }
+
 @media (max-width: 1120px) {
   .ad-charts { grid-template-columns: 1fr 1fr; }
   .ad-filters-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }

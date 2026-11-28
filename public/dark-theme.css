@@ -380,6 +380,9 @@ html[data-theme="dark"] .ad-kpi.kpi-ok .ad-kpi-value { color: #4ade80; }
 html[data-theme="dark"] .ad-kpi.kpi-infra .ad-kpi-value { color: #60a5fa; }
 html[data-theme="dark"] .ad-kpi.is-active { background: #261a24; border-color: #e0354b; }
 html[data-theme="dark"] .ad-chip { background: rgba(224, 53, 75, .24); border-color: #8f2d3c; color: #ffb3be; }
+html[data-theme="dark"] .ad-quality-btn { background: #1b273a; border-color: var(--portal-line); color: var(--portal-ink); }
+html[data-theme="dark"] .ad-quality-btn:hover { background: #22324a; border-color: #4c6487; }
+html[data-theme="dark"] .ad-quality-btn.is-active { background: var(--portal-red-soft); border-color: #e0354b; color: #ffb3be; }
 html[data-theme="dark"] .ad-tab { background: var(--portal-surface); border-color: var(--portal-line); color: var(--portal-muted); }
 html[data-theme="dark"] .ad-tab:hover { background: #1f2e45; color: #fff; }
 html[data-theme="dark"] .ad-tab[aria-selected="true"] { background: var(--portal-red-soft); border-color: #8f2d3c; color: #ffb3be; }

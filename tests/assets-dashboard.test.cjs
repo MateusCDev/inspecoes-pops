@@ -6,6 +6,7 @@ const vm = require('node:vm');
 
 function loadFrontendDash() {
   const ctx = vm.createContext({
+    URL,
     document: { addEventListener() {}, getElementById() { return null; } },
     esc: s => String(s ?? ''),
     googleUser: { role: 'GESTAO', email: 'gestor@voanet.com.br' }
@@ -205,4 +206,42 @@ test('applyStationInventoryToRecord mescla sem duplicar e googleHistoryTrend cal
   assert.equal(ctx.googleHistoryTrend(history[0], history).label, '↓ -3 NC');
   assert.equal(ctx.googleHistoryTrend(history[1], history).cls, 'same');
   assert.equal(ctx.googleHistoryTrend(history[2], history), null);
+});
+
+test('calcula Matriz Por POP, qualidade cadastral (séries duplicadas/sem ID) e URL compartilhável', () => {
+  const dash = loadFrontendDash();
+  const nowMs = Date.UTC(2026, 10, 28);
+  const sample = {
+    assets: [
+      { id: '1', stationCode: 'POP-01', station: 'POP Curralinho', category: 'OLT', equipment: 'OLT', serial: 'SN-DUP', assetTag: 'PAT-1', status: 'Operacional', lastInspection: '2026-11-20' },
+      { id: '2', stationCode: 'POP-02', station: 'POP Centro', category: 'OLT', equipment: 'OLT', serial: 'SN-DUP', assetTag: 'PAT-2', status: 'Crítico', lastInspection: '2026-11-18' },
+      { id: '3', stationCode: 'POP-02', station: 'POP Centro', category: 'Switch', equipment: 'Switch', serial: '', assetTag: '', status: '', lastInspection: '2026-11-10' }
+    ],
+    batteries: [{ station: 'POP Centro', tech: 'VRLA', ageMonths: '48', status: 'Atenção' }],
+    rectifiers: [],
+    climate: [],
+    recentEvents: []
+  };
+
+  const m = dash.computeAssetDashboardMetrics(sample, {}, nowMs);
+  assert.equal(m.quality.missingBoth, 1);
+  assert.equal(m.quality.duplicateSerialCount, 2);
+  assert.equal(m.quality.unratedCount, 1);
+  assert.equal(m.quality.qualityPct, 67);
+  assert.equal(m.popMatrix.length, 2);
+  assert.equal(m.popMatrix[0].station, 'POP Centro');
+  assert.equal(m.popMatrix[0].batteries, 1);
+  assert.equal(m.popMatrix[0].alerts, 1);
+
+  const dupOnly = dash.computeAssetDashboardMetrics(sample, { qualityFilter: 'duplicateSerial' }, nowMs);
+  assert.equal(dupOnly.filteredAssets.length, 2);
+
+  const missingOnly = dash.computeAssetDashboardMetrics(sample, { qualityFilter: 'missingId' }, nowMs);
+  assert.equal(missingOnly.filteredAssets.length, 1);
+  assert.equal(missingOnly.filteredAssets[0].id, '3');
+
+  const shareUrl = dash.adBuildShareUrl({ station: 'POP Centro', status: 'Crítico', tab: 'pops' }, 'https://mateuscdev.github.io/inspecoes-pops/');
+  assert.ok(shareUrl.includes('modulo=ativos'));
+  assert.ok(shareUrl.includes('pop=POP+Centro'));
+  assert.ok(shareUrl.includes('aba=pops'));
 });

@@ -15,7 +15,7 @@ const FTTX_ROUTE_FIELDS=[
 const FTTX_ROUTE_DETAILS=[
   ['guidePoles','Postes com guia, sem CTO e sem BAP','Inclui 2 anéis guia e 1,5 m de fita de aço por poste informado.'],
   ['dielectricGroups','Grupos de três postes aptos para dielétrico','Informe um grupo por suporte, com olhal nas pontas e dielétrico no meio. Confira curvas, vegetação e vãos longos.'],
-  ['extraEyelets','Olhais adicionais','Some os demais olhais nas curvas, cruzamentos, ancoragens e pontas dos grupos. O olhal básico de cada poste com CTO entra automaticamente.'],
+  ['extraEyelets','Olhais adicionais','Some os demais olhais nas curvas, cruzamentos e pontas dos grupos dielétricos. O sistema já inclui automaticamente 2 olhais nas pontas de cada cabo, 2 por CTO comum, 1 por CTO de ponta e 2 por CEO.'],
   ['bolt','Parafusos','Informe quantos serão usados na montagem prevista.'],
   ['bapSupport','Suportes para BAP','Conte os suportes conforme os pontos de fixação do trajeto.']
 ];
@@ -203,7 +203,7 @@ function fttxAutoLoops(draft){
     }
   }
   const extraEyelets=fttxQuantity(draft.extraEyelets);
-  if(extraEyelets>0&&dominantField)loops[dominantField]+=2*extraEyelets;
+  if(extraEyelets>0&&dominantField)loops[dominantField]+=extraEyelets;
   return loops;
 }
 
@@ -225,13 +225,14 @@ function fttxEstimateHardware(draft){
 }
 
 function calculateFttx(draft){
-  let ctoTotal=0,ceoTotal=0,cableTotal=0,reserveTotal=0,routeTotal=0;
+  let ctoTotal=0,ceoTotal=0,cableTotal=0,reserveTotal=0,routeTotal=0,cableAnchors=0;
   const cables=FTTX_FIBERS.map(fibers=>{
     const row=draft.cables?.[fibers]||{};
     const meters=fttxQuantity(row.meters,true),cto=fttxQuantity(row.cto),endCto=fttxQuantity(row.endCto),ceo=fttxQuantity(row.ceo);
     const ctoReserve=22*cto+12.5*endCto,ceoReserve=20*ceo,routeReserve=50*Math.floor(meters/500);
     const reserve=ctoReserve+ceoReserve+routeReserve;
     const total=fttxQuantity(meters+reserve,true);
+    if(meters>0||cto>0||endCto>0||ceo>0)cableAnchors+=2*cto+endCto+2*ceo+(meters>0?2:0);
     ctoTotal+=cto+endCto;
     ceoTotal+=ceo;
     routeTotal+=meters;
@@ -288,10 +289,11 @@ function calculateFttx(draft){
   ];
 
   const guideBuckles=includeGuideBuckle?guidePoles:0;
+  const baseEyelets=cableAnchors||ctoPoles;
   const groups=[
     {title:'Lançamento',items:[
       ...cables.map(c=>['Cabo óptico '+String(c.fibers).padStart(2,'0')+' FO','m',c.total]),
-      ['Olhal reto M12','un',ctoPoles+get('extraEyelets')],
+      ['Olhal reto M12','un',baseEyelets+get('extraEyelets')],
       ['Parafuso','un',get('bolt')],
       ['Suporte para BAP','un',get('bapSupport')],
       ['Alça pré-formada para cabo de 06 a 12 FO','un',resolvedLoops.loopSmall],
@@ -892,7 +894,7 @@ function renderFttx(){
           </div>
           <div class="fttx-subsection">
             <h3>Alças pré-formadas de ancoragem</h3>
-            <p class="small muted">Calculadas automaticamente por bitola (2 por CTO comum, 1 por CTO de ponta, 2 por CEO, 2 nas extremidades do cabo e 2 por olhal adicional). Digite um valor para substituir manualmente.</p>
+            <p class="small muted">Calculadas automaticamente em 1:1 com cada ancoragem/olhal (2 por CTO comum, 1 por CTO de ponta, 2 por CEO, 2 nas extremidades do cabo e 1 por olhal adicional). Digite um valor para substituir manualmente.</p>
             <label class="fttx-checkbox-inline">
               <input type="checkbox" data-fttx-checkbox="autoLoops" ${result.autoLoops?'checked':''}>
               Calcular alças pré-formadas automaticamente pelas ancoragens do trajeto
@@ -955,13 +957,13 @@ function renderFttx(){
               </div>
             </div>
           </div>
-          <p class="small muted">Por caixa, o sistema inclui 1 plaqueta, 3 m de fita de aço, 2 fechos e 6 anéis guia. Também inclui 1 olhal básico por poste com CTO. A reserva é de 22 m por CTO comum e 12,5 m por CTO de ponta.</p>
+          <p class="small muted">Por caixa, o sistema inclui 1 plaqueta, 3 m de fita de aço, 2 fechos e 6 anéis guia. Nas ancoragens, entram 2 olhais e 2 alças por CTO comum e 1 olhal e 1 alça por CTO de ponta. A reserva é de 22 m por CTO comum e 12,5 m por CTO de ponta.</p>
           ${fttxStepActions(2)}
         </section>
         <section ${panel(3)} aria-labelledby="fttx-box-heading">
           ${fttxStep(3,'fttx-box-heading','Montagem de CEO / CEP e Splitters')}
           ${issues(3)}
-          <p class="fttx-panel-description">Cada CEO soma 20 m de cabo na bitola indicada e 2 alças de cordoalha. Cada CEO ou CEP inclui 1 conjunto de reserva e 1 plaqueta.</p>
+          <p class="fttx-panel-description">Cada CEO soma 20 m de cabo na bitola indicada, 2 olhais e 2 alças de ancoragem do cabo, além de 2 alças de cordoalha. Cada CEO ou CEP inclui 1 conjunto de reserva e 1 plaqueta.</p>
           ${fttxCableInputs(['ceo'])}
           <div class="fttx-fields">${fttxInput(...FTTX_BOX_FIELDS[0])}</div>
           <details class="fttx-options" ${hasCeoModels?'open':''}>

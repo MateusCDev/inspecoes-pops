@@ -22,7 +22,9 @@ test('soma as reservas por bitola e calcula ferragens por poste sem duplicar pla
   assert.equal(result.reserveTotal,176.5);
   assert.equal(result.cableTotal,1675.5);
   assert.equal(result.cables[0].routeReserve,0);
-  assert.equal(quantity('Olhal reto M12'),7);
+  // 6 FO (2 pontas) + 12 FO (2 pontas + 2*2 CTOs + 1 ponta + 2 CEO) + 4 extras = 15
+  assert.equal(quantity('Olhal reto M12'),15);
+  assert.equal(quantity('Alça pré-formada para cabo de 06 a 12 FO'),15);
   assert.equal(quantity('Plaqueta de identificação do cabo'),40);
   assert.equal(quantity('Abraçadeira BAP'),30);
   assert.equal(quantity('Anel guia AGFE para postes sem CTO e sem BAP'),10);
@@ -263,9 +265,10 @@ test('calcula alças pré-formadas automaticamente na construção, aceita ajust
     poles:26,ctoPoles:4,extraEyelets:2
   });
   const qty=res=>name=>res.groups.flatMap(g=>g.items).find(i=>i[0]===name)?.[2];
-  // 12 FO (dominante): 2*3 + 1 + 2 (pontas) + 2*2 (olhais extras) = 13; 24 FO: 2*2 + 2 = 6
-  assert.equal(qty(auto)('Alça pré-formada para cabo de 06 a 12 FO'),13);
+  // 12 FO (dominante): 2*3 + 1 + 2 (pontas) + 2 (olhais extras) = 11; 24 FO: 2*2 + 2 = 6; Olhais totais = 17
+  assert.equal(qty(auto)('Alça pré-formada para cabo de 06 a 12 FO'),11);
   assert.equal(qty(auto)('Alça pré-formada para cabo de 24 FO'),6);
+  assert.equal(qty(auto)('Olhal reto M12'),17);
 
   // Sobrescrita manual prevalece (inclusive 0 explícito)
   const manual=ctx.calculateFttx({

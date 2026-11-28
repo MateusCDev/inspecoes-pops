@@ -60,10 +60,22 @@ function googleLoginView(){
     ${ready?'':'<p role="status">Aguardando a configuração do serviço Google.</p>'}
     <form id="googleAccessLogin">
       <label for="google-key">Chave individual</label>
-      <input id="google-key" name="key" type="password" autocomplete="off" required ${ready?'':'disabled'}>
-      <button type="submit" class="btn primary" ${ready?'':'disabled'}>Entrar</button>
+      <div class="login-key-wrap">
+        <input id="google-key" name="key" type="password" autocomplete="off" placeholder="Cole sua chave recebida da Gestão" required ${ready?'':'disabled'}>
+        <button type="button" class="btn tiny login-key-toggle" data-toggle-login-key aria-label="Mostrar ou ocultar chave" aria-pressed="false">Mostrar</button>
+      </div>
+      <button type="submit" class="btn primary" ${ready?'':'disabled'}>Entrar no portal</button>
     </form>
     <p id="google-login-error" class="portal-login-error" role="alert"></p>
+    <details class="login-help-box">
+      <summary>Primeiro acesso? Como funciona a chave e os perfis</summary>
+      <ul>
+        <li><strong>Chave individual:</strong> cada colaborador recebe uma chave única da Gestão (não é sua senha Google).</li>
+        <li><strong>Perfil Operação:</strong> registra inspeções em campo (funciona offline), acompanha seus envios e usa o Fibra Import.</li>
+        <li><strong>Perfil Gestão:</strong> acessa Central com SLA, Dashboard de Ativos, pendências, Frota, FTTx e emissão/revogação de chaves.</li>
+        <li><strong>Perdeu a chave?</strong> Solicite a reemissão à Gestão — a chave antiga é revogada automaticamente.</li>
+      </ul>
+    </details>
   </div></div></main>`;
 }
 function googleProfilePanel(){
@@ -753,6 +765,17 @@ function renderStationInventoryImport(record){
 }
 
 document.addEventListener('click',event=>{
+  const toggleKey=event.target.closest('[data-toggle-login-key]');
+  if(toggleKey){
+    const input=document.getElementById('google-key');
+    if(input){
+      const showing=input.type==='text';
+      input.type=showing?'password':'text';
+      toggleKey.textContent=showing?'Mostrar':'Ocultar';
+      toggleKey.setAttribute('aria-pressed',String(!showing));
+    }
+    return;
+  }
   if(!event.target.closest('[data-load-station-inventory]'))return;
   const r=cur();
   if(r)loadStationInventory(r,{manual:true});

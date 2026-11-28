@@ -50,9 +50,10 @@
     overview.innerHTML = `<div class="overview-shell">
       <header class="overview-hero">
         <h1 id="overview-title" tabindex="-1">Central de Infraestrutura</h1>
-        <p>${manager ? 'Acompanhe as vistorias, a frota e os levantamentos da equipe.' : 'Acesse suas vistorias de campo e acompanhe os envios.'}</p>
+        <p>${manager ? 'Acompanhe as vistorias, ativos, SLA dos POPs, frota e levantamentos FTTx.' : 'Registre suas vistorias de campo (inclusive offline) e acompanhe seus envios.'}</p>
         <div class="overview-account"><strong>${manager ? 'Gestão' : 'Operação'}</strong><span>${esc(googleUser.email)}</span></div>
       </header>
+      <section id="overview-onboarding" class="overview-section overview-onboarding" aria-label="${manager ? 'Governança e ações rápidas' : 'Guia rápido de início'}"></section>
       <section class="overview-section" aria-labelledby="overview-modules-title">
         <h2 id="overview-modules-title">Módulos</h2>
         <div class="overview-modules">${(manager ? Object.keys(modules) : ['inspecoes','fibra']).map(overviewModule).join('')}</div>
@@ -96,6 +97,40 @@
     stats.innerHTML = metrics.map(([label,value,link])=>`<div><strong>${esc(value ?? '—')}</strong><span>${label}</span>
       ${link ? '<a class="overview-history-link" href="./?modulo=inspecoes&visao=envios" data-module="inspecoes" data-inspection-view="envios">Ver envios</a>' : ''}
       </div>`).join('');
+    const onboarding = document.getElementById('overview-onboarding');
+    if (onboarding) {
+      const pendingAssetsTotal = googleCentralItems.reduce((sum, item) => sum + (Number(item.assets?.pending) || 0), 0);
+      if (manager) {
+        onboarding.innerHTML = `<div class="overview-gov-bar">
+          <div>
+            <h2>Governança e ações rápidas</h2>
+            <p class="small muted">Acesso de Gestão auditado · chaves individuais revogáveis · periodicidade automática (45d Alta/Crítica, 90d Média).</p>
+          </div>
+          <div class="btnrow">
+            <a class="btn tiny primary" href="./?modulo=ativos" data-module="ativos">Abrir Dashboard de Ativos</a>
+            <a class="btn tiny" href="./?modulo=inspecoes&visao=pendencias" data-module="inspecoes" data-inspection-view="pendencias">Pendências de ativos${pendingAssetsTotal > 0 ? ` (${pendingAssetsTotal})` : ''}</a>
+            <a class="btn tiny" href="./?modulo=fttx" data-module="fttx">Novo FTTx</a>
+            <a class="btn tiny" href="./?modulo=inspecoes&visao=acessos" data-module="inspecoes" data-inspection-view="acessos">Gerenciar acessos e chaves</a>
+          </div>
+        </div>`;
+      } else {
+        const drafts = records.filter(record => !record.finalizedAt).length;
+        onboarding.innerHTML = `<div class="overview-guide-card">
+          <div class="overview-section-heading">
+            <div>
+              <h2>Comece por aqui · Vistoria em campo</h2>
+              <p class="small muted">Seus rascunhos e fotos ficam salvos no aparelho mesmo sem internet e sincronizam assim que a conexão voltar.</p>
+            </div>
+            <a class="btn primary" href="./?modulo=inspecoes&visao=nova" data-module="inspecoes" data-inspection-view="nova">＋ Iniciar nova inspeção</a>
+          </div>
+          <ol class="overview-steps-list">
+            <li><strong>1. Selecione o POP</strong><span>Escolha a estação cadastrada para preencher periodicidade e pré-carregar ativos.</span></li>
+            <li><strong>2. Revise inventário e checklist</strong><span>Confirme etiquetas, marque C/NC/NA e anexe foto nas não conformidades.</span></li>
+            <li><strong>3. Finalize e sincronize</strong><span>Finalize na aba Resumo para gerar o PDF e atualizar a base central.${drafts ? ` (${drafts} rascunho(s) aberto(s))` : ''}</span></li>
+          </ol>
+        </div>`;
+      }
+    }
     const slaBox = document.getElementById('overview-sla');
     if (slaBox && manager) {
       const activeStations = (typeof googleStations !== 'undefined' ? googleStations : []).filter(s => !s.inactive && !s.duplicate);
@@ -220,8 +255,25 @@
     const target = new URL(location.href).searchParams.get('visao');
     if (target === 'historico' && (view !== 'googleCentral' || googleCentralSection !== 'history')) {
       openGoogleCentral('history');
+    } else if (target === 'pendencias') {
+      if (typeof googleHistoryPendingOnly !== 'undefined') googleHistoryPendingOnly = true;
+      openGoogleCentral('history');
     } else if (target === 'cronograma' && (view !== 'googleCentral' || googleCentralSection !== 'schedule')) {
       openGoogleCentral('schedule');
+    } else if (target === 'acessos' && googleUser.role === 'GESTAO') {
+      if (typeof googleIssuedKey !== 'undefined') googleIssuedKey = null;
+      view = 'googleAccess';
+      render();
+      if (typeof googleLoadAccess === 'function') googleLoadAccess();
+    } else if (target === 'nova') {
+      if (typeof blank === 'function' && typeof records !== 'undefined') {
+        const fresh = blank();
+        records.unshift(fresh);
+        activeId = fresh.id;
+        view = 'identificacao';
+        if (typeof saveAll === 'function') saveAll();
+        render();
+      }
     } else if (target === 'envios') {
       if (view !== 'home') navigate('home');
       document.getElementById('sync-section')?.scrollIntoView();
@@ -268,6 +320,85 @@
       syncThemeButton();
     });
   }
+
+  // Guia rápido contextual (Novatos & Gestores) + Atalhos de acessibilidade
+  const helpBtn = document.getElementById('portal-help-btn');
+  const helpDialog = document.getElementById('portal-help-dialog');
+  function openPortalHelp() {
+    if (!helpDialog || typeof helpDialog.showModal !== 'function') return;
+    const manager = googleUser?.role === 'GESTAO';
+    const logged = Boolean(googleUser);
+    helpDialog.innerHTML = `<div class="ad-dialog-head">
+      <div><h3 id="portal-help-title">Guia Rápido & Governança · VOANET</h3>
+        <span class="small muted">${logged ? (manager ? 'Perfil Gestão · Acesso administrativo e auditoria' : 'Perfil Operação · Campo e envios') : 'Orientações de acesso'}</span></div>
+      <button type="button" class="btn tiny" data-portal-help-close>Fechar (Esc)</button>
+    </div>
+    <div class="ad-dialog-body">
+      ${!logged ? `<section><h4>Como acessar pela primeira vez</h4>
+        <p class="small">Peça sua <strong>chave individual</strong> ao gestor de infraestrutura. Cada acesso é vinculado ao seu e-mail corporativo e pode ser revogado a qualquer momento sem perder o histórico.</p></section>` : ''}
+      ${!logged || !manager ? `<section><h4>Passo a passo para Operadores (Campo)</h4>
+        <ol class="portal-help-list">
+          <li><strong>Escolha o POP cadastrado:</strong> o sistema define automaticamente a periodicidade e pré-carrega os equipamentos já registrados na base central.</li>
+          <li><strong>Use a legenda do checklist:</strong> <code>C</code> Conforme · <code>NC</code> Não conforme (exige observação) · <code>NA</code> Não se aplica · <code>NV</code> Não verificado.</li>
+          <li><strong>Funciona offline:</strong> rascunhos e fotos ficam salvos no celular/navegador e sobem automaticamente quando houver conexão.</li>
+        </ol></section>` : ''}
+      ${manager ? `<section><h4>Rotina recomendada para Gestores</h4>
+        <ol class="portal-help-list">
+          <li><strong>Central + Radar de SLA:</strong> acompanhe POPs vencidos (45d Alta/Crítica, 90d Média) e estações sem vistoria.</li>
+          <li><strong>Dashboard de Ativos:</strong> filtre por POP, categoria, status, nº de série ou patrimônio; clique nos gráficos para cruzar filtros e baixe o <strong>PDF Executivo</strong> ou envie o <strong>resumo por e-mail</strong>.</li>
+          <li><strong>Governança de Acessos e Auditoria:</strong> em <em>Gerenciar acessos</em>, emita/revogue chaves de operadores. Todas as alterações e trocas de ativos ficam registradas em <code>Historico_Ativos_POPs</code>.</li>
+          <li><strong>Levantamento FTTx:</strong> importe KML/KMZ do OZmap, valide orçamento óptico GPON/XGS-PON e exporte a lista com 92 referências de preço atualizadas diariamente.</li>
+        </ol></section>` : ''}
+      <section><h4>Acessibilidade e atalhos de teclado</h4>
+        <ul class="portal-help-list">
+          <li><kbd>/</kbd> ou <kbd>Ctrl</kbd>+<kbd>K</kbd>: foca a busca rápida na tela atual (Ativos, Histórico ou FTTx).</li>
+          <li><kbd>Alt</kbd>+<kbd>1</kbd>.. <kbd>Alt</kbd>+<kbd>5</kbd>: alterna entre os módulos disponíveis na barra superior.</li>
+          <li><kbd>?</kbd>: abre este guia rápido em qualquer tela.</li>
+          <li><kbd>Esc</kbd>: fecha modais e retorna o foco.</li>
+        </ul>
+      </section>
+    </div>`;
+    helpDialog.showModal();
+  }
+  helpBtn?.addEventListener?.('click', openPortalHelp);
+  helpDialog?.addEventListener?.('click', event => {
+    if (event.target === helpDialog || event.target.closest?.('[data-portal-help-close]')) helpDialog.close();
+  });
+  document.addEventListener?.('keydown', event => {
+    const tag = event.target?.tagName;
+    const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || event.target?.isContentEditable;
+    if ((event.ctrlKey || event.metaKey) && String(event.key).toLowerCase() === 'k') {
+      const searchEl = document.getElementById('ad-search-input') || document.getElementById('google-history-search') || document.getElementById('fttx-search');
+      if (searchEl && !searchEl.closest('[hidden]')) {
+        event.preventDefault();
+        searchEl.focus();
+        searchEl.select?.();
+      }
+      return;
+    }
+    if (typing) return;
+    if (event.key === '/') {
+      const searchEl = document.getElementById('ad-search-input') || document.getElementById('google-history-search') || document.getElementById('fttx-search');
+      if (searchEl && !searchEl.closest('[hidden]')) {
+        event.preventDefault();
+        searchEl.focus();
+      }
+      return;
+    }
+    if (event.key === '?') {
+      event.preventDefault();
+      openPortalHelp();
+      return;
+    }
+    if (event.altKey && /^[1-6]$/.test(event.key) && isGoogleMode() && googleUser) {
+      const visibleLinks = [...(navigation?.querySelectorAll?.('a[data-module]') || [])].filter(a => !a.hidden);
+      const chosen = visibleLinks[Number(event.key) - 1];
+      if (chosen) {
+        event.preventDefault();
+        openModule(chosen.dataset.module);
+      }
+    }
+  });
 
   window.VOANET_PORTAL = Object.freeze({
     updateOverview,

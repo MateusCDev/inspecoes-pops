@@ -26,6 +26,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.52 system-ui,-ap
 .v22-alert{border-color:#efc77b;background:#fff9ec}
 </style><script>(function(){try{var t=localStorage.getItem('voanet_theme');if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme:dark)').matches)t='dark';if(t==='dark')document.documentElement.dataset.theme='dark';}catch(_){}})();</script><link rel="stylesheet" href="./portal.css?v=__BUILD_ID__"><link rel="stylesheet" href="./inspection-layout.css?v=__BUILD_ID__"><link rel="stylesheet" href="./fttx-layout.css?v=__BUILD_ID__"><link rel="stylesheet" href="./assets-dashboard.css?v=__BUILD_ID__"><link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png?v=__BUILD_ID__"></head>
 <body class="portal-inspections">
+<a class="portal-skip-link" href="#main-content">Pular para o conteúdo principal</a>
 <header class="portal-header">
   <div class="portal-bar">
     <a class="portal-brand" href="./" data-module="central"><img src="./voanet.png" alt="VOANET" width="1116" height="229"><span>Infraestrutura</span></a>
@@ -37,13 +38,15 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.52 system-ui,-ap
       <a href="./?modulo=fttx" data-module="fttx" hidden>FTTx</a>
       <a href="./?modulo=fibra" data-module="fibra" hidden>Fibra Import</a>
     </nav>
-    <div class="portal-actions"><span id="save" role="status">Dados neste dispositivo</span><button class="btn tiny" type="button" id="goHome">Estações</button><button id="portal-theme-toggle" class="btn tiny" type="button" aria-label="Alternar tema claro e escuro">☾ Tema</button><button id="portal-signout" class="btn tiny" type="button" hidden>Sair do portal</button></div>
+    <div class="portal-actions"><span id="save" role="status">Dados neste dispositivo</span><button class="btn tiny" type="button" id="goHome">Estações</button><button id="portal-help-btn" class="btn tiny" type="button" aria-label="Abrir guia rápido e governança" title="Guia rápido e atalhos (?)">? Ajuda</button><button id="portal-theme-toggle" class="btn tiny" type="button" aria-label="Alternar tema claro e escuro">☾ Tema</button><button id="portal-signout" class="btn tiny" type="button" hidden>Sair do portal</button></div>
   </div>
 </header>
 <div id="portal-update-banner" class="portal-update-banner" role="status" hidden>
   <span>Nova versão do portal disponível.</span>
   <button type="button" class="btn tiny primary" id="portal-update-apply">Atualizar agora</button>
 </div>
+<dialog id="portal-help-dialog" class="portal-help-dialog" aria-labelledby="portal-help-title"></dialog>
+<div id="main-content" tabindex="-1"></div>
 <div id="app"></div>
 <main id="portal-overview" aria-labelledby="overview-title" hidden></main>
 <section id="portal-fleet-pane" aria-label="Frota" hidden>
@@ -276,7 +279,7 @@ function inv13Input(group,id,field,val,label,type='text'){
 function inv13Select(group,id,field,val,label,opts){return `<div class="field"><label>${esc(label)}</label><select data-inv13-group="${group}" data-inv13-id="${esc(id)}" data-inv13-field="${field}">${opts.map(o=>`<option value="${esc(o)}" ${o===val?'selected':''}>${field==='equipamentoId'?(o?(cur()?.inventory||[]).find(x=>x.id===o)?.modelo|| (cur()?.inventory||[]).find(x=>x.id===o)?.tipo||o:'— Selecione equipamento —'):esc(o)}</option>`).join('')}</select></div>`}
 function inv13View(r){inv13(r);loadStationTransceivers(r);
  const options=r.inventory||[];
- const txCards=r.invTransceivers.map((t,i)=>`<div class="card" style="border-color:#e1e6ec"><div class="card-head"><h3>Transceiver ${i+1} · ${esc(t.tipo||'Não identificado')}</h3>${button('inv13-del-tx:'+t.id,'Remover','danger tiny')}</div>${renderTransceiverReference(r,t)}<div class="grid">
+ const txCards=r.invTransceivers.map((t,i)=>`<div class="card unit-block"><div class="card-head"><h3>Transceiver ${i+1} · ${esc(t.tipo||'Não identificado')}</h3>${button('inv13-del-tx:'+t.id,'Remover','danger tiny')}</div>${renderTransceiverReference(r,t)}<div class="grid">
  ${inv13Select('tx',t.id,'equipamentoId',t.equipamentoId,'Equipamento vinculado',['',...options.map(x=>x.id)])}
  ${inv13Input('tx',t.id,'porta',t.porta,'Porta / interface (ex.: xe-0/0/0)')}
  ${inv13Select('tx',t.id,'tipo',t.tipo,'Tipo',['SFP','SFP+','QSFP+','QSFP28','GPON','Elétrico (RJ45)','Outro'])}
@@ -290,13 +293,13 @@ function inv13View(r){inv13(r);loadStationTransceivers(r);
  ${inv13Select('tx',t.id,'estado',t.estado,'Situação',['Instalado','Reserva / estoque','Defeito','Retirado','Não verificado'])}
  ${inv13Input('tx',t.id,'observacao',t.observacao,'Observações')}
  </div><p class="muted small">Equipamento selecionado: ${esc(options.find(x=>x.id===t.equipamentoId)?.modelo||options.find(x=>x.id===t.equipamentoId)?.tipo||'Não vinculado — selecione no campo acima')}</p>${photoAttachments(r,'inv13:tx:'+t.id)}</div>`).join('');
- const bankCards=r.invBatteryBanks.map((bank,i)=>`<div class="card" style="border-color:#dde2e8"><div class="card-head"><h3 id="inventory-bank-${esc(bank.id)}" class="inventory-battery-anchor" tabindex="-1">Banco ${i+1} — ${esc(bank.identificacao||'Sem identificação')}</h3><div class="btnrow">${button('inv13-add-bat:'+bank.id,'+ Bateria','primary tiny')}${button('inv13-del-bank:'+bank.id,'Remover banco','danger tiny')}</div></div><div class="grid">
+ const bankCards=r.invBatteryBanks.map((bank,i)=>`<div class="card unit-block"><div class="card-head"><h3 id="inventory-bank-${esc(bank.id)}" class="inventory-battery-anchor" tabindex="-1">Banco ${i+1} — ${esc(bank.identificacao||'Sem identificação')}</h3><div class="btnrow">${button('inv13-add-bat:'+bank.id,'+ Bateria','primary tiny')}${button('inv13-del-bank:'+bank.id,'Remover banco','danger tiny')}</div></div><div class="grid">
  ${inv13Input('bank',bank.id,'identificacao',bank.identificacao,'Identificação do banco')}
  ${inv13Input('bank',bank.id,'local',bank.local,'Localização / rack')}
  ${inv13Input('bank',bank.id,'tensao',bank.tensao,'Tensão nominal do banco (V)')}
  ${inv13Input('bank',bank.id,'topologia',bank.topologia,'Configuração (série / paralelo)')}<div class="field full"><label><input type="checkbox" data-bank-complete="${esc(bank.id)}" ${bank.cadastroCompleto?'checked':''}> Conferi todas as baterias deste banco; o cadastro está completo.</label></div>${inv13Input('bank',bank.id,'capacidade',bank.capacidade,'Capacidade nominal do banco (Ah)','number')}${inv13Input('bank',bank.id,'autonomiaHoras',bank.autonomiaHoras,'Autonomia verificada do banco (horas)','number')}
  </div>${photoAttachments(r,'inv13:bank:'+bank.id)}
- ${(bank.baterias||[]).map((b,j)=>`<div class="card" style="background:#fafbfc"><div class="card-head"><h3 id="inventory-battery-${esc(b.id)}">Bateria ${j+1} — ${esc(b.identificacao||'Sem identificação')}</h3>${button('inv13-del-bat:'+bank.id+':'+b.id,'Remover','danger tiny')}</div><div class="grid">
+ ${(bank.baterias||[]).map((b,j)=>`<div class="card battery-unit"><div class="card-head"><h3 id="inventory-battery-${esc(b.id)}">Bateria ${j+1} — ${esc(b.identificacao||'Sem identificação')}</h3>${button('inv13-del-bat:'+bank.id+':'+b.id,'Remover','danger tiny')}</div><div class="grid">
  ${inv13Input('bat',b.id,'identificacao',b.identificacao,'Identificação da bateria')}
  ${inv13Input('bat',b.id,'fabricante',b.fabricante,'Fabricante')}
  ${inv13Input('bat',b.id,'modelo',b.modelo,'Modelo')}

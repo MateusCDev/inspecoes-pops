@@ -133,7 +133,7 @@
     }
     const slaBox = document.getElementById('overview-sla');
     if (slaBox && manager) {
-      const activeStations = (typeof googleStations !== 'undefined' ? googleStations : []).filter(s => !s.inactive && !s.duplicate);
+      const activeStations = (typeof googleStations !== 'undefined' ? googleStations : []).filter(s => !s.inactive && !s.swap && !s.duplicate && !/\bSWAP\b/i.test(String(s.name || '') + ' ' + String(s.code || '')));
       const upcoming = typeof googleUpcomingInspections === 'function' ? googleUpcomingInspections(googleCentralItems) : [];
       const byCode = new Map(upcoming.map(item => [String(item.stationCode || ''), item]));
       const overdue = [], dueSoon = [], never = [], current = [];

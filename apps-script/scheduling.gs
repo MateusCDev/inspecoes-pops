@@ -4,19 +4,25 @@ function schedulingDays_(criticality){
   if(normalized==='MEDIA')return 90;
   return null;
 }
+function isSwapStation_(row){
+  return row.some(cell=>/\bSWAP\b/i.test(String(cell??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')));
+}
 function stations_(){
   const ctx=context_();
   if(ctx.stations)return ctx.stations;
   const sheet=book_(config_().SPREADSHEET_ID).getSheetByName('POPs');
   if(!sheet||sheet.getLastRow()<1)throw Error('Cadastro de POPs indisponível.');
-  const data=sheet.getRange(1,1,sheet.getLastRow(),10).getValues(),header=data.shift();
+  const cols=Math.max(10,sheet.getLastColumn());
+  const data=sheet.getRange(1,1,sheet.getLastRow(),cols).getValues(),header=data.shift();
   if(header[0]!=='Código'||header[1]!=='Nome da Estação'||header[8]!=='Criticidade')throw Error('Cabeçalho do cadastro de POPs incompatível.');
   const stations=data.flatMap(row=>{
     const code=String(row[0]??'').trim(),name=String(row[1]??'').trim();
     if(!code||!name)return [];
     const criticality=String(row[8]||'').trim();
-    const inactive=code==='PCAM.021'&&name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase()==='POP CORDEBRAS';
-    return [{code,name,city:String(row[3]||''),criticality,days:schedulingDays_(criticality),inactive}];
+    const swap=isSwapStation_(row);
+    const cordebras=code==='PCAM.021'&&name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase()==='POP CORDEBRAS';
+    const inactive=cordebras||swap;
+    return [{code,name,city:String(row[3]||''),criticality,days:schedulingDays_(criticality),inactive,swap}];
   });
   const counts=Object.create(null);stations.filter(s=>!s.inactive).forEach(s=>counts[s.code]=(counts[s.code]||0)+1);
   ctx.stations=stations.map(s=>({...s,duplicate:!s.inactive&&counts[s.code]>1}));
@@ -30,7 +36,8 @@ function addInspectionDays_(date,days){
 }
 function applyScheduling_(record){
   const code=String(record.codigoPop??'').trim(),catalog=stations_();
-  if(catalog.some(s=>s.inactive&&s.code===code&&s.name===record.nome))throw Error('Este POP foi retirado da programação de inspeções.');
+  const excluded=catalog.find(s=>s.inactive&&s.code===code&&(s.name===record.nome||s.swap&&!catalog.some(o=>!o.inactive&&o.code===code)));
+  if(excluded)throw Error(excluded.swap?'POPs do tipo SWAP estão fora do escopo de inspeções preventivas.':'Este POP foi retirado da programação de inspeções.');
   const station=catalog.find(s=>s.code===code&&!s.inactive);
   if(!station)throw Error('Selecione um código do cadastro de POPs.');
   if(station.duplicate)throw Error('O código deste POP está duplicado no cadastro. Solicite a correção à gestão.');

@@ -99,6 +99,20 @@ test('Cordebras sai do escopo e Base Nova continua com o código compartilhado',
  r.nome='POP 46 Base Nova';const result=h.send(r);assert.equal(result.ok,true);assert.equal(result.schedule.days,90);
  const catalog=h.request({action:'stations'}).stations;assert.equal(catalog.find(s=>s.name==='POP Cordebras').inactive,true);assert.equal(catalog.find(s=>s.name==='POP 46 Base Nova').duplicate,false);
 });
+test('POPs SWAP ficam fora do escopo de inspeções (por nome ou coluna no cadastro)',()=>{
+ const h=harness();
+ h.stations.push(['POP-SW1','POP Parceiro SWAP','','Teste','','','','','ALTA','']);
+ h.stations.push(['POP-SW2','POP Estação Terceira','SWAP','Teste','','','','','MEDIA','']);
+ const catalog=h.request({action:'stations'}).stations;
+ assert.equal(catalog.find(s=>s.code==='POP-SW1').swap,true);
+ assert.equal(catalog.find(s=>s.code==='POP-SW1').inactive,true);
+ assert.equal(catalog.find(s=>s.code==='POP-SW2').swap,true);
+ assert.equal(catalog.find(s=>s.code==='POP-SW2').inactive,true);
+ const r=h.record();r.codigoPop='POP-SW1';r.nome='POP Parceiro SWAP';
+ const blocked1=h.send(r);assert.equal(blocked1.ok,false);assert.match(blocked1.error,/SWAP/);
+ r.codigoPop='POP-SW2';r.nome='POP Estação Terceira';
+ const blocked2=h.send(r);assert.equal(blocked2.ok,false);assert.match(blocked2.error,/SWAP/);
+});
 test('data impossível, código ausente ou criticidade sem regra são rejeitados',()=>{
  const h=harness(),r=h.record();r.data='2026-02-30';assert.equal(h.send(r).ok,false);
  r.data='2026-02-28';r.codigoPop='';assert.equal(h.send(r).ok,false);

@@ -115,8 +115,9 @@ function googleLogout(){
   googlePageBusy=false;googlePageError='';googleStationOptics=null;googleHistoryQuery='';googleHistoryPendingOnly=false;photosCache.clear();render();
   window.VOANET_PORTAL?.refresh();
 }
-function googleStation(record){return googleStations.find(s=>s.code===String(record.codigoPop??'').trim()&&!s.duplicate&&!s.inactive);}
-function googleStationField(r){return `<div class="field full"><label>POP cadastrado — prazo por criticidade<span class="req-mark" aria-hidden="true">*</span></label><select data-google-station required><option value="">Selecione o POP</option>${googleStations.filter(s=>!s.inactive).map(s=>`<option value="${esc(s.code)}" ${r.codigoPop===s.code?'selected':''} ${s.duplicate||!s.days?'disabled':''}>${esc(s.code+' — '+s.name+' · '+s.criticality+(s.duplicate?' — código duplicado':s.days?' · '+s.days+' dias':' — regra não definida'))}</option>`).join('')}</select></div>`;}
+function isSwapStation(station){return Boolean(station?.swap||/\bSWAP\b/i.test(String(station?.name||'')+' '+String(station?.code||'')));}
+function googleStation(record){return googleStations.find(s=>s.code===String(record.codigoPop??'').trim()&&!s.duplicate&&!s.inactive&&!isSwapStation(s));}
+function googleStationField(r){return `<div class="field full"><label>POP cadastrado — prazo por criticidade<span class="req-mark" aria-hidden="true">*</span></label><select data-google-station required><option value="">Selecione o POP</option>${googleStations.filter(s=>!s.inactive&&!isSwapStation(s)).map(s=>`<option value="${esc(s.code)}" ${r.codigoPop===s.code?'selected':''} ${s.duplicate||!s.days?'disabled':''}>${esc(s.code+' — '+s.name+' · '+s.criticality+(s.duplicate?' — código duplicado':s.days?' · '+s.days+' dias':' — regra não definida'))}</option>`).join('')}</select><small class="muted">Apenas POPs elegíveis para vistoria (POPs SWAP ficam fora do escopo).</small></div>`;}
 function googleScheduleForm(r){
   const station=googleStation(r),due=station?.days?addLocalDays(r.data,station.days):'';
   return `<div class="card"><h2>Próxima inspeção preventiva</h2>${googleStationField(r)}<p>ALTA/CRÍTICA: 45 dias · MÉDIA: 90 dias.</p><p>Contagem em dias corridos a partir da data da vistoria. Recalculada a cada nova inspeção.</p><p><b>Criticidade do POP:</b> ${esc(station?.criticality||'Selecione o POP')} · <b>Prazo:</b> ${station?.days||'—'} dias</p><p><b>Próxima inspeção:</b> ${esc(due?fmt(due):'Informe POP e data da vistoria')}</p><p class="small muted">O servidor confirma o prazo usando o cadastro de POPs. A criticidade operacional da vistoria é registrada separadamente.</p></div>`;
@@ -423,9 +424,9 @@ function googleUpcomingInspections(items){
     const previous=latest.get(key);
     if(!previous||String(item.date)+String(item.updated)>String(previous.date)+String(previous.updated))latest.set(key,item);
   }
-  const inactive=new Set(googleStations.filter(station=>station.inactive).map(station=>String(station.code)+'|'+station.name));
+  const inactive=new Set(googleStations.filter(station=>station.inactive||isSwapStation(station)).map(station=>String(station.code)+'|'+station.name));
   return [...latest.values()]
-    .filter(item=>!inactive.has(String(item.stationCode)+'|'+item.station))
+    .filter(item=>!inactive.has(String(item.stationCode)+'|'+item.station)&&!/\bSWAP\b/i.test(String(item.station||'')+' '+String(item.stationCode||'')))
     .sort((a,b)=>String(a.due||'9999').localeCompare(String(b.due||'9999')));
 }
 

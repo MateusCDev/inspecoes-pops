@@ -788,6 +788,7 @@ document.addEventListener('click', event => {
   }
   const row = target.closest('[data-ad-asset-idx]');
   if (row) { adOpenAssetDetail(Number(row.dataset.adAssetIdx)); return; }
+  if (target.id === 'ad-asset-dialog' && typeof target.close === 'function') { target.close(); return; }
   if (target.closest('[data-ad-close-dialog]')) { document.getElementById('ad-asset-dialog')?.close(); return; }
   const filterClose = target.closest('[data-ad-filter-station-close]');
   if (filterClose) {

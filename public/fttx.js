@@ -1,6 +1,6 @@
 'use strict';
 
-const FTTX_FIBERS=[6,12,24,36];
+const FTTX_FIBERS=[6,12,24,36,48,72];
 const FTTX_STEPS=[
   ['Lançamento','fttx-project-heading'],
   ['CTO','fttx-cto-heading'],
@@ -20,16 +20,49 @@ const FTTX_ROUTE_DETAILS=[
   ['bapSupport','Suportes para BAP','Conte os suportes conforme os pontos de fixação do trajeto.'],
   ['loopSmall','Alças pré-formadas de 06 a 12 FO','Some as alças previstas para cabos de 6 a 12 fibras.'],
   ['loop24','Alças pré-formadas de 24 FO','Some as alças previstas para cabo de 24 fibras.'],
-  ['loop36','Alças pré-formadas de 36 FO','Some as alças previstas para cabo de 36 fibras.']
+  ['loop36','Alças pré-formadas de 36 FO','Some as alças previstas para cabo de 36 fibras.'],
+  ['loop48','Alças pré-formadas de 48 FO','Some as alças previstas para cabo de 48 fibras.'],
+  ['loop72','Alças pré-formadas de 72 FO','Some as alças previstas para cabo de 72 fibras.']
 ];
+const FTTX_CTO_MODELS=[
+  ['cto8','CTO 1:8 (8 portas)',8,false],
+  ['cto16','CTO 1:16 (16 portas)',16,false],
+  ['cto24','CTO 1:24 (24 portas)',24,false],
+  ['ctoPre8','CTO pré-conectorizada 1:8',8,true],
+  ['ctoPre16','CTO pré-conectorizada 1:16',16,true]
+];
+const FTTX_CEO_MODELS=[
+  ['ceo24','CEO 24 FO'],
+  ['ceo48','CEO 48 FO'],
+  ['ceo72','CEO 72 FO'],
+  ['ceo144','CEO 144 FO']
+];
+const FTTX_SPLITTERS_CONNECTORIZED=[
+  ['splitConn2','Splitter 1:2 conectorizado SC/APC',3],
+  ['splitConn4','Splitter 1:4 conectorizado SC/APC',5],
+  ['splitConn8','Splitter 1:8 conectorizado SC/APC',9],
+  ['splitConn16','Splitter 1:16 conectorizado SC/APC',17],
+  ['splitConn32','Splitter 1:32 conectorizado SC/APC',33]
+];
+const FTTX_SPLITTERS_BARE=[
+  ['split2','Splitter 1:2 sem conector',3],
+  ['split4','Splitter 1:4 sem conector',5],
+  ['split8','Splitter 1:8 sem conector',9],
+  ['split16','Splitter 1:16 sem conector',17],
+  ['split32','Splitter 1:32 sem conector',33]
+];
+const FTTX_UNBALANCED_RATIOS=['5/95','10/90','15/85','20/80','30/70','40/60','50/50'];
+const FTTX_SPLITTERS_UNBALANCED_BARE=FTTX_UNBALANCED_RATIOS.map(ratio=>[
+  'splitUnb'+ratio.split('/')[0],`Splitter desbalanceado ${ratio} sem conector`,3
+]);
+const FTTX_SPLITTERS_UNBALANCED_CONN=FTTX_UNBALANCED_RATIOS.map(ratio=>[
+  'splitUnbConn'+ratio.split('/')[0],`Splitter desbalanceado ${ratio} conectorizado SC/APC`,3
+]);
 const FTTX_BOX_FIELDS=[
   ['cep','CEPs','Informe as caixas de emenda de passagem previstas.'],
   ['tray','Bandejas de emenda','Some as bandejas previstas nas caixas.'],
-  ['split2','Splitters 1:2','Informe o número previsto de divisores ópticos com duas saídas.'],
-  ['split8','Splitters 1:8','Informe o número previsto de divisores ópticos com oito saídas.'],
-  ['split16','Splitters 1:16','Informe o número previsto de divisores ópticos com dezesseis saídas.'],
   ['strand','Cordoalha medida no projeto (m)','Estime a metragem no traçado considerando os pontos previstos a cada 100 m.'],
-  ['sleeve','Tubetes protetores de emenda','Conte os protetores das emendas previstas.'],
+  ['sleeve','Tubetes protetores de emenda','Conte os protetores das emendas previstas (ou use o atalho de estimativa).'],
   ['blanket','Mantas para CEO','Some as mantas previstas para as caixas de emenda.']
 ];
 const fttxQuantityFormat=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2});
@@ -42,6 +75,17 @@ function fttxQuantity(value,decimal=false){
   const number=Number(value);
   if(!Number.isFinite(number)||number<=0)return 0;
   return decimal?Math.round((number+Number.EPSILON)*100)/100:Math.floor(number);
+}
+
+function fttxEstimatedSleeves(draft){
+  const get=field=>fttxQuantity(draft[field]);
+  const ceoTotal=FTTX_FIBERS.reduce((sum,fibers)=>sum+fttxQuantity(draft.cables?.[fibers]?.ceo),0);
+  const ctoTotal=FTTX_FIBERS.reduce((sum,fibers)=>sum+fttxQuantity(draft.cables?.[fibers]?.cto)+fttxQuantity(draft.cables?.[fibers]?.endCto),0);
+  const preCto=get('ctoPre8')+get('ctoPre16');
+  const bareSplitSplices=[...FTTX_SPLITTERS_BARE,...FTTX_SPLITTERS_UNBALANCED_BARE]
+    .reduce((sum,[field,,splices])=>sum+get(field)*splices,0);
+  const conventionalCto=Math.max(0,ctoTotal-preCto);
+  return bareSplitSplices+12*ceoTotal+2*conventionalCto;
 }
 
 function calculateFttx(draft){
@@ -61,6 +105,38 @@ function calculateFttx(draft){
   });
   const get=(field,decimal)=>fttxQuantity(draft[field],decimal);
   const cep=get('cep'),guidePoles=get('guidePoles'),poles=get('poles'),ctoPoles=get('ctoPoles'),asPoles=get('asPoles');
+
+  const ctoBreakdown=FTTX_CTO_MODELS.map(([field,label,ports,pre])=>({field,label,ports,pre,qty:get(field)}));
+  const ctoTypedTotal=ctoBreakdown.reduce((sum,entry)=>sum+entry.qty,0);
+  const ctoPorts=ctoBreakdown.reduce((sum,entry)=>sum+entry.qty*entry.ports,0);
+  const ctoAssembly=draft.ctoAssembly==='vazia'?'vazia':'montada';
+  const ctoItems=[];
+  if(ctoTypedTotal>0){
+    for(const entry of ctoBreakdown)ctoItems.push([entry.label,'un',entry.qty]);
+    if(ctoAssembly==='vazia'){
+      const cto8Qty=get('cto8'),cto16Qty=get('cto16'),cto24Qty=get('cto24');
+      if(cto8Qty>0)ctoItems.push(['Splitter 1:8 conectorizado SC/APC','un',cto8Qty]);
+      if(cto16Qty>0)ctoItems.push(['Splitter 1:16 conectorizado SC/APC','un',cto16Qty]);
+      const adapters=8*cto8Qty+16*cto16Qty+24*cto24Qty;
+      if(adapters>0)ctoItems.push(['Adaptador SC/APC','un',adapters]);
+    }
+  }else{
+    ctoItems.push(['CTO','un',ctoTotal]);
+  }
+
+  const ceoBreakdown=FTTX_CEO_MODELS.map(([field,label])=>({field,label,qty:get(field)}));
+  const ceoTypedTotal=ceoBreakdown.reduce((sum,entry)=>sum+entry.qty,0);
+  const ceoItems=ceoTypedTotal>0
+    ? ceoBreakdown.map(entry=>[entry.label,'un',entry.qty])
+    : [['CEO','un',ceoTotal]];
+
+  const splitterItems=[
+    ...FTTX_SPLITTERS_CONNECTORIZED.map(([field,label])=>[label,'un',get(field)]),
+    ...FTTX_SPLITTERS_BARE.map(([field,label])=>[label,'un',get(field)]),
+    ...FTTX_SPLITTERS_UNBALANCED_CONN.map(([field,label])=>[label,'un',get(field)]),
+    ...FTTX_SPLITTERS_UNBALANCED_BARE.map(([field,label])=>[label,'un',get(field)])
+  ];
+
   const groups=[
     {title:'Lançamento',items:[
       ...cables.map(c=>['Cabo óptico '+String(c.fibers).padStart(2,'0')+' FO','m',c.total]),
@@ -70,6 +146,8 @@ function calculateFttx(draft){
       ['Alça pré-formada para cabo de 06 a 12 FO','un',get('loopSmall')],
       ['Alça pré-formada para cabo de 24 FO','un',get('loop24')],
       ['Alça pré-formada para cabo de 36 FO','un',get('loop36')],
+      ['Alça pré-formada para cabo de 48 FO','un',get('loop48')],
+      ['Alça pré-formada para cabo de 72 FO','un',get('loop72')],
       ['Suporte dielétrico','un',get('dielectricGroups')],
       ['Plaqueta de identificação do cabo','un',poles],
       ['Anel guia AGFE para postes sem CTO e sem BAP','un',2*guidePoles],
@@ -77,15 +155,15 @@ function calculateFttx(draft){
       ['Abraçadeira BAP','un',asPoles]
     ]},
     {title:'Montagem de CTO',items:[
-      ['CTO','un',ctoTotal],
+      ...ctoItems,
       ['Plaqueta de CTO','un',ctoTotal],
       ['Fita de aço 3/4″','m',3*ctoTotal],
       ['Fecho de aço 3/4″','un',2*ctoTotal],
       ['Anel guia AGFE','un',6*ctoTotal]
     ]},
-    {title:'Montagem de CEO / CEP',items:[
-      ['CEO','un',ceoTotal],['CEP','un',cep],['Bandeja de caixa de emenda','un',get('tray')],
-      ['Splitter 1:2','un',get('split2')],['Splitter 1:8','un',get('split8')],['Splitter 1:16','un',get('split16')],
+    {title:'Montagem de CEO / CEP e Splitters',items:[
+      ...ceoItems,['CEP','un',cep],['Bandeja de caixa de emenda','un',get('tray')],
+      ...splitterItems,
       ['Alça pré-formada para cordoalha','un',2*ceoTotal],
       ['Conjunto de reserva técnica para caixa de emenda','un',ceoTotal+cep],
       ['Cordoalha','m',get('strand',true)],['Plaqueta de caixa de emenda','un',ceoTotal+cep],
@@ -103,10 +181,20 @@ function calculateFttx(draft){
   }else if(ctoPoles&&!ctoTotal){
     issues.push({step:2,text:'Informe quantas CTOs comuns e de ponta há em cada bitola.'});
   }
+  if(ctoTypedTotal>0&&ctoTypedTotal!==ctoTotal){
+    issues.push({step:2,text:`A soma das CTOs por capacidade (${ctoTypedTotal}) precisa coincidir com o total de CTOs do trajeto (${ctoTotal}).`});
+  }
+  if(ceoTypedTotal>0&&ceoTypedTotal!==ceoTotal){
+    issues.push({step:3,text:`A soma das CEOs por capacidade (${ceoTypedTotal}) precisa coincidir com o total de CEOs do trajeto (${ceoTotal}).`});
+  }
   if(get('dielectricGroups')&&poles<3){
     issues.push({step:1,text:'Confira os suportes dielétricos. Cada grupo informado precisa de pelo menos três postes no trajeto.'});
   }
-  return {cables,groups,cableTotal:fttxQuantity(cableTotal,true),reserveTotal,routeTotal:fttxQuantity(routeTotal,true),issues,alerts:issues.map(issue=>issue.text)};
+  return {
+    cables,groups,ctoTotal,ceoTotal,ctoPorts,
+    cableTotal:fttxQuantity(cableTotal,true),reserveTotal,routeTotal:fttxQuantity(routeTotal,true),
+    issues,alerts:issues.map(issue=>issue.text)
+  };
 }
 
 function loadFttxDraft(){
@@ -155,8 +243,17 @@ function fttxMaterialKey(name){
   return name.replace(' para postes sem CTO e sem BAP','');
 }
 
+function fttxLookupReference(key){
+  if(fttxReferences[key])return fttxReferences[key];
+  const bareSplitter=key.match(/^(Splitter 1:(?:2|8|16)) sem conector$/);
+  if(bareSplitter&&fttxReferences[bareSplitter[1]])return fttxReferences[bareSplitter[1]];
+  if(key==='CEO 24 FO'&&fttxReferences['CEO'])return fttxReferences['CEO'];
+  if(key==='CTO 1:16 (16 portas)'&&fttxDraft.ctoAssembly==='vazia'&&fttxReferences['CTO'])return fttxReferences['CTO'];
+  return null;
+}
+
 function fttxEstimate(name,quantity){
-  const key=fttxMaterialKey(name),manual=fttxDraft.prices?.[key],reference=fttxReferences[key];
+  const key=fttxMaterialKey(name),manual=fttxDraft.prices?.[key],reference=fttxLookupReference(key);
   if(manual!==undefined&&manual!==''&&Number.isFinite(Number(manual))&&Number(manual)>=0){
     const unit=Number(manual);
     return {unit,cents:Math.round(quantity*unit*100),source:'Estimativa manual'};
@@ -230,7 +327,7 @@ function fttxOverview(result){
   const {items,missing,subtotal}=fttxCostRows(result.groups);
   const meters=value=>fttxQuantityFormat.format(value)+' m';
   return `<dl class="fttx-overview">
-    <div><dt>Trajeto</dt><dd>${meters(result.routeTotal)}</dd></div>
+    <div><dt>Trajeto</dt><dd>${meters(result.routeTotal)}</dd>${result.ctoPorts>0?`<small>${fttxQuantityFormat.format(result.ctoPorts)} portas CTO</small>`:''}</div>
     <div><dt>Cabo com reserva</dt><dd>${meters(result.cableTotal)}</dd></div>
     <div><dt>Estimativa de materiais</dt><dd>${subtotal===null?'—':fttxCurrency.format(subtotal)}</dd>
     ${items.length&&missing?`<small>${missing} de ${items.length} linhas sem preço</small>`:''}</div>
@@ -240,6 +337,11 @@ function fttxOverview(result){
 function updateFttxOverview(result){
   const overview=document.getElementById('fttx-overview');
   if(overview)overview.innerHTML=fttxOverview(result);
+  const portsBadge=document.getElementById('fttx-cto-ports-badge');
+  if(portsBadge){
+    portsBadge.hidden=result.ctoPorts<=0;
+    portsBadge.textContent=`Capacidade planejada: ${fttxQuantityFormat.format(result.ctoPorts)} portas de atendimento`;
+  }
 }
 
 function fttxIssues(result,step){
@@ -251,6 +353,16 @@ function fttxIssues(result,step){
     </li>`).join('')}</ul></div>`;
 }
 
+function fttxExtrasListHtml(){
+  const entries=Object.entries(fttxDraft.extras||{}).filter(([,qty])=>Number(qty)>0);
+  if(!entries.length)return '';
+  const unitMap=new Map(FTTX_CATALOG.flatMap(([,items])=>items));
+  return `<ul class="fttx-extras-list" aria-label="Materiais complementares adicionados">${entries.map(([name,qty])=>`<li>
+    <span><strong>${esc(name)}</strong> · ${fttxQuantityFormat.format(Number(qty))} ${unitMap.get(name)||'un'}</span>
+    <button type="button" class="btn danger tiny" data-fttx-remove-extra="${esc(name)}">Remover</button>
+  </li>`).join('')}</ul>`;
+}
+
 function updateFttxResults(){
   const result=calculateFttx(fttxDraft);
   updateFttxOverview(result);
@@ -258,6 +370,8 @@ function updateFttxResults(){
     const message=fttxIssues(result,Number(target.dataset.fttxIssues));
     if(target.innerHTML!==message)target.innerHTML=message;
   });
+  const extrasNode=document.getElementById('fttx-extras-list');
+  if(extrasNode)extrasNode.innerHTML=fttxExtrasListHtml();
   if(currentFttxStep()!==4)return;
   const target=document.getElementById('fttx-results');
   if(!target)return;
@@ -296,11 +410,11 @@ function fttxStepActions(step){
   </div>`;
 }
 
-function fttxInput(field,label,help,decimal=false){
+function fttxInput(field,label,help='',decimal=false){
   return `<div class="fttx-field"><label for="fttx-${field}">${label}</label><input id="fttx-${field}" type="number"
     min="0" step="${decimal?'0.01':'1'}" inputmode="${decimal?'decimal':'numeric'}"
-    aria-describedby="fttx-help-${field}" value="${esc(fttxDraft[field]??'')}" data-fttx-field="${field}" placeholder="0">
-    <small id="fttx-help-${field}">${help}</small></div>`;
+    ${help?`aria-describedby="fttx-help-${field}"`:''} value="${esc(fttxDraft[field]??'')}" data-fttx-field="${field}" placeholder="0">
+    ${help?`<small id="fttx-help-${field}">${help}</small>`:''}</div>`;
 }
 
 function fttxCableInputs(fields){
@@ -315,7 +429,7 @@ function fttxCableInputs(fields){
   };
   const otherFibers=FTTX_FIBERS.filter(fibers=>fibers!==12);
   const expanded=otherFibers.some(fibers=>[...fields,'meters'].some(field=>fttxQuantity(fttxDraft.cables?.[fibers]?.[field],true)>0));
-  return `${inputGroup(12)}<details class="fttx-options" data-fttx-other-cables ${expanded?'open':''}><summary>Outras bitolas · 06, 24 e 36 FO</summary>
+  return `${inputGroup(12)}<details class="fttx-options" data-fttx-other-cables ${expanded?'open':''}><summary>Outras bitolas · 06, 24, 36, 48 e 72 FO</summary>
     <div class="fttx-other-cables">${otherFibers.map(inputGroup).join('')}</div></details>`;
 }
 
@@ -371,9 +485,12 @@ function renderFttx(){
   const result=calculateFttx(fttxDraft),step=currentFttxStep();
   const panel=number=>`class="card fttx-panel" data-fttx-panel="${number}" ${step!==number?'hidden':''}`;
   const issues=number=>`<div data-fttx-issues="${number}" role="status">${fttxIssues(result,number)}</div>`;
+  const hasUnbalanced=[...FTTX_SPLITTERS_UNBALANCED_CONN,...FTTX_SPLITTERS_UNBALANCED_BARE].some(([field])=>fttxQuantity(fttxDraft[field])>0);
+  const hasCeoModels=FTTX_CEO_MODELS.some(([field])=>fttxQuantity(fttxDraft[field])>0);
   return `<main class="shell fttx-shell">
     <header class="fttx-page-heading"><div><h1>Levantamento FTTx</h1>
-      <p>Calcule a metragem, confira os materiais e prepare o levantamento para o almoxarifado.</p></div>${isGoogleMode()?'':button('home','Voltar à Gestão','tiny')}</header>
+      <p>Calcule a metragem, especifique CTOs, CEOs e splitters e prepare o levantamento para o almoxarifado.</p></div>
+      <div class="btnrow"><button type="button" class="btn tiny danger" data-fttx-reset>Limpar levantamento</button>${isGoogleMode()?'':button('home','Voltar à Gestão','tiny')}</div></header>
     <div id="fttx-overview">${fttxOverview(result)}</div>
     <div class="fttx-workspace">
       <aside class="fttx-wizard" aria-label="Progresso do levantamento">
@@ -410,20 +527,69 @@ function renderFttx(){
         <section ${panel(2)} aria-labelledby="fttx-cto-heading">
           ${fttxStep(2,'fttx-cto-heading','Montagem de CTO')}
           ${issues(2)}
-          <p class="fttx-panel-description">Separe as caixas de atendimento comuns das de ponta. Informe cada caixa na bitola do cabo que terá a reserva.</p>
+          <p class="fttx-panel-description">Separe as caixas de atendimento comuns das de ponta na bitola do cabo que terá a reserva, e escolha os modelos de CTO abaixo.</p>
           ${fttxCableInputs(['cto','endCto'])}
           <div class="fttx-fields">${fttxInput('ctoPoles','Postes com CTO','Conte os postes distintos. Se duas caixas estiverem no mesmo poste, conte apenas um poste.')}</div>
           <button type="button" class="btn tiny fttx-suggestion" data-fttx-suggestion="ctoPoles">Estimar uma CTO por poste</button>
+          <div class="fttx-subsection">
+            <h3>Capacidade e modelo das CTOs</h3>
+            <p class="small muted">Opcional: especifique quantas CTOs serão 1:8, 1:16, 1:24 ou pré-conectorizadas. A soma deve igualar o total de CTOs informadas acima.</p>
+            <div class="fttx-quick-bar">
+              <button type="button" class="btn tiny" data-fttx-cto-fill="cto8">Todas 1:8</button>
+              <button type="button" class="btn tiny" data-fttx-cto-fill="cto16">Todas 1:16</button>
+              <button type="button" class="btn tiny" data-fttx-cto-fill="ctoPre16">Todas pré-conectorizada 1:16</button>
+              <span id="fttx-cto-ports-badge" class="fttx-ports-pill" ${result.ctoPorts>0?'':'hidden'}>Capacidade planejada: ${fttxQuantityFormat.format(result.ctoPorts)} portas de atendimento</span>
+            </div>
+            <div class="fttx-fields">
+              ${FTTX_CTO_MODELS.map(([field,label])=>fttxInput(field,label)).join('')}
+              <div class="fttx-field">
+                <label for="fttx-ctoAssembly">Fornecimento das CTOs convencionais</label>
+                <select id="fttx-ctoAssembly" data-fttx-field="ctoAssembly">
+                  <option value="montada" ${fttxDraft.ctoAssembly!=='vazia'?'selected':''}>CTO já montada / equipada</option>
+                  <option value="vazia" ${fttxDraft.ctoAssembly==='vazia'?'selected':''}>CTO vazia (incluir splitter SC/APC e adaptadores)</option>
+                </select>
+                <small>No modo vazia, CTO 1:8 e 1:16 somam automaticamente splitter conectorizado SC/APC e adaptadores SC/APC. Para CTO 1:24 vazia, informe os splitters desejados na etapa 3.</small>
+              </div>
+            </div>
+          </div>
           <p class="small muted">Por caixa, o sistema inclui 1 plaqueta, 3 m de fita de aço, 2 fechos e 6 anéis guia. Também inclui 1 olhal básico por poste com CTO. A reserva é de 22 m por CTO comum e 12,5 m por CTO de ponta.</p>
           ${fttxStepActions(2)}
         </section>
         <section ${panel(3)} aria-labelledby="fttx-box-heading">
-          ${fttxStep(3,'fttx-box-heading','Montagem de CEO / CEP')}
+          ${fttxStep(3,'fttx-box-heading','Montagem de CEO / CEP e Splitters')}
+          ${issues(3)}
           <p class="fttx-panel-description">Cada CEO soma 20 m de cabo na bitola indicada e 2 alças de cordoalha. Cada CEO ou CEP inclui 1 conjunto de reserva e 1 plaqueta.</p>
           ${fttxCableInputs(['ceo'])}
           <div class="fttx-fields">${fttxInput(...FTTX_BOX_FIELDS[0])}</div>
+          <details class="fttx-options" ${hasCeoModels?'open':''}>
+            <summary>Detalhar capacidade das CEOs (24, 48, 72 ou 144 FO)</summary>
+            <p class="small muted">Opcional: distribua as CEOs por capacidade. Se deixar zerado, o levantamento lista como CEO padrão.</p>
+            <div class="fttx-quick-bar">
+              <button type="button" class="btn tiny" data-fttx-ceo-fill="ceo24">Todas 24 FO</button>
+              <button type="button" class="btn tiny" data-fttx-ceo-fill="ceo48">Todas 48 FO</button>
+            </div>
+            <div class="fttx-fields">${FTTX_CEO_MODELS.map(([field,label])=>fttxInput(field,label)).join('')}</div>
+          </details>
+          <div class="fttx-subsection">
+            <h3>Splitters de rede</h3>
+            <p class="small muted">Informe os divisores ópticos necessários na distribuição (CEOs, DIOs ou CTOs sem inclusão automática).</p>
+            <h4>Balanceados conectorizados SC/APC</h4>
+            <div class="fttx-fields">${FTTX_SPLITTERS_CONNECTORIZED.map(([field,label])=>fttxInput(field,label)).join('')}</div>
+            <h4>Balanceados sem conector (fusão)</h4>
+            <div class="fttx-fields">${FTTX_SPLITTERS_BARE.map(([field,label])=>fttxInput(field,label)).join('')}</div>
+            <details class="fttx-options" ${hasUnbalanced?'open':''}>
+              <summary>Splitters desbalanceados (rede em cascata · 5/95 a 50/50)</summary>
+              <h4>Desbalanceados conectorizados SC/APC</h4>
+              <div class="fttx-fields">${FTTX_SPLITTERS_UNBALANCED_CONN.map(([field,label])=>fttxInput(field,label)).join('')}</div>
+              <h4>Desbalanceados sem conector (fusão)</h4>
+              <div class="fttx-fields">${FTTX_SPLITTERS_UNBALANCED_BARE.map(([field,label])=>fttxInput(field,label)).join('')}</div>
+            </details>
+          </div>
           <details class="fttx-options" ${FTTX_BOX_FIELDS.slice(1).some(([key])=>fttxQuantity(fttxDraft[key],true)>0)?'open':''}>
-            <summary>Detalhar componentes das caixas de emenda</summary>
+            <summary>Detalhar bandejas, cordoalha, tubetes e mantas</summary>
+            <div class="fttx-quick-bar">
+              <button type="button" class="btn tiny" data-fttx-suggestion="sleeve">Estimar tubetes pelas fusões</button>
+            </div>
             <div class="fttx-fields">${FTTX_BOX_FIELDS.slice(1).map(([field,label,help])=>fttxInput(field,label,help,field==='strand')).join('')}</div>
           </details>
           ${fttxStepActions(3)}
@@ -441,12 +607,13 @@ function renderFttx(){
           <details class="fttx-options fttx-catalog" ${Object.keys(fttxDraft.extras||{}).length?'open':''}>
             <summary>Adicionar outros materiais do catálogo</summary>
             <form id="fttx-catalog-form" class="fttx-fields">
-              <label class="fttx-field"><span>Buscar no catálogo</span><input type="search" id="fttx-search" placeholder="Ex.: DIO, OLT ou microduto"></label>
+              <label class="fttx-field"><span>Buscar no catálogo</span><input type="search" id="fttx-search" placeholder="Ex.: DIO, OLT, drop ou microduto"></label>
               <label class="fttx-field"><span id="fttx-material-label">Material</span><select id="fttx-catalog-item" aria-labelledby="fttx-material-label" required>${fttxCatalogOptions()}</select></label>
               <label class="fttx-field"><span>Quantidade</span><input id="fttx-catalog-quantity" type="number" min="0" step="0.01" inputmode="decimal" required></label>
               <button class="btn" type="submit">Aplicar quantidade</button>
             </form>
-            <p class="small muted" id="fttx-catalog-status" role="status">Informe zero para retirar um material complementar da lista.</p>
+            <p class="small muted" id="fttx-catalog-status" role="status">Informe zero ou clique em Remover para retirar um material complementar da lista.</p>
+            <div id="fttx-extras-list">${fttxExtrasListHtml()}</div>
           </details>
           <details class="fttx-options">
             <summary>Ver um exemplo de cálculo da reserva</summary>
@@ -467,7 +634,7 @@ function persistFttx(){
   }catch(_){fttxSaveError=true;}
   const status=document.getElementById('fttx-save');
   const message=fttxSaveError?'Não foi possível salvar o rascunho neste dispositivo.':'Rascunho salvo neste dispositivo';
-  if(status.textContent!==message)status.textContent=message;
+  if(status&&status.textContent!==message)status.textContent=message;
 }
 
 function saveFttx(event){
@@ -517,7 +684,7 @@ function buildFttxCsv(report){
 
 let fttxExportRequest;
 async function exportFttx(format){
-  const {groups,alerts,routeTotal,reserveTotal,cableTotal}=calculateFttx(fttxDraft);
+  const {groups,alerts,routeTotal,reserveTotal,cableTotal,ctoPorts}=calculateFttx(fttxDraft);
   const costs=fttxCostRows(groups);
   if(alerts.length||!costs.items.length||fttxExportRequest?.session===googleSession)return;
   const status=document.getElementById('fttx-export-status');
@@ -525,7 +692,7 @@ async function exportFttx(format){
   fttxExportRequest=request;
   const project=fttxDraft.name?.trim()||'Projeto FTTx';
   const date=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo'}).format();
-  const report={...costs,project,date,routeTotal,reserveTotal,cableTotal};
+  const report={...costs,project,date,routeTotal,reserveTotal,cableTotal,ctoPorts};
   const filename=project.replace(/[<>:"/\\|?*\x00-\x1f\x7f]/g,' ').trim()||'Projeto FTTx';
   const exports={
     pdf:[buildFttxPdf,'application/pdf'],
@@ -552,23 +719,81 @@ document.addEventListener('click',event=>{
 });
 
 document.addEventListener('input',saveFttx);
+document.addEventListener('change',event=>{
+  if(event.target.matches('select[data-fttx-field]'))saveFttx(event);
+});
 document.addEventListener('click',event=>{
+  if(!fttxActive())return;
   const step=event.target.closest('[data-fttx-step]');
-  if(step&&fttxActive())return goFttxStep(Number(step.dataset.fttxStep));
+  if(step)return goFttxStep(Number(step.dataset.fttxStep));
+  const reset=event.target.closest('[data-fttx-reset]');
+  if(reset){
+    if(!confirm('Limpar todos os campos deste levantamento FTTx para iniciar um novo projeto?'))return;
+    fttxDraft={step:1};
+    persistFttx();
+    const pane=isGoogleMode()?document.getElementById('portal-fttx-pane'):document.getElementById('app');
+    if(pane)pane.innerHTML=renderFttx();
+    return;
+  }
+  const removeExtra=event.target.closest('[data-fttx-remove-extra]');
+  if(removeExtra){
+    const itemName=removeExtra.dataset.fttxRemoveExtra;
+    if(fttxDraft.extras&&Object.hasOwn(fttxDraft.extras,itemName)){
+      delete fttxDraft.extras[itemName];
+      persistFttx();
+      updateFttxResults();
+      const status=document.getElementById('fttx-catalog-status');
+      if(status)status.textContent=itemName+' retirado da lista.';
+    }
+    return;
+  }
+  const ctoFill=event.target.closest('[data-fttx-cto-fill]');
+  if(ctoFill){
+    const target=ctoFill.dataset.fttxCtoFill;
+    const total=calculateFttx(fttxDraft).ctoTotal;
+    if(!total){document.querySelector('[data-fttx-fiber="12"][data-fttx-field="cto"]')?.focus();return;}
+    for(const [field] of FTTX_CTO_MODELS){
+      const val=field===target?String(total):'';
+      fttxDraft[field]=val;
+      const input=document.getElementById('fttx-'+field);
+      if(input)input.value=val;
+    }
+    persistFttx();
+    updateFttxResults();
+    document.getElementById('fttx-'+target)?.focus();
+    return;
+  }
+  const ceoFill=event.target.closest('[data-fttx-ceo-fill]');
+  if(ceoFill){
+    const target=ceoFill.dataset.fttxCeoFill;
+    const total=calculateFttx(fttxDraft).ceoTotal;
+    if(!total){document.querySelector('[data-fttx-fiber="12"][data-fttx-field="ceo"]')?.focus();return;}
+    for(const [field] of FTTX_CEO_MODELS){
+      const val=field===target?String(total):'';
+      fttxDraft[field]=val;
+      const input=document.getElementById('fttx-'+field);
+      if(input)input.value=val;
+    }
+    persistFttx();
+    updateFttxResults();
+    document.getElementById('fttx-'+target)?.focus();
+    return;
+  }
   const suggestion=event.target.closest('[data-fttx-suggestion]');
-  if(suggestion&&fttxActive()){
+  if(suggestion){
     const field=suggestion.dataset.fttxSuggestion;
     const input=document.getElementById('fttx-'+field);
-    const value=field==='asPoles'?fttxQuantity(fttxDraft.poles):FTTX_FIBERS.reduce((sum,fibers)=>{
-      const cable=fttxDraft.cables?.[fibers];
-      return sum+fttxQuantity(cable?.cto)+fttxQuantity(cable?.endCto);
-    },0);
+    let value=0;
+    if(field==='asPoles')value=fttxQuantity(fttxDraft.poles);
+    else if(field==='sleeve')value=fttxEstimatedSleeves(fttxDraft);
+    else value=calculateFttx(fttxDraft).ctoTotal;
     if(value){
       input.value=value;
       saveFttx({target:input});
       input.focus();
     }else{
-      document.querySelector(field==='asPoles'?'#fttx-poles':'[data-fttx-fiber="12"][data-fttx-field="cto"]').focus();
+      const fallback=field==='asPoles'?'#fttx-poles':field==='sleeve'?'#fttx-sleeve':'[data-fttx-fiber="12"][data-fttx-field="cto"]';
+      document.querySelector(fallback)?.focus();
     }
     return;
   }

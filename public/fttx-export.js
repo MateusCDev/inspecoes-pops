@@ -66,6 +66,7 @@ async function buildFttxWorkbook(report) {
   summary.addRow(['Cabo lançado (m)', report.routeTotal]);
   summary.addRow(['Reserva técnica (m)', report.reserveTotal]);
   summary.addRow(['Cabo total (m)', report.cableTotal]);
+  if (report.ctoPorts > 0) summary.addRow(['Portas de atendimento (CTO)', report.ctoPorts]);
   summary.addRow(['Linhas de material', report.items.length]);
   const last = materials.rowCount;
   summary.addRow(['Linhas sem preço', {formula:`COUNTBLANK(Materiais!F2:F${last})`, result:report.missing}]);
@@ -75,9 +76,10 @@ async function buildFttxWorkbook(report) {
   }]);
   total.getCell(2).numFmt = money;
   total.font = {bold:true, color:{argb:color}};
-  summary.mergeCells('A11:D12');
-  summary.getCell('A11').value = FTTX_COST_NOTE;
-  summary.getCell('A11').alignment = {wrapText:true, vertical:'middle'};
+  const noteStart = summary.rowCount + 1;
+  summary.mergeCells(`A${noteStart}:D${noteStart+1}`);
+  summary.getCell(`A${noteStart}`).value = FTTX_COST_NOTE;
+  summary.getCell(`A${noteStart}`).alignment = {wrapText:true, vertical:'middle'};
   return book.xlsx.writeBuffer();
 }
 
@@ -155,7 +157,7 @@ async function buildFttxPdf(report) {
       const metrics = [
         ['Cabo lançado', fttxQuantityFormat.format(report.routeTotal)+' m'],
         ['Reserva técnica', fttxQuantityFormat.format(report.reserveTotal)+' m'],
-        ['Cabo total', fttxQuantityFormat.format(report.cableTotal)+' m']
+        ['Cabo total', fttxQuantityFormat.format(report.cableTotal)+' m'+(report.ctoPorts>0?'  ·  '+fttxQuantityFormat.format(report.ctoPorts)+' portas':'')]
       ];
       metrics.forEach(([label,value],index) => {
         const x = left+12+index*171;

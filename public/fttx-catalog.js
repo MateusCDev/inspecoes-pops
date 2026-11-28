@@ -3,18 +3,18 @@
 const FTTX_CATALOG=[
   ['Cabos e lançamento',[
     ['Cabo óptico 02 FO','m'],['Cabo óptico 04 FO','m'],['Cabo óptico 08 FO','m'],
-    ['Cabo óptico 48 FO','m'],['Cabo óptico 72 FO','m'],['Cabo óptico 96 FO','m'],['Cabo óptico 144 FO','m'],
+    ['Cabo óptico 96 FO','m'],['Cabo óptico 144 FO','m'],
     ['Cabo drop óptico 1 FO','m'],['Cabo drop óptico 2 FO','m'],['Cabo óptico para duto','m'],
     ['Cabo óptico interno LSZH','m'],['Microcabo óptico para microduto','m']
   ]],
   ['Rede aérea e ancoragem',[
-    ['Alça pré-formada para drop','un'],['Alça pré-formada para cabo de 48 FO','un'],
+    ['Alça pré-formada para drop','un'],
     ['Abraçadeira de suspensão para cabo AS','un'],['Suporte de reserva técnica para poste','un'],
     ['Conjunto de ancoragem aéreo','un'],['Conjunto de suspensão aéreo','un'],
     ['Manilha de ancoragem','un'],['Parafuso passante para poste','un'],['Porca M12','un'],
     ['Arruela lisa M12','un'],['Cantoneira para poste','un'],['Cinta para poste de concreto','un'],
     ['Isolador para cordoalha','un'],['Grampo para cordoalha','un'],['Esticador para cordoalha','un'],
-    ['Cordoalha dielétrica','m'],['Fita de aço inox 3/4″','m'],['Abraçadeira plástica com proteção UV','un'],
+    ['Cordoalha dielétrica','m'],['Abraçadeira plástica com proteção UV','un'],
     ['Poste','un'],['Protetor de subida de cabo','m']
   ]],
   ['Rede subterrânea e civil',[
@@ -27,13 +27,11 @@ const FTTX_CATALOG=[
     ['Suporte para cabo em caixa subterrânea','un']
   ]],
   ['Distribuição e passivos ópticos',[
-    ['CTO pré-conectorizada','un'],['Caixa de emenda óptica de 48 FO','un'],
-    ['Caixa de emenda óptica de 72 FO','un'],['Caixa de emenda óptica de 144 FO','un'],
+    ['Splitter 1:64 sem conector','un'],['Splitter 1:64 conectorizado SC/APC','un'],
     ['PTO de 1 ou 2 portas','un'],['Roseta óptica','un'],['DIO de 12 FO','un'],['DIO de 24 FO','un'],
     ['DIO de 48 FO','un'],['Bandeja óptica para rack','un'],['Painel de adaptadores ópticos','un'],
-    ['Splitter 1:4','un'],['Splitter 1:32','un'],['Splitter 1:64','un'],
-    ['Splitter desbalanceado','un'],['Adaptador SC/APC','un'],['Adaptador SC/UPC','un'],
-    ['Adaptador LC/UPC','un'],['Pigtail SC/APC','un'],['Pigtail SC/UPC','un'],
+    ['Adaptador SC/APC','un'],['Adaptador SC/UPC','un'],['Adaptador LC/UPC','un'],
+    ['Pigtail SC/APC','un'],['Pigtail SC/UPC','un'],
     ['Cordão óptico SC/APC','un'],['Cordão óptico LC/UPC','un'],
     ['Conector de montagem em campo SC/APC','un'],['Conector de montagem em campo SC/UPC','un'],
     ['Protetor de porta óptica','un'],['Atenuador óptico','un'],

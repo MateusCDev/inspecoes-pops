@@ -156,6 +156,58 @@
 .fttx-review-table .fttx-budget-table { min-width: 27rem; }
 .fttx-review-table .fttx-price-table { min-width: 34rem; }
 
+.fttx-subsection {
+  margin-top: 1rem;
+  padding-top: .85rem;
+  border-top: 1px solid var(--portal-line);
+}
+.fttx-subsection h3 {
+  margin: 0 0 .35rem;
+  font-size: 1rem;
+}
+.fttx-subsection h4 {
+  margin: .75rem 0 .4rem;
+  font-size: .88rem;
+  color: var(--portal-muted);
+}
+.fttx-quick-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+  margin: .55rem 0 .75rem;
+}
+.fttx-ports-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .3rem .65rem;
+  border-radius: 999px;
+  background: #edf7f1;
+  color: #146c43;
+  font-size: .8rem;
+  font-weight: 700;
+}
+.fttx-extras-list {
+  list-style: none;
+  margin: .75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: .4rem;
+}
+.fttx-extras-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  padding: .45rem .65rem;
+  border: 1px solid var(--portal-line);
+  border-radius: .5rem;
+  background: #fff;
+  font-size: .85rem;
+}
+
 @media (max-width: 900px) {
   .fttx-workspace { grid-template-columns: minmax(0, 1fr); }
   .fttx-wizard { position: static; }
